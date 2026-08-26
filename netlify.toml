@@ -1,0 +1,14 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Single-page app with no URL-based routing today (navigation is all
+# in-memory state in App.jsx) — this redirect is just cheap insurance
+# against a 404 on refresh/deep-link if that ever changes.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

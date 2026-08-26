@@ -1,0 +1,209 @@
+import { useEffect, useState } from 'react';
+import { Coins, ArrowUpCircle, ArrowDownCircle, ListChecks } from 'lucide-react';
+import { supabase } from '../lib/supabaseClient';
+import { useAuth } from '../auth/AuthProvider';
+import { isManager } from '../lib/permissions';
+import { bookingTypeLabelHe } from '../lib/bookingColors';
+
+// Reference rate card — informational, matches the official rules.
+// No "partner alone" rate: a Shared/Cyprus sail always requires >=1
+// additional partner to save at all (client-side rule), and the
+// per-participant charge trigger (trg_fn_charge_participant_coins,
+// 0014_coin_quota_system.sql) charges a flat 1 coin/hour regardless of
+// participant count — there was never a solo-rate branch to remove.
+const RATE_CARD_ITEMS = [
+  { label: 'חול (יום)', value: '5 מטבעות/שעה' },
+  { label: 'סופ״ש / חג', value: '10 מטבעות/שעה' },
+  { label: 'לילה / רתיקה', value: '1 מטבע/שעה' },
+  { label: 'שותפים', value: '1 מטבע/שותף/שעה' },
+];
+
+function transactionTitle(t) {
+  if (t.reason === 'quarterly_allowance') return 'חלוקה רבעונית אוטומטית';
+  if (t.reason === 'booking_refund' || t.reason === 'participant_refund') return 'ביטול הזמנה - החזר';
+  if (t.reason === 'booking_charge' || t.reason === 'participant_charge') {
+    const typeLabel = t.bookings?.booking_type ? bookingTypeLabelHe(t.bookings.booking_type) : null;
+    return typeLabel ? `הזמנה: ${typeLabel}` : 'הזמנה';
+  }
+  return t.reason;
+}
+
+export default function CoinsPage() {
+  const { currentUser } = useAuth();
+  const canViewAll = isManager(currentUser);
+
+  const [balance, setBalance] = useState(null);
+  const [transactions, setTransactions] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState(null);
+
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    let isCancelled = false;
+
+    async function fetchData() {
+      setIsLoading(true);
+      setErrorMessage(null);
+
+      // Ensures periods.is_current points at the real current calendar
+      // quarter (and this partner has a wallet row for it) before
+      // reading anything — see 0014_coin_quota_system.sql.
+      const { error: ensureError } = await supabase.rpc('ensure_current_quarter_period');
+      if (ensureError) console.error('Failed to ensure current quarter period', ensureError);
+
+      const { data: period } = await supabase.from('periods').select('id').eq('is_current', true).limit(1).maybeSingle();
+
+      if (period) {
+        const { data: wallet } = await supabase
+          .from('user_wallets')
+          .select('coins_weekend_day, coins_weekend_night, coins_midweek_day, coins_midweek_night')
+          .eq('user_id', currentUser.id)
+          .eq('period_id', period.id)
+          .maybeSingle();
+        if (!isCancelled && wallet) {
+          setBalance(
+            wallet.coins_weekend_day + wallet.coins_weekend_night + wallet.coins_midweek_day + wallet.coins_midweek_night
+          );
+        }
+      }
+
+      // RLS (coin_transactions_select: auth.uid()=user_id or is_manager())
+      // scopes this automatically — a manager sees everyone, a regular
+      // partner only ever sees their own rows, no client-side filter needed.
+      // bookings(...) is embedded for the sail's own type/date, needed to
+      // show "הזמנה: הפלגה פרטית" and the actual sail date, not just when
+      // the coin transaction itself was recorded.
+      const { data, error } = await supabase
+        .from('coin_transactions')
+        .select(
+          'id, delta, reason, related_booking_id, created_at, user_id, users(full_name, email), bookings(booking_type, start_time, end_time)'
+        )
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (isCancelled) return;
+      if (error) {
+        console.error('Failed to load coin transactions', error);
+        setErrorMessage('אירעה שגיאה בטעינת יומן המטבעות.');
+      } else {
+        setTransactions(data);
+      }
+      setIsLoading(false);
+    }
+
+    fetchData();
+    return () => {
+      isCancelled = true;
+    };
+  }, [currentUser?.id]);
+
+  return (
+    <div className="flex flex-col gap-6 p-6" dir="rtl">
+      <header>
+        <h2 className="text-2xl font-bold text-slate-800">המטבעות שלי</h2>
+        <p className="text-sm text-slate-500">
+          {canViewAll ? 'יתרה ויומן תנועות מטבעות - כל השותפים' : 'היתרה והיסטוריית התנועות שלכם'}
+        </p>
+      </header>
+
+      {/* Top section: rates (left) + balance (right) side by side */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <ListChecks size={18} className="text-slate-500" />
+            <h3 className="text-base font-bold text-slate-800">תעריפים</h3>
+          </div>
+          <ul className="flex flex-col divide-y divide-slate-50">
+            {RATE_CARD_ITEMS.map((item) => (
+              <li key={item.label} className="flex items-center justify-between py-2.5 text-sm">
+                <span className="text-slate-600">{item.label}</span>
+                <span className="font-semibold text-slate-800">{item.value}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="rounded-2xl bg-gradient-to-l from-amber-500 to-orange-400 px-6 py-5 shadow-sm text-white flex items-center gap-4">
+          <span className="w-14 h-14 shrink-0 rounded-xl bg-white/20 flex items-center justify-center">
+            <Coins size={26} />
+          </span>
+          <div>
+            <p className="text-sm text-amber-50">יתרת מטבעות</p>
+            <p className="text-4xl font-extrabold leading-tight">{balance ?? '—'}</p>
+            <p className="text-xs text-amber-50 mt-1">מתוך מכסה רבעונית של 400</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom section: transaction history */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="px-5 py-4 border-b border-slate-100">
+          <h3 className="text-base font-bold text-slate-800">היסטוריית עסקאות</h3>
+        </div>
+
+        {isLoading ? (
+          <p className="p-10 text-center text-sm text-slate-400">טוען...</p>
+        ) : errorMessage ? (
+          <p className="p-10 text-center text-sm text-rose-600">{errorMessage}</p>
+        ) : transactions.length === 0 ? (
+          <p className="p-10 text-center text-sm text-slate-400">אין עדיין תנועות מטבעות.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 text-start text-slate-500">
+                  <th className="px-4 py-3 font-medium text-start">תאריך פעולה</th>
+                  {canViewAll && <th className="px-4 py-3 font-medium text-start">שותף</th>}
+                  <th className="px-4 py-3 font-medium text-start">פעולה</th>
+                  <th className="px-4 py-3 font-medium text-start">תאריך הפלגה</th>
+                  <th className="px-4 py-3 font-medium text-start">מטבעות</th>
+                </tr>
+              </thead>
+              <tbody>
+                {transactions.map((t) => (
+                  <tr key={t.id} className="border-b border-slate-50 last:border-0">
+                    <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
+                      {new Date(t.created_at).toLocaleString('he-IL', {
+                        day: 'numeric',
+                        month: 'numeric',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </td>
+                    {canViewAll && (
+                      <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
+                        {t.users?.full_name ?? t.users?.email ?? '—'}
+                      </td>
+                    )}
+                    <td className="px-4 py-3 font-medium text-slate-800">{transactionTitle(t)}</td>
+                    <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
+                      {t.bookings?.start_time
+                        ? new Date(t.bookings.start_time).toLocaleDateString('he-IL', {
+                            day: 'numeric',
+                            month: 'numeric',
+                            year: 'numeric',
+                          })
+                        : '—'}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`inline-flex items-center gap-1 font-semibold ${
+                          t.delta >= 0 ? 'text-emerald-600' : 'text-rose-600'
+                        }`}
+                      >
+                        {t.delta >= 0 ? <ArrowUpCircle size={14} /> : <ArrowDownCircle size={14} />}
+                        {t.delta >= 0 ? '+' : ''}
+                        {t.delta}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,267 @@
+-- =====================================================================
+-- SailShare — Schema reality baseline (documentation, not a migration)
+-- =====================================================================
+-- Confirmed on 2026-08-26 by direct introspection of the live Supabase
+-- project (information_schema.columns, pg_constraint, pg_trigger,
+-- pg_get_functiondef) after 0001-0003 turned out NOT to match what was
+-- actually deployed. This file is the source of truth for "what is
+-- really live" going forward — treat 0001/0002/0003 as historical/
+-- aspirational design notes, not as an accurate description of the
+-- database. Nothing in this file is meant to be executed as a
+-- migration; it's a snapshot for reference so nobody (including a
+-- future session) re-derives this by trial and error again.
+--
+-- STATUS: COMPLETE as of 2026-08-26. Both bookings triggers have been
+-- captured and analyzed (see bottom of file). Neither references a
+-- missing column; both are self-consistent with the real schema above.
+-- =====================================================================
+
+
+-- ---------------------------------------------------------------------
+-- public.users — confirmed columns
+-- ---------------------------------------------------------------------
+-- id          uuid            (FK -> auth.users(id), confirmed via successful RLS-authenticated inserts)
+-- full_name   text
+-- email       text
+-- role        text            -- NOT an enum; free text. 0004 writes 'treasurer' / 'partner' here as plain strings.
+-- created_at  timestamptz
+--
+-- Added by 0004 (confirmed applied 2026-08-26):
+-- phone            text
+-- is_active        boolean not null default true
+-- is_test_account  boolean not null default false
+
+
+-- ---------------------------------------------------------------------
+-- public.periods — confirmed columns
+-- ---------------------------------------------------------------------
+-- id            integer  (int4 — NOT uuid; likely serial/identity, unconfirmed which)
+-- start_date    date
+-- end_date      date
+-- s_multiplier  integer  (NOT numeric, as 0001 assumed)
+-- is_current    boolean
+--
+-- No created_at column exists (0001 assumed one).
+
+
+-- ---------------------------------------------------------------------
+-- public.user_wallets — confirmed columns
+-- ---------------------------------------------------------------------
+-- id                    integer  (int4 — NOT uuid)
+-- user_id               uuid     (FK -> users(id) on delete cascade)
+-- period_id             integer  (int4 — FK -> periods(id) on delete cascade)
+-- coins_weekend_day     integer  (int4 — NOT numeric)
+-- coins_weekend_night   integer
+-- coins_midweek_day     integer
+-- coins_midweek_night   integer
+--
+-- No future_bookings_count column (S-Rule is computed dynamically instead — see below).
+-- No updated_at column.
+-- Constraint: unique (user_id, period_id).
+
+
+-- ---------------------------------------------------------------------
+-- public.bookings — confirmed columns
+-- ---------------------------------------------------------------------
+-- id            integer  (int4 — NOT uuid; 0001 assumed gen_random_uuid())
+-- user_id       uuid     (FK -> users(id) on delete cascade)
+-- start_time    timestamptz
+-- end_time      timestamptz
+-- booking_type  text     -- NOT an enum (0001/0002 both assumed one)
+-- status        text     -- NOT an enum
+-- guests_count  integer
+-- notes         text
+-- created_at    timestamptz
+--
+-- No coins_weekend_day / coins_weekend_night / coins_midweek_day /
+-- coins_midweek_night / total_coins columns exist at all, and there is
+-- no coin-calculation trigger in pg_trigger for this table. Coin cost
+-- is NOT tracked per booking at the DB level — NewBookingModal's coin
+-- breakdown is purely a client-side estimate (coinCalculator.js) with
+-- nothing backing it server-side. Per 2026-08-26 decision: left as-is
+-- for now (no server-side debiting), revisit as a separate feature.
+
+
+-- ---------------------------------------------------------------------
+-- public.bookings — confirmed constraints (pg_constraint, 2026-08-26)
+-- ---------------------------------------------------------------------
+-- bookings_pkey        PRIMARY KEY (id)
+-- bookings_user_id_fkey  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+--
+-- check_valid_duration   CHECK (end_time > start_time)
+--
+-- check_hour_alignment   CHECK (
+--   EXTRACT(minute FROM start_time) = 0 AND EXTRACT(second FROM start_time) = 0
+--   AND EXTRACT(minute FROM end_time) = 0 AND EXTRACT(second FROM end_time) = 0
+-- )
+--   -- Same effect as 0001's date_trunc('hour', x) = x, different spelling.
+--
+-- check_max_24_hours     CHECK (
+--   EXTRACT(epoch FROM (end_time - start_time)) / 3600 <= 24
+-- )
+--
+-- prevent_overlap (EXCLUDE, gist)
+--   EXCLUDE USING gist (tstzrange(start_time, end_time) WITH &&)
+--   WHERE (status = 'Confirmed')
+--
+--   *** DIVERGENCE from 0001, but NOT a bug: 0001's version excludes on
+--   `status <> 'Cancelled'` (protects Confirmed AND Pending_LastMinute
+--   alike). The live constraint only protects rows where status is
+--   LITERALLY 'Confirmed'. Initially flagged as a possible
+--   inconsistency, but check_no_one_hour_gap (below) turns out to use
+--   the exact same 'Confirmed'-only scope — both "does this booking
+--   physically occupy the calendar" rules (overlap + gap) consistently
+--   ignore Pending_LastMinute, while enforce_s_rule's quota count
+--   deliberately includes it. Read together, this is coherent, likely
+--   intentional design: a pending booking reserves the partner's
+--   quota slot immediately, but doesn't yet claim the physical time
+--   slot on the calendar until confirmed. Not treating this as broken;
+--   just documenting it so it isn't re-flagged as a bug later.
+
+
+-- ---------------------------------------------------------------------
+-- public.bookings — confirmed triggers (pg_trigger, 2026-08-26)
+-- ---------------------------------------------------------------------
+-- trg_check_no_one_hour_gap   ENABLED ('O')  -- source NOT YET CAPTURED, see below
+-- trg_enforce_s_rule          ENABLED ('O')  -- source confirmed, reproduced below
+
+
+-- ---------------------------------------------------------------------
+-- Confirmed real source: S-Rule (captured 2026-08-26 via pg_get_functiondef)
+-- ---------------------------------------------------------------------
+-- Reproduced verbatim for reference — this is NOT re-executed by this
+-- file (no CREATE statement below); it already exists live.
+--
+-- Notable, confirmed-correct behavior:
+--   - Skips the check entirely when NEW.status = 'Cancelled'.
+--   - Reads s_multiplier from the is_current period; falls back to 1
+--     (not an error) if no period is marked current — a deliberate
+--     fail-OPEN choice, unlike 0001's fail-CLOSED "raise exception"
+--     when no period exists.
+--   - Counts future bookings for NEW.user_id LIVE via COUNT(*) over
+--     bookings (status IN ('Confirmed','Pending_LastMinute'), start_time
+--     > now(), excluding NEW's own row) rather than a cached counter
+--     column — cannot drift out of sync the way 0001's cached
+--     future_bookings_count could.
+--   - Boundary check (future_count >= current_s * 4) is equivalent to
+--     0001's (count + 1 > max) — correct.
+--
+-- Known gap, not yet fixed (flagged 2026-08-26, low real-world risk for
+-- a small partner group): no row lock / advisory lock, so two
+-- concurrent booking attempts by the same partner sitting exactly at
+-- quota could both read the same future_count before either commits,
+-- letting both through. Fix if it ever matters: add
+-- `perform pg_advisory_xact_lock(hashtext(NEW.user_id::text));` as the
+-- first line of the function body to serialize per-user.
+--
+-- /*
+-- CREATE OR REPLACE FUNCTION public.enforce_s_rule()
+--  RETURNS trigger
+--  LANGUAGE plpgsql
+-- AS $function$
+-- DECLARE
+--   current_s INT;
+--   future_count INT;
+-- BEGIN
+--   IF NEW.status = 'Cancelled' THEN
+--     RETURN NEW;
+--   END IF;
+--
+--   SELECT s_multiplier INTO current_s FROM periods WHERE is_current = true LIMIT 1;
+--   IF current_s IS NULL THEN current_s := 1; END IF;
+--
+--   SELECT COUNT(*) INTO future_count
+--   FROM bookings
+--   WHERE user_id = NEW.user_id
+--     AND start_time > NOW()
+--     AND status IN ('Confirmed', 'Pending_LastMinute')
+--     AND id != COALESCE(NEW.id, -1);
+--
+--   IF future_count >= (current_s * 4) AND NEW.start_time > NOW() THEN
+--     RAISE EXCEPTION '...S-Rule violation message in Hebrew...', (current_s * 4);
+--   END IF;
+--
+--   RETURN NEW;
+-- END;
+-- $function$
+-- */
+
+
+-- ---------------------------------------------------------------------
+-- Confirmed real source: No-Gap Rule (captured 2026-08-26)
+-- ---------------------------------------------------------------------
+-- Function name is check_no_one_hour_gap (trigger name has the trg_
+-- prefix, function does not — same pattern as enforce_s_rule).
+--
+-- Notable, confirmed-correct behavior:
+--   - Skips entirely unless NEW.status = 'Confirmed' — a booking being
+--     inserted/updated as Pending_LastMinute or Cancelled is never
+--     gap-checked. Same scope as prevent_overlap (see above).
+--   - Only compares against OTHER 'Confirmed' bookings too, so it's
+--     internally consistent with prevent_overlap on both sides.
+--   - Uses direct equality point-lookups (end_time = NEW.start_time -
+--     1h, and start_time = NEW.end_time + 1h) rather than 0001's
+--     MAX/MIN-nearest-neighbor approach. These are logically
+--     equivalent given prevent_overlap already guarantees at most one
+--     Confirmed booking can occupy any given instant: if a booking
+--     other than the true nearest neighbor happened to end exactly at
+--     start-1h, it would BE the nearest neighbor by definition. So the
+--     live implementation is a simpler, equally-correct rewrite of the
+--     same rule, not a different rule.
+--   - Global across all partners (not scoped to NEW.user_id), which is
+--     correct for a single shared yacht — the gap is a property of the
+--     calendar, not of any one partner.
+--   - Error text (verbatim, referenced by NewBookingModal.jsx's
+--     friendlyBookingErrorMessage — matched on 'חור של שעה'):
+--     "הזמנה זו יוצרת חור של שעה בדיוק ביומן, דבר שאסור על פי התקנון
+--     (סעיף 90). אנא הרחב את ההזמנה." — this actually cites a real
+--     bylaws section (סעיף 90), which 0001's invented English text
+--     obviously never did.
+--
+-- /*
+-- CREATE OR REPLACE FUNCTION public.check_no_one_hour_gap()
+--  RETURNS trigger
+--  LANGUAGE plpgsql
+-- AS $function$
+-- DECLARE
+--   gap_before INT;
+--   gap_after INT;
+-- BEGIN
+--   IF NEW.status != 'Confirmed' THEN
+--     RETURN NEW;
+--   END IF;
+--
+--   SELECT COUNT(*) INTO gap_before
+--   FROM bookings
+--   WHERE status = 'Confirmed'
+--     AND end_time = NEW.start_time - INTERVAL '1 hour'
+--     AND id != COALESCE(NEW.id, -1);
+--
+--   SELECT COUNT(*) INTO gap_after
+--   FROM bookings
+--   WHERE status = 'Confirmed'
+--     AND start_time = NEW.end_time + INTERVAL '1 hour'
+--     AND id != COALESCE(NEW.id, -1);
+--
+--   IF gap_before > 0 OR gap_after > 0 THEN
+--     RAISE EXCEPTION '...No-Gap message citing סעיף 90...';
+--   END IF;
+--
+--   RETURN NEW;
+-- END;
+-- $function$
+-- */
+
+
+-- ---------------------------------------------------------------------
+-- Bottom line for testing
+-- ---------------------------------------------------------------------
+-- All three rules originally asked about are live and functionally
+-- sound against the real schema:
+--   - No-Gap Rule: check_no_one_hour_gap — confirmed correct.
+--   - S-Rule (max future bookings): enforce_s_rule — confirmed correct,
+--     with one known low-risk concurrency gap (no advisory lock).
+--   - Max 24h / hour-alignment / no-overlap: plain CHECK/EXCLUDE
+--     constraints on bookings — confirmed present, no trigger needed.
+-- Not live: any coin-cost calculation or debiting (no columns, no
+-- trigger). Per 2026-08-26 decision, left alone for now.

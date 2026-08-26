@@ -1,0 +1,90 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-slate-50 text-slate-800 font-sans;
+  }
+}
+
+/* =====================================================================
+   FullCalendar — "Michael's Method" visual coin indicators
+   These target the background events defined in YachtCalendar.jsx.
+   Two-tier weekend/holiday distinction:
+     fc-bg-weekend      — Friday / erev-chag (lighter, partial rest day)
+     fc-bg-weekend-full — Saturday / chag (deeper, full rest day)
+   fc-bg-night tints the 20:00-06:00 rows on every day. Where multiple
+   layers apply (e.g. a chag night) they stack.
+
+   All opacities are kept well under 1 on purpose: FullCalendar draws
+   hour gridlines as table-cell borders *underneath* these background
+   event layers. An opaque wash here can paint over those borders,
+   making the hour lines look "missing" on whichever days the wash
+   covers — this happened once already (fully opaque, Friday/Saturday)
+   so fc-bg-weekend-full's deeper color is reached via a richer hue at
+   a still-translucent opacity, not by pushing toward 1.
+   ===================================================================== */
+.fc-bg-weekend {
+  background-color: #fef08a !important;
+  opacity: 0.45 !important;
+}
+.fc-bg-weekend-full {
+  background-color: #f59e0b !important;
+  opacity: 0.55 !important;
+}
+.fc-bg-night {
+  background-color: rgba(15, 23, 42, 0.16) !important;
+  opacity: 1 !important;
+}
+
+.fc .fc-timegrid-slot-lane {
+  height: 2.25rem;
+}
+.fc .fc-timegrid-axis-frame,
+.fc .fc-col-header-cell-cushion,
+.fc .fc-timegrid-slot-label-cushion {
+  font-family: inherit;
+}
+.fc-theme-standard td,
+.fc-theme-standard th {
+  border-color: rgb(226 232 240) !important;
+}
+.fc-event {
+  border: none !important;
+  border-radius: 0.375rem !important;
+  padding: 1px 4px !important;
+  font-size: 0.75rem !important;
+}
+.fc .fc-toolbar-title {
+  font-size: 1.125rem !important;
+  font-weight: 700;
+}
+
+/* Mobile: the header toolbar (today/prev/next + view switch) has no
+   built-in responsive wrapping, and YachtCalendar's outer container
+   uses overflow-hidden — on a narrow phone the buttons were getting
+   clipped and unusable instead of wrapping onto a second row. */
+@media (max-width: 640px) {
+  .fc .fc-toolbar {
+    flex-wrap: wrap;
+    row-gap: 0.5rem;
+  }
+  .fc .fc-toolbar-chunk {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+  }
+  .fc .fc-toolbar-title {
+    font-size: 1rem !important;
+  }
+  .fc .fc-button {
+    padding: 0.3rem 0.55rem !important;
+    font-size: 0.75rem !important;
+  }
+}

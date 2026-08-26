@@ -1,0 +1,230 @@
+import { useCallback, useMemo, useRef, useState } from 'react';
+import FullCalendar from '@fullcalendar/react';
+import dayGridPlugin from '@fullcalendar/daygrid';
+import timeGridPlugin from '@fullcalendar/timegrid';
+import interactionPlugin from '@fullcalendar/interaction';
+import heLocale from '@fullcalendar/core/locales/he';
+import { getBookingTypeColors, bookingTypeLabelHe } from '../lib/bookingColors';
+import { fetchIsraeliHolidayMap, toDateKey } from '../lib/israeliHolidays';
+
+// Recurring, non-interactive background layers so partners can see at
+// a glance which of the 4 coin types a slot will draw from:
+//  - Friday/erev-chag get a light wash (fc-bg-weekend) — a partial rest
+//    day, still ramping up to Shabbat/chag.
+//  - Saturday/chag get a deeper, more saturated wash (fc-bg-weekend-full)
+//    — the actual full rest day. Same two-tier distinction applies to
+//    holidays below (see holidayMapToBackgroundEvents).
+//  - 20:00-08:00 rows get a dark wash for night hours (matches the
+//    real night rate in 0014_coin_quota_system.sql — was 20:00-06:00
+//    before that migration redefined "night").
+// FullCalendar's display:'background' + daysOfWeek/startTime/endTime
+// is the same mechanism it uses internally for businessHours, so no
+// custom cell-rendering hook is needed; layers stack automatically.
+const WEEKEND_BACKGROUND_EVENTS = [
+  {
+    daysOfWeek: [5], // Friday (יום ו') — erev Shabbat, lighter tier
+    display: 'background',
+    classNames: ['fc-bg-weekend'],
+  },
+  {
+    daysOfWeek: [6], // Saturday (שבת) — full rest day, deeper tier
+    display: 'background',
+    classNames: ['fc-bg-weekend-full'],
+  },
+];
+
+const NIGHT_BACKGROUND_EVENTS = [
+  {
+    daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+    startTime: '20:00',
+    endTime: '24:00',
+    display: 'background',
+    classNames: ['fc-bg-night'],
+  },
+  {
+    daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+    startTime: '00:00',
+    endTime: '08:00',
+    display: 'background',
+    classNames: ['fc-bg-night'],
+  },
+];
+
+function mapBookingToEvent(booking) {
+  const { backgroundColor, borderColor } = getBookingTypeColors(booking.booking_type);
+  return {
+    id: booking.id,
+    title: booking.title,
+    start: booking.start,
+    end: booking.end,
+    backgroundColor,
+    borderColor,
+    extendedProps: {
+      bookingType: booking.booking_type,
+      bookedBy: booking.title,
+      userId: booking.user_id,
+      guestsCount: booking.guests_count,
+      notes: booking.notes,
+    },
+  };
+}
+
+function formatEventClock(date) {
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
+// One all-day background wash per holiday/eve date. Same two-tier
+// distinction as WEEKEND_BACKGROUND_EVENTS above: an actual chag
+// (holiday.type === 'holiday', Saturday-equivalent) gets the deeper
+// fc-bg-weekend-full tier; erev-chag (holiday.type === 'eve', Friday-
+// equivalent) gets the lighter fc-bg-weekend tier.
+//
+// Plain 'YYYY-MM-DD' strings + allDay:true, deliberately NOT
+// Date#toISOString(): that converts to UTC and shifts the boundary by
+// Israel's UTC offset (local midnight becomes ~21:00 the prior day),
+// which a timeGrid view can still paint (the shifted wash still lands
+// somewhere in a 7-day week) but a single Day view or dayGridMonth
+// cannot — Month view specifically needs a clean all-day date match to
+// shade a whole cell, which a UTC-shifted timed range doesn't satisfy.
+// This was the actual cause of holidays showing in Week but not Day/Month.
+function holidayMapToBackgroundEvents(holidayMap) {
+  const events = [];
+  for (const [dateKey, holiday] of holidayMap) {
+    const nextDay = new Date(`${dateKey}T00:00:00`);
+    nextDay.setDate(nextDay.getDate() + 1);
+    events.push({
+      start: dateKey,
+      end: toDateKey(nextDay),
+      allDay: true,
+      display: 'background',
+      classNames: [holiday.type === 'holiday' ? 'fc-bg-weekend-full' : 'fc-bg-weekend'],
+    });
+  }
+  return events;
+}
+
+export default function YachtCalendar({ bookings, onSelectRange, onEventClick }) {
+  const calendarRef = useRef(null);
+  const fetchTokenRef = useRef(0);
+  const [holidayMap, setHolidayMap] = useState(new Map());
+
+  const holidayEvents = useMemo(() => holidayMapToBackgroundEvents(holidayMap), [holidayMap]);
+
+  const events = useMemo(
+    () => [
+      ...WEEKEND_BACKGROUND_EVENTS,
+      ...NIGHT_BACKGROUND_EVENTS,
+      ...holidayEvents,
+      ...bookings.map(mapBookingToEvent),
+    ],
+    [bookings, holidayEvents]
+  );
+
+  const handleDatesSet = useCallback((arg) => {
+    // Pad a week either side so an erev-chag just outside the visible
+    // range (or a holiday whose "eve" background needs the prior day)
+    // is still available without a second fetch on the next nav click.
+    const rangeStart = new Date(arg.start);
+    rangeStart.setDate(rangeStart.getDate() - 7);
+    const rangeEnd = new Date(arg.end);
+    rangeEnd.setDate(rangeEnd.getDate() + 7);
+
+    const token = ++fetchTokenRef.current;
+    fetchIsraeliHolidayMap(rangeStart, rangeEnd)
+      .then((map) => {
+        if (fetchTokenRef.current !== token) return; // a newer request superseded this one
+        setHolidayMap(map);
+      })
+      .catch((err) => {
+        console.error('Failed to load Israeli holidays', err);
+      });
+  }, []);
+
+  return (
+    <div className="flex flex-col h-[calc(100vh-140px)] overflow-hidden bg-white rounded-2xl shadow-sm border border-slate-200 p-2 sm:p-4">
+      <FullCalendar
+        ref={calendarRef}
+        plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+        initialView="timeGridWeek"
+        locale={heLocale}
+        direction="rtl"
+        firstDay={0}
+        headerToolbar={{ start: 'title', center: '', end: 'today prev,next dayGridMonth,timeGridWeek,timeGridDay' }}
+        buttonText={{ month: 'חודשית', week: 'שבועית', day: 'יומית', today: 'היום' }}
+        height="100%"
+        expandRows
+        allDaySlot={false}
+        nowIndicator
+        // Bookings must land exactly on the hour (matches the DB's
+        // bookings_hour_aligned constraint), so slots snap to 1h.
+        slotDuration="01:00:00"
+        snapDuration="01:00:00"
+        slotLabelInterval="01:00"
+        slotMinTime="00:00:00"
+        slotMaxTime="24:00:00"
+        selectable
+        selectMirror
+        select={(info) => onSelectRange(info.start, info.end)}
+        eventClick={(info) => {
+          if (!info.event.extendedProps.bookingType) return; // decorative background washes aren't clickable bookings
+          onEventClick?.(info.event);
+        }}
+        datesSet={handleDatesSet}
+        events={events}
+        eventContent={(arg) => {
+          const { bookingType } = arg.event.extendedProps;
+          if (!bookingType) return null; // decorative weekend/night/holiday background washes
+          const typeLabel = bookingTypeLabelHe(bookingType);
+          return (
+            <div className="px-1.5 py-1 leading-tight overflow-hidden">
+              <div className="font-semibold text-xs truncate">{typeLabel}</div>
+              <div className="text-[11px] opacity-90 truncate">
+                {formatEventClock(arg.event.start)} - {formatEventClock(arg.event.end)}
+              </div>
+            </div>
+          );
+        }}
+        dayHeaderContent={(arg) => {
+          const holiday = holidayMap.get(toDateKey(arg.date));
+          return (
+            <div className="leading-tight py-0.5">
+              <div>{arg.text}</div>
+              {holiday && (
+                <div
+                  className={`text-[10px] font-medium truncate ${
+                    holiday.type === 'holiday' ? 'text-amber-700' : 'text-amber-600'
+                  }`}
+                  title={holiday.label}
+                >
+                  {holiday.label}
+                </div>
+              )}
+            </div>
+          );
+        }}
+        // dayHeaderContent above only fires once per weekday-name column
+        // in dayGridMonth (it shows "א' ב' ג'..." once, not per date), so
+        // Month view needs its own per-cell hook to show the holiday
+        // label under each specific day number.
+        dayCellContent={(arg) => {
+          const holiday = holidayMap.get(toDateKey(arg.date));
+          return (
+            <div className="leading-tight py-0.5 px-1">
+              <div>{arg.dayNumberText}</div>
+              {holiday && (
+                <div
+                  className={`text-[9px] font-medium truncate ${
+                    holiday.type === 'holiday' ? 'text-amber-700' : 'text-amber-600'
+                  }`}
+                  title={holiday.label}
+                >
+                  {holiday.label}
+                </div>
+              )}
+            </div>
+          );
+        }}
+      />
+    </div>
+  );
+}
