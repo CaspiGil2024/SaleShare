@@ -47,5 +47,7 @@ begin
         coins_midweek_night = 0
     where period_id = v_period_id;
 
-  update public.partner_roster set balance = 400;
+  -- where true: intentionally unconditional (resets every partner) —
+  -- required explicitly for the safeupdate extension (see 0019).
+  update public.partner_roster set balance = 400 where true;
 end $$;
