@@ -40,9 +40,9 @@ export default function Dashboard({ onNavigate }) {
       // over would see a stale prior-quarter balance until someone
       // happens to make a booking (the only other thing that calls
       // this). See 0014_coin_quota_system.sql.
-      const { error: ensureError } = await supabase.rpc('ensure_current_quarter_period');
+      const { error: ensureError } = await supabase.rpc('ensure_current_period');
       if (ensureError) {
-        console.error('Failed to ensure current quarter period', ensureError);
+        console.error('Failed to ensure current period', ensureError);
       }
 
       const { data: period } = await supabase

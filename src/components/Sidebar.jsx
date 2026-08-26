@@ -8,10 +8,12 @@ import {
   ListChecks,
   FileBarChart,
   DatabaseBackup,
+  Settings,
   LogOut,
   X,
 } from 'lucide-react';
 import { roleLabelHe } from '../auth/AuthProvider';
+import { isAdminOrTreasurer } from '../lib/permissions';
 
 const NAV_ITEMS = [
   { key: 'dashboard', label: 'לוח בקרה', icon: LayoutDashboard },
@@ -22,6 +24,10 @@ const NAV_ITEMS = [
   { key: 'checklists', label: "צ'קליסטים", icon: ListChecks },
   { key: 'reports', label: 'דוחות', icon: FileBarChart },
   { key: 'maintenance-data', label: 'תחזוקה ונתונים', icon: DatabaseBackup },
+  // Parameters is admin/treasurer-only (0024) — filtered into the
+  // rendered list below rather than removed from this array outright,
+  // so adding another gated item later follows the same pattern.
+  { key: 'parameters', label: 'פרמטרים', icon: Settings, managementOnly: true },
 ];
 
 function UserProfile({ user, onSignOut }) {
@@ -71,7 +77,7 @@ function SidebarContent({ active, onNavigate, user, onSignOut }) {
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {NAV_ITEMS.map((item) => {
+        {NAV_ITEMS.filter((item) => !item.managementOnly || isAdminOrTreasurer(user)).map((item) => {
           const isActive = active === item.key;
           const Icon = item.icon;
           return (

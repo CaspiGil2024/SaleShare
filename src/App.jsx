@@ -11,6 +11,7 @@ import ChecklistsPage from './pages/ChecklistsPage';
 import CoinsPage from './pages/CoinsPage';
 import ReportsPage from './pages/ReportsPage';
 import MaintenanceDataPage from './pages/MaintenanceDataPage';
+import ParametersPage from './pages/ParametersPage';
 
 function AuthenticatedApp() {
   const [active, setActive] = useState('dashboard');
@@ -57,6 +58,7 @@ function AuthenticatedApp() {
           {active === 'coins' && <CoinsPage />}
           {active === 'reports' && <ReportsPage />}
           {active === 'maintenance-data' && <MaintenanceDataPage />}
+          {active === 'parameters' && <ParametersPage />}
         </main>
       </div>
     </div>

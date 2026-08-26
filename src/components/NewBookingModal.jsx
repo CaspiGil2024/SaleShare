@@ -1,20 +1,27 @@
 import { useEffect, useMemo, useState } from 'react';
-import { X, Calendar as CalendarIcon, Clock, Coins as CoinsIcon } from 'lucide-react';
+import { X, Calendar as CalendarIcon, Clock, Coins as CoinsIcon, Anchor } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
-import { calculateBookingCoins, calculateSharedSailCoins, COIN_TYPE_LABELS_HE } from '../lib/coinCalculator';
+import { classifyHours, calculateSharedSailCoins, COIN_TYPE_LABELS_HE } from '../lib/coinCalculator';
 import { BOOKING_TYPE_OPTIONS, chargesCoins } from '../lib/bookingTypes';
 import { fetchIsraeliHolidayMap, syncIsraeliHolidays } from '../lib/israeliHolidays';
 import { friendlyBookingErrorMessage } from '../lib/bookingErrors';
 import PartnerPicker from './PartnerPicker';
 
 const MAX_TOTAL_PARTICIPANTS = 9;
-// Matches check_max_24_hours' Cyprus branch (0013_cyprus_duration.sql):
-// 5-14 days, i.e. 120-336 hours.
+// Matches trg_fn_enforce_day_night_hour_limit's Cyprus branch
+// (0022_michael_method_booking_rules.sql): 5-14 days, i.e. 120-336 hours.
 const CYPRUS_MIN_DURATION_DAYS = 5;
 const CYPRUS_MAX_DURATION_DAYS = 14;
+// §70: a single booking can never need more than 16 day-hours + 8
+// night-hours = 24h total either way, so the dropdown's upper bound
+// stays 24 — the day/16 + night/8 sub-limits (checked below) are what
+// actually narrow it further for a given start time.
+const MAX_STANDARD_DURATION_HOURS = 24;
+const MAX_DAY_HOURS = 16;
+const MAX_NIGHT_HOURS = 8;
 
 const START_HOUR_OPTIONS = Array.from({ length: 24 }, (_, hour) => hour);
-const DURATION_OPTIONS = Array.from({ length: 24 }, (_, i) => i + 1);
+const DURATION_OPTIONS = Array.from({ length: MAX_STANDARD_DURATION_HOURS }, (_, i) => i + 1);
 const CYPRUS_DURATION_DAY_OPTIONS = Array.from(
   { length: CYPRUS_MAX_DURATION_DAYS - CYPRUS_MIN_DURATION_DAYS + 1 },
   (_, i) => CYPRUS_MIN_DURATION_DAYS + i
@@ -25,8 +32,6 @@ function formatHourLabel(hour) {
   return `${String(hour).padStart(2, '0')}:00`;
 }
 
-// Matches the two examples from the spec verbatim: "שעה 1" for the
-// first option, "24 שעות" for the last.
 function formatDurationOptionLabel(hours) {
   return hours === 1 ? 'שעה 1' : `${hours} שעות`;
 }
@@ -35,8 +40,6 @@ function formatDaysLabel(days) {
   return days === 1 ? 'יום 1' : `${days} ימים`;
 }
 
-// Matches the summary-card example verbatim: "1 שעה". Cyprus durations
-// are always whole days (24h multiples), so shown in days instead.
 function formatDurationSummaryLabel(hours, isCyprus) {
   if (isCyprus) return formatDaysLabel(hours / 24);
   return hours === 1 ? '1 שעה' : `${hours} שעות`;
@@ -54,14 +57,25 @@ function buildDateTime(baseDate, hour) {
   return dt;
 }
 
+function formatCoinAmount(n) {
+  const rounded = Math.round(n * 100) / 100;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2);
+}
+
 export default function NewBookingModal({ isOpen, onClose, initialStart, initialEnd, currentUser, onBookingCreated }) {
   const [selectedDate, setSelectedDate] = useState(initialStart ?? new Date());
   const [startHour, setStartHour] = useState(initialStart ? initialStart.getHours() : 9);
   const [durationHours, setDurationHours] = useState(1);
   const [bookingType, setBookingType] = useState('Private');
   const [guestsCount, setGuestsCount] = useState(0);
+  const [isAnchor, setIsAnchor] = useState(false);
   const [notes, setNotes] = useState('');
   const [selectedPartnerIds, setSelectedPartnerIds] = useState([]);
+  // Per-partner guest counts for Shared/Cyprus (§40 — a guest increases
+  // the relative share of whoever brought them, so it has to be
+  // attributed to a specific participant, not one flat number for the
+  // whole booking). Keyed by user_id, including the organizer.
+  const [guestCountByUserId, setGuestCountByUserId] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
 
@@ -74,15 +88,17 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
 
     if (initialEnd) {
       const rawHours = Math.round((initialEnd.getTime() - initialStart.getTime()) / 3_600_000);
-      setDurationHours(Math.min(Math.max(rawHours, 1), 24));
+      setDurationHours(Math.min(Math.max(rawHours, 1), MAX_STANDARD_DURATION_HOURS));
     } else {
       setDurationHours(1);
     }
 
     setBookingType('Private');
     setGuestsCount(0);
+    setIsAnchor(false);
     setNotes('');
     setSelectedPartnerIds([]);
+    setGuestCountByUserId({});
     setErrorMessage(null);
   }, [isOpen, initialStart, initialEnd]);
 
@@ -125,32 +141,54 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
   }, [isOpen, startDateTime.getTime(), endDateTime.getTime()]);
 
   const isCyprusType = bookingType === 'Cyprus';
-  // Cyprus has its own duration bounds (5-14 days, see 0013_cyprus_
-  // duration.sql); every other type keeps the original <=24h rule.
+  const requiresPartners = bookingType === 'Shared' || isCyprusType;
+
   const exceedsMaxDuration = isCyprusType
     ? durationHours > CYPRUS_MAX_DURATION_DAYS * 24
-    : durationHours > 24;
+    : durationHours > MAX_STANDARD_DURATION_HOURS;
   const insufficientCyprusDuration = isCyprusType && durationHours < CYPRUS_MIN_DURATION_DAYS * 24;
-  // Cyprus is a partners sail too — same picker, same minimum-1-partner
-  // and 9-person-cap rules as Shared. Zero-overlap for the whole
-  // duration needs no extra code — prevent_overlap already covers any
-  // booking length.
-  const requiresPartners = bookingType === 'Shared' || isCyprusType;
-  const totalParticipants = 1 + (requiresPartners ? selectedPartnerIds.length : 0) + guestsCount;
+
+  // §70: day-hours <= 16, night-hours <= 8 — client-side estimate of
+  // the same rule trg_fn_enforce_day_night_hour_limit enforces server-
+  // side. Cyprus is exempt (its own 5-14 day rule applies instead).
+  const dayNightBreakdown = useMemo(
+    () => (isCyprusType ? null : classifyHours(startDateTime, endDateTime, new Set(holidayMap.keys()))),
+    [isCyprusType, startDateTime, endDateTime, holidayMap]
+  );
+  const exceedsDayHourLimit =
+    !!dayNightBreakdown && dayNightBreakdown.weekendDay + dayNightBreakdown.midweekDay > MAX_DAY_HOURS;
+  const exceedsNightHourLimit =
+    !!dayNightBreakdown && dayNightBreakdown.weekendNight + dayNightBreakdown.midweekNight > MAX_NIGHT_HOURS;
+
+  function guestCountFor(userId) {
+    return guestCountByUserId[userId] ?? 0;
+  }
+  function setGuestCountFor(userId, count) {
+    setGuestCountByUserId((prev) => ({ ...prev, [userId]: Math.max(0, count) }));
+  }
+
+  const sharedParticipantIds = useMemo(
+    () => (currentUser?.id ? [currentUser.id, ...selectedPartnerIds] : selectedPartnerIds),
+    [currentUser?.id, selectedPartnerIds]
+  );
+  const totalGuestsAcrossParticipants = requiresPartners
+    ? sharedParticipantIds.reduce((sum, id) => sum + guestCountFor(id), 0)
+    : guestsCount;
+  const totalParticipants = requiresPartners
+    ? sharedParticipantIds.length + totalGuestsAcrossParticipants
+    : 1 + guestsCount;
   const exceedsCapacity = totalParticipants > MAX_TOTAL_PARTICIPANTS;
   const missingPartners = requiresPartners && selectedPartnerIds.length === 0;
 
   const coinBreakdown = useMemo(() => {
     if (!chargesCoins(bookingType)) return null;
     if (requiresPartners) {
-      // Flat 1 coin/hour per participant, paid individually — the
-      // organizer is a participant too (see submit handler, which
-      // inserts them into booking_participants alongside the picked
-      // partners), so they're counted here.
-      return { shared: true, ...calculateSharedSailCoins(startDateTime, endDateTime, 1 + selectedPartnerIds.length) };
+      const participants = sharedParticipantIds.map((id) => ({ userId: id, guestCount: guestCountFor(id) }));
+      return { shared: true, ...calculateSharedSailCoins(startDateTime, endDateTime, participants, new Set(holidayMap.keys())) };
     }
-    return { shared: false, ...calculateBookingCoins(startDateTime, endDateTime, new Set(holidayMap.keys())) };
-  }, [bookingType, requiresPartners, startDateTime, endDateTime, holidayMap, selectedPartnerIds.length]);
+    return { shared: false, ...classifyHours(startDateTime, endDateTime, new Set(holidayMap.keys())) };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookingType, requiresPartners, startDateTime, endDateTime, holidayMap, sharedParticipantIds, guestCountByUserId]);
 
   const formattedDateHe = startDateTime.toLocaleDateString('he-IL', {
     weekday: 'long',
@@ -177,12 +215,20 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
       setErrorMessage(
         isCyprusType
           ? `משך שייט לקפריסין לא יכול לעלות על ${CYPRUS_MAX_DURATION_DAYS} ימים.`
-          : 'משך ההפלגה לא יכול לעלות על 24 שעות.'
+          : `משך ההפלגה לא יכול לעלות על ${MAX_STANDARD_DURATION_HOURS} שעות.`
       );
       return;
     }
     if (insufficientCyprusDuration) {
       setErrorMessage(`שייט לקפריסין חייב להימשך לפחות ${CYPRUS_MIN_DURATION_DAYS} ימים.`);
+      return;
+    }
+    if (exceedsDayHourLimit) {
+      setErrorMessage(`הזמנה בודדת מוגבלת ל-${MAX_DAY_HOURS} שעות יום לכל היותר.`);
+      return;
+    }
+    if (exceedsNightHourLimit) {
+      setErrorMessage(`הזמנה בודדת מוגבלת ל-${MAX_NIGHT_HOURS} שעות לילה לכל היותר.`);
       return;
     }
     if (missingPartners) {
@@ -213,45 +259,37 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
         return;
       }
 
-      // The server-side rate function checks public.israeli_holidays
-      // for weekend/holiday classification — it can't call Hebcal
-      // itself mid-transaction, so make sure the dates this booking
-      // actually spans are synced before the insert that needs them.
+      // The server-side classifier checks public.israeli_holidays for
+      // weekend/holiday classification — it can't call Hebcal itself
+      // mid-transaction, so make sure the dates this booking actually
+      // spans are synced before the insert/RPC call that needs them.
       await syncIsraeliHolidays(holidayMap);
 
-      const payload = {
-        user_id: authUser.id,
-        start_time: startDateTime.toISOString(),
-        end_time: endDateTime.toISOString(),
-        booking_type: bookingType,
-        guests_count: guestsCount,
-        notes: notes.trim() ? notes.trim() : null,
-      };
-      const { data: newBooking, error } = await supabase.from('bookings').insert(payload).select('id').single();
-
-      if (error) throw error;
-
       if (requiresPartners) {
-        // The organizer is a participant too — each joining partner
-        // (organizer included) pays their own 1 coin/hour individually
-        // (0014_coin_quota_system.sql), so they need their own row here.
-        const participantUserIds = [authUser.id, ...selectedPartnerIds];
-        const { error: participantsError } = await supabase.from('booking_participants').insert(
-          participantUserIds.map((partnerId) => ({ booking_id: newBooking.id, user_id: partnerId }))
-        );
-        if (participantsError) {
-          // The booking row itself was already created and can't be
-          // rolled back from here (two separate inserts, no shared
-          // transaction) — surface this clearly rather than pretending
-          // it fully succeeded.
-          console.error('Failed to attach partners to booking', participantsError);
-          setErrorMessage(
-            'ההזמנה נוצרה אך אירעה שגיאה בצירוף השותפים: ' + friendlyBookingErrorMessage(participantsError)
-          );
-          await onBookingCreated?.();
-          setSubmitting(false);
-          return;
-        }
+        const participants = sharedParticipantIds.map((id) => ({
+          user_id: id,
+          guest_count: guestCountFor(id),
+        }));
+        const { error } = await supabase.rpc('fn_create_shared_booking', {
+          p_booking_type: bookingType,
+          p_start: startDateTime.toISOString(),
+          p_end: endDateTime.toISOString(),
+          p_notes: notes.trim() ? notes.trim() : null,
+          p_participants: participants,
+        });
+        if (error) throw error;
+      } else {
+        const payload = {
+          user_id: authUser.id,
+          start_time: startDateTime.toISOString(),
+          end_time: endDateTime.toISOString(),
+          booking_type: bookingType,
+          guests_count: guestsCount,
+          notes: notes.trim() ? notes.trim() : null,
+          is_anchor: bookingType === 'Private' ? isAnchor : false,
+        };
+        const { error } = await supabase.from('bookings').insert(payload);
+        if (error) throw error;
       }
 
       // Re-fetch from the DB rather than locally patching in the new
@@ -317,13 +355,22 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
             <p className="text-sm text-rose-600 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2">
               {isCyprusType
                 ? `משך שייט לקפריסין לא יכול לעלות על ${CYPRUS_MAX_DURATION_DAYS} ימים.`
-                : 'משך הפלגה מקסימלי הוא 24 שעות. אנא קצרו את משך ההפלגה.'}
+                : `משך הפלגה מקסימלי הוא ${MAX_STANDARD_DURATION_HOURS} שעות. אנא קצרו את משך ההפלגה.`}
             </p>
           )}
-
           {insufficientCyprusDuration && (
             <p className="text-sm text-rose-600 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2">
               שייט לקפריסין חייב להימשך לפחות {CYPRUS_MIN_DURATION_DAYS} ימים. אנא הגדילו את משך ההפלגה.
+            </p>
+          )}
+          {!exceedsMaxDuration && exceedsDayHourLimit && (
+            <p className="text-sm text-rose-600 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2">
+              הזמנה זו כוללת יותר מ-{MAX_DAY_HOURS} שעות יום. אנא בחרו שעת התחלה/משך אחרים.
+            </p>
+          )}
+          {!exceedsMaxDuration && exceedsNightHourLimit && (
+            <p className="text-sm text-rose-600 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2">
+              הזמנה זו כוללת יותר מ-{MAX_NIGHT_HOURS} שעות לילה. אנא בחרו שעת התחלה/משך אחרים.
             </p>
           )}
 
@@ -335,12 +382,13 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
               onChange={(e) => {
                 const nextType = e.target.value;
                 setBookingType(nextType);
+                if (nextType !== 'Private') setIsAnchor(false);
                 // Switching to/from Cyprus needs a matching duration
                 // unit (days vs hours) — otherwise the day-select would
                 // show a duration that isn't one of its own options.
                 if (nextType === 'Cyprus' && durationHours < CYPRUS_MIN_DURATION_DAYS * 24) {
                   setDurationHours(CYPRUS_MIN_DURATION_DAYS * 24);
-                } else if (nextType !== 'Cyprus' && durationHours > 24) {
+                } else if (nextType !== 'Cyprus' && durationHours > MAX_STANDARD_DURATION_HOURS) {
                   setDurationHours(1);
                 }
               }}
@@ -356,6 +404,23 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
               {BOOKING_TYPE_OPTIONS.find((opt) => opt.value === bookingType)?.helper}
             </p>
           </div>
+
+          {/* Anchor sailing — Private only (§140) */}
+          {bookingType === 'Private' && (
+            <label className="flex items-center gap-2.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isAnchor}
+                onChange={(e) => setIsAnchor(e.target.checked)}
+                className="rounded border-amber-300 text-amber-600 focus:ring-amber-500"
+              />
+              <Anchor size={15} className="text-amber-600 shrink-0" />
+              <span>
+                הפלגת עוגן (אירוע חיים משמעותי) — עד 2 בשנה, פטורה ממגבלת ההזמנות העתידיות (S) אך עדיין
+                מחייבת מטבעות כרגיל.
+              </span>
+            </label>
+          )}
 
           {/* Start time + duration */}
           <div className="grid grid-cols-2 gap-4">
@@ -426,25 +491,58 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
           </div>
 
           {/* Guests */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-slate-700">מספר אורחים</label>
-            <select
-              value={guestsCount}
-              onChange={(e) => setGuestsCount(Number(e.target.value))}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {GUEST_OPTIONS.map((count) => (
-                <option key={count} value={count}>
-                  {formatGuestsLabel(count)}
-                </option>
-              ))}
-            </select>
-            {requiresPartners && (
-              <p className={`text-xs ${exceedsCapacity ? 'text-rose-600 font-medium' : 'text-slate-400'}`}>
-                סה"כ משתתפים (כולל אתכם): {totalParticipants} / {MAX_TOTAL_PARTICIPANTS}
+          {requiresPartners ? (
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-slate-700">אורחים לכל שותף</label>
+              <p className="text-xs text-slate-400">
+                אורח מגדיל את החלק היחסי בעלות של השותף שהביא אותו (סעיף 40).
               </p>
-            )}
-          </div>
+              <div className="flex flex-col gap-1.5">
+                {sharedParticipantIds.map((id) => {
+                  const isSelf = id === currentUser?.id;
+                  return (
+                    <div
+                      key={id}
+                      className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-1.5"
+                    >
+                      <span className="text-sm text-slate-700">
+                        {isSelf ? currentUser?.full_name ?? currentUser?.email ?? 'אני' : id}
+                      </span>
+                      <select
+                        value={guestCountFor(id)}
+                        onChange={(e) => setGuestCountFor(id, Number(e.target.value))}
+                        className="rounded-lg border border-slate-300 px-2 py-1 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        {GUEST_OPTIONS.map((count) => (
+                          <option key={count} value={count}>
+                            {formatGuestsLabel(count)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className={`text-xs ${exceedsCapacity ? 'text-rose-600 font-medium' : 'text-slate-400'}`}>
+                סה"כ משתתפים (כולל אתכם ואורחים): {totalParticipants} / {MAX_TOTAL_PARTICIPANTS}
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-slate-700">מספר אורחים</label>
+              <select
+                value={guestsCount}
+                onChange={(e) => setGuestsCount(Number(e.target.value))}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {GUEST_OPTIONS.map((count) => (
+                  <option key={count} value={count}>
+                    {formatGuestsLabel(count)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Notes */}
           <div className="flex flex-col gap-1.5">
@@ -465,28 +563,34 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
               <span>עלות משוערת</span>
             </div>
             {coinBreakdown ? coinBreakdown.shared ? (
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-medium">
-                  לכל משתתף: {coinBreakdown.perPerson} מטבעות ({coinBreakdown.hours} שעות × 1)
-                </span>
-                <span className="px-2.5 py-1 rounded-full bg-blue-600 text-white text-xs font-semibold">
-                  סה"כ לקבוצה: {coinBreakdown.total} מטבעות
-                </span>
+              <div className="flex flex-col gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  {Object.entries(COIN_TYPE_LABELS_HE).map(([key, label]) =>
+                    coinBreakdown.totalBreakdown[key] > 0 ? (
+                      <span key={key} className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-medium">
+                        {label}: {formatCoinAmount(coinBreakdown.totalBreakdown[key])}
+                      </span>
+                    ) : null
+                  )}
+                  <span className="px-2.5 py-1 rounded-full bg-blue-600 text-white text-xs font-semibold">
+                    סה"כ לקבוצה: {formatCoinAmount(coinBreakdown.totalBreakdown.total)} מטבעות
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500">
+                  {isSelfShareLabel(coinBreakdown, currentUser?.id)}
+                </p>
               </div>
             ) : (
               <div className="flex flex-wrap items-center gap-2">
                 {Object.entries(COIN_TYPE_LABELS_HE).map(([key, label]) =>
                   coinBreakdown[key] > 0 ? (
-                    <span
-                      key={key}
-                      className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-medium"
-                    >
-                      {label}: {coinBreakdown[key]}
+                    <span key={key} className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-medium">
+                      {label}: {formatCoinAmount(coinBreakdown[key])}
                     </span>
                   ) : null
                 )}
                 <span className="px-2.5 py-1 rounded-full bg-blue-600 text-white text-xs font-semibold">
-                  סה"כ {coinBreakdown.total} מטבעות
+                  סה"כ {formatCoinAmount(coinBreakdown.total)} מטבעות
                 </span>
               </div>
             ) : (
@@ -505,7 +609,13 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
             <button
               type="submit"
               disabled={
-                submitting || exceedsMaxDuration || exceedsCapacity || missingPartners || insufficientCyprusDuration
+                submitting ||
+                exceedsMaxDuration ||
+                exceedsDayHourLimit ||
+                exceedsNightHourLimit ||
+                exceedsCapacity ||
+                missingPartners ||
+                insufficientCyprusDuration
               }
               className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed text-white text-sm font-semibold py-2.5 transition-colors"
             >
@@ -527,4 +637,10 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
       </div>
     </div>
   );
+}
+
+function isSelfShareLabel(coinBreakdown, selfId) {
+  const mine = coinBreakdown.perParticipant?.find((p) => p.userId === selfId);
+  if (!mine) return '';
+  return `החלק שלכם (כולל האורחים שהבאתם): ${formatCoinAmount(mine.total)} מטבעות`;
 }

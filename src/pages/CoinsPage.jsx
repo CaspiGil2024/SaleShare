@@ -5,18 +5,33 @@ import { useAuth } from '../auth/AuthProvider';
 import { isManager } from '../lib/permissions';
 import { bookingTypeLabelHe } from '../lib/bookingColors';
 
-// Reference rate card — informational, matches the official rules.
-// No "partner alone" rate: a Shared/Cyprus sail always requires >=1
-// additional partner to save at all (client-side rule), and the
-// per-participant charge trigger (trg_fn_charge_participant_coins,
-// 0014_coin_quota_system.sql) charges a flat 1 coin/hour regardless of
-// participant count — there was never a solo-rate branch to remove.
+// Reference rate card — Michael's Method (§10/30/40,
+// 0021-0024_michael_method_*.sql): every hour costs exactly 1 coin of
+// its OWN type (4 types, not a flat 5/10/1 tier table). A shared sail
+// costs the same total as a private one of that duration would, split
+// proportionally among participants by (1 + their own guest count) —
+// see fn_create_shared_booking. No "partner alone" rate: a Shared/
+// Cyprus sail always requires >=1 additional partner to save at all.
 const RATE_CARD_ITEMS = [
-  { label: 'חול (יום)', value: '5 מטבעות/שעה' },
-  { label: 'סופ״ש / חג', value: '10 מטבעות/שעה' },
-  { label: 'לילה / רתיקה', value: '1 מטבע/שעה' },
-  { label: 'שותפים', value: '1 מטבע/שותף/שעה' },
+  { label: 'אמצ״ש (יום)', value: '1 מטבע אמצ״ש-יום / שעה' },
+  { label: 'אמצ״ש (לילה)', value: '1 מטבע אמצ״ש-לילה / שעה' },
+  { label: 'סופ״ש / חג (יום)', value: '1 מטבע סופ״ש-יום / שעה' },
+  { label: 'סופ״ש / חג (לילה)', value: '1 מטבע סופ״ש-לילה / שעה' },
+  { label: 'הפלגת שותפים', value: 'כמו הפלגה פרטית, מחולק יחסית לפי אורחים לכל שותף' },
 ];
+
+function formatCoinDisplay(n) {
+  if (n === null || n === undefined) return '—';
+  const rounded = Math.round(n * 100) / 100;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2);
+}
+
+const COIN_TYPE_SHORT_LABELS_HE = {
+  weekend_day: 'סופ"ש יום',
+  weekend_night: 'סופ"ש לילה',
+  midweek_day: 'אמצ"ש יום',
+  midweek_night: 'אמצ"ש לילה',
+};
 
 function transactionTitle(t) {
   if (t.reason === 'quarterly_allowance') return 'חלוקה רבעונית אוטומטית';
@@ -32,7 +47,7 @@ export default function CoinsPage() {
   const { currentUser } = useAuth();
   const canViewAll = isManager(currentUser);
 
-  const [balance, setBalance] = useState(null);
+  const [wallet, setWallet] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState(null);
@@ -45,25 +60,23 @@ export default function CoinsPage() {
       setIsLoading(true);
       setErrorMessage(null);
 
-      // Ensures periods.is_current points at the real current calendar
-      // quarter (and this partner has a wallet row for it) before
-      // reading anything — see 0014_coin_quota_system.sql.
-      const { error: ensureError } = await supabase.rpc('ensure_current_quarter_period');
-      if (ensureError) console.error('Failed to ensure current quarter period', ensureError);
+      // Ensures periods.is_current points at the real current 20-week
+      // period (and this partner has a wallet row for it) before
+      // reading anything — see 0024_michael_method_settings_and_overdraft.sql.
+      const { error: ensureError } = await supabase.rpc('ensure_current_period');
+      if (ensureError) console.error('Failed to ensure current period', ensureError);
 
       const { data: period } = await supabase.from('periods').select('id').eq('is_current', true).limit(1).maybeSingle();
 
       if (period) {
-        const { data: wallet } = await supabase
+        const { data: walletRow } = await supabase
           .from('user_wallets')
           .select('coins_weekend_day, coins_weekend_night, coins_midweek_day, coins_midweek_night')
           .eq('user_id', currentUser.id)
           .eq('period_id', period.id)
           .maybeSingle();
-        if (!isCancelled && wallet) {
-          setBalance(
-            wallet.coins_weekend_day + wallet.coins_weekend_night + wallet.coins_midweek_day + wallet.coins_midweek_night
-          );
+        if (!isCancelled && walletRow) {
+          setWallet(walletRow);
         }
       }
 
@@ -76,7 +89,7 @@ export default function CoinsPage() {
       const { data, error } = await supabase
         .from('coin_transactions')
         .select(
-          'id, delta, reason, related_booking_id, created_at, user_id, users(full_name, email), bookings(booking_type, start_time, end_time)'
+          'id, delta, reason, coin_type, related_booking_id, created_at, user_id, users(full_name, email), bookings(booking_type, start_time, end_time)'
         )
         .order('created_at', { ascending: false })
         .limit(100);
@@ -123,15 +136,35 @@ export default function CoinsPage() {
           </ul>
         </div>
 
-        <div className="rounded-2xl bg-gradient-to-l from-amber-500 to-orange-400 px-6 py-5 shadow-sm text-white flex items-center gap-4">
-          <span className="w-14 h-14 shrink-0 rounded-xl bg-white/20 flex items-center justify-center">
-            <Coins size={26} />
-          </span>
-          <div>
-            <p className="text-sm text-amber-50">יתרת מטבעות</p>
-            <p className="text-4xl font-extrabold leading-tight">{balance ?? '—'}</p>
-            <p className="text-xs text-amber-50 mt-1">מתוך מכסה רבעונית של 400</p>
+        <div className="rounded-2xl bg-gradient-to-l from-amber-500 to-orange-400 px-6 py-5 shadow-sm text-white flex flex-col gap-3">
+          <div className="flex items-center gap-3">
+            <span className="w-11 h-11 shrink-0 rounded-xl bg-white/20 flex items-center justify-center">
+              <Coins size={22} />
+            </span>
+            <p className="text-sm text-amber-50">יתרת מטבעות לפי סוג (סעיף 10)</p>
           </div>
+          {wallet ? (
+            <div className="grid grid-cols-2 gap-2.5">
+              <div className="rounded-lg bg-white/15 px-3 py-2">
+                <p className="text-[11px] text-amber-50">אמצ"ש יום</p>
+                <p className="text-xl font-bold">{formatCoinDisplay(wallet.coins_midweek_day)}</p>
+              </div>
+              <div className="rounded-lg bg-white/15 px-3 py-2">
+                <p className="text-[11px] text-amber-50">אמצ"ש לילה</p>
+                <p className="text-xl font-bold">{formatCoinDisplay(wallet.coins_midweek_night)}</p>
+              </div>
+              <div className="rounded-lg bg-white/15 px-3 py-2">
+                <p className="text-[11px] text-amber-50">סופ"ש יום</p>
+                <p className="text-xl font-bold">{formatCoinDisplay(wallet.coins_weekend_day)}</p>
+              </div>
+              <div className="rounded-lg bg-white/15 px-3 py-2">
+                <p className="text-[11px] text-amber-50">סופ"ש לילה</p>
+                <p className="text-xl font-bold">{formatCoinDisplay(wallet.coins_weekend_night)}</p>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-amber-50">טוען...</p>
+          )}
         </div>
       </div>
 
@@ -155,6 +188,7 @@ export default function CoinsPage() {
                   <th className="px-4 py-3 font-medium text-start">תאריך פעולה</th>
                   {canViewAll && <th className="px-4 py-3 font-medium text-start">שותף</th>}
                   <th className="px-4 py-3 font-medium text-start">פעולה</th>
+                  <th className="px-4 py-3 font-medium text-start">סוג מטבע</th>
                   <th className="px-4 py-3 font-medium text-start">תאריך הפלגה</th>
                   <th className="px-4 py-3 font-medium text-start">מטבעות</th>
                 </tr>
@@ -178,6 +212,9 @@ export default function CoinsPage() {
                     )}
                     <td className="px-4 py-3 font-medium text-slate-800">{transactionTitle(t)}</td>
                     <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
+                      {COIN_TYPE_SHORT_LABELS_HE[t.coin_type] ?? '—'}
+                    </td>
+                    <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
                       {t.bookings?.start_time
                         ? new Date(t.bookings.start_time).toLocaleDateString('he-IL', {
                             day: 'numeric',
@@ -194,7 +231,7 @@ export default function CoinsPage() {
                       >
                         {t.delta >= 0 ? <ArrowUpCircle size={14} /> : <ArrowDownCircle size={14} />}
                         {t.delta >= 0 ? '+' : ''}
-                        {t.delta}
+                        {formatCoinDisplay(t.delta)}
                       </span>
                     </td>
                   </tr>

@@ -1,28 +1,24 @@
-// Mirrors public.fn_calculate_standard_cost() / the per-participant
-// flat-rate charge in 0014_coin_quota_system.sql — a client-side
-// *estimate* for instant UI feedback. The database trigger is the real
-// source of truth at insert/update time; this is purely for display.
+// Mirrors public.fn_classify_hours() / trg_fn_charge_booking_coins() /
+// fn_create_shared_booking() (0021-0023_michael_method_*.sql) — a
+// client-side *estimate* for instant UI feedback. The database
+// functions are the real source of truth at insert/update time; this
+// is purely for display and light client-side validation.
 //
-// Rates (from 0014):
-//   night (20:00-08:00, any day)        -> 1 coin/hour  (highest priority)
-//   weekend (Fri/Sat) or holiday, else  -> 10 coin/hour
-//   everything else (weekday daytime)   -> 5 coin/hour
-// Shared/Cyprus don't use this table at all — flat 1 coin/hour per
-// participant, computed directly by the caller (see
-// calculateSharedSailCoins below), no day/night/weekend variation.
+// Michael's Method (§10/30/40): 4 coin types — weekend/weekday ×
+// day/night — each hour costs exactly 1 coin of its own type. A
+// shared sail's total cost is the SAME per-type breakdown a private
+// booking of that duration would get, split among participants
+// proportionally to (1 + their own guest_count) — a guest increases
+// the relative share of whoever brought them, not a flat per-head
+// split.
 //
-// Same assumption as the backend: hours are classified using the
-// browser's local time, which is only correct if the client runs in
-// Asia/Jerusalem. Revisit with a timezone-aware library if SailShare
-// ever needs to support partners booking from abroad.
+// Day/night boundary (20:00-08:00) and weekend/holiday classification
+// match every other rule in this project — Asia/Jerusalem local time,
+// Friday/Saturday + Israeli holidays, same assumption as the backend
+// (browser must run in that timezone for this estimate to be exact).
 const NIGHT_START_HOUR = 20; // 20:00
 const NIGHT_END_HOUR = 8; // 08:00 (exclusive)
 const WEEKEND_DAYS = [5, 6]; // Friday, Saturday
-
-const NIGHT_RATE = 1;
-const WEEKEND_OR_HOLIDAY_RATE = 10;
-const WEEKDAY_RATE = 5;
-const SHARED_SAIL_RATE_PER_PARTICIPANT = 1;
 
 function toDateKey(date) {
   const y = date.getFullYear();
@@ -34,47 +30,64 @@ function toDateKey(date) {
 // holidayDates: optional Set<'YYYY-MM-DD'> of Israeli chag/erev-chag
 // dates (see src/lib/israeliHolidays.js).
 //
-// Returns { night, weekendOrHoliday, weekday, total } — hour counts
-// per rate tier and the total coin cost (for Private/Dockside only;
-// see calculateSharedSailCoins for Shared/Cyprus).
-export function calculateBookingCoins(start, end, holidayDates = new Set()) {
-  const breakdown = { night: 0, weekendOrHoliday: 0, weekday: 0 };
+// Returns { weekendDay, weekendNight, midweekDay, midweekNight, total }
+// — hour counts per coin type (1 coin/hour each, so hours === coins)
+// and the total coin cost.
+export function classifyHours(start, end, holidayDates = new Set()) {
+  const breakdown = { weekendDay: 0, weekendNight: 0, midweekDay: 0, midweekNight: 0 };
 
   const cursor = new Date(start);
   while (cursor < end) {
     const day = cursor.getDay();
     const hour = cursor.getHours();
     const isNight = hour >= NIGHT_START_HOUR || hour < NIGHT_END_HOUR;
-    const isWeekendOrHoliday = WEEKEND_DAYS.includes(day) || holidayDates.has(toDateKey(cursor));
+    const isWeekend = WEEKEND_DAYS.includes(day) || holidayDates.has(toDateKey(cursor));
 
-    if (isNight) breakdown.night += 1;
-    else if (isWeekendOrHoliday) breakdown.weekendOrHoliday += 1;
-    else breakdown.weekday += 1;
+    if (isWeekend && isNight) breakdown.weekendNight += 1;
+    else if (isWeekend) breakdown.weekendDay += 1;
+    else if (isNight) breakdown.midweekNight += 1;
+    else breakdown.midweekDay += 1;
 
     cursor.setHours(cursor.getHours() + 1);
   }
 
-  const total =
-    breakdown.night * NIGHT_RATE +
-    breakdown.weekendOrHoliday * WEEKEND_OR_HOLIDAY_RATE +
-    breakdown.weekday * WEEKDAY_RATE;
-
+  const total = breakdown.weekendDay + breakdown.weekendNight + breakdown.midweekDay + breakdown.midweekNight;
   return { ...breakdown, total };
 }
 
-// Flat 1 coin/hour, per participant (organizer included — see
-// NewBookingModal.jsx/EditBookingModal.jsx, which now insert the
-// organizer into booking_participants too). Returns the cost for ONE
-// participant and the total across everyone, since the UI needs both
-// ("you'll pay X, total across the group is Y").
-export function calculateSharedSailCoins(start, end, participantCount) {
-  const hours = Math.max(0, Math.round((end.getTime() - start.getTime()) / 3_600_000));
-  const perPerson = hours * SHARED_SAIL_RATE_PER_PARTICIPANT;
-  return { hours, perPerson, total: perPerson * participantCount };
+// Same breakdown as a private booking of this duration would get —
+// that IS the shared sail's total cost (§40). Kept as a thin alias so
+// call sites read naturally either way.
+export function calculateBookingCoins(start, end, holidayDates = new Set()) {
+  return classifyHours(start, end, holidayDates);
+}
+
+// participants: [{ userId, guestCount }], must include the organizer.
+// Returns the total breakdown plus each participant's own share
+// (proportional to 1 + their guest_count), for display before submit.
+export function calculateSharedSailCoins(start, end, participants, holidayDates = new Set()) {
+  const totalBreakdown = classifyHours(start, end, holidayDates);
+  const totalShares = participants.reduce((sum, p) => sum + 1 + (p.guestCount ?? 0), 0) || 1;
+
+  const perParticipant = participants.map((p) => {
+    const share = (1 + (p.guestCount ?? 0)) / totalShares;
+    return {
+      userId: p.userId,
+      guestCount: p.guestCount ?? 0,
+      weekendDay: totalBreakdown.weekendDay * share,
+      weekendNight: totalBreakdown.weekendNight * share,
+      midweekDay: totalBreakdown.midweekDay * share,
+      midweekNight: totalBreakdown.midweekNight * share,
+      total: totalBreakdown.total * share,
+    };
+  });
+
+  return { totalBreakdown, perParticipant, totalShares };
 }
 
 export const COIN_TYPE_LABELS_HE = {
-  night: 'לילה (1 מטבע/שעה)',
-  weekendOrHoliday: 'סופ"ש/חג (10 מטבעות/שעה)',
-  weekday: 'יום חול (5 מטבעות/שעה)',
+  weekendDay: 'סופ"ש יום',
+  weekendNight: 'סופ"ש לילה',
+  midweekDay: 'אמצ"ש יום',
+  midweekNight: 'אמצ"ש לילה',
 };

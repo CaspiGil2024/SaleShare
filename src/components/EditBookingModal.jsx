@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { X, Calendar as CalendarIcon, Clock, Coins as CoinsIcon, User } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
-import { calculateBookingCoins, calculateSharedSailCoins, COIN_TYPE_LABELS_HE } from '../lib/coinCalculator';
+import { classifyHours, calculateSharedSailCoins, COIN_TYPE_LABELS_HE } from '../lib/coinCalculator';
 import { BOOKING_TYPE_OPTIONS, chargesCoins } from '../lib/bookingTypes';
 import { bookingTypeLabelHe } from '../lib/bookingColors';
 import { fetchIsraeliHolidayMap, syncIsraeliHolidays } from '../lib/israeliHolidays';
@@ -154,10 +154,14 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
   const coinBreakdown = useMemo(() => {
     if (!chargesCoins(bookingType)) return null;
     if (requiresPartners) {
-      return { shared: true, ...calculateSharedSailCoins(startDateTime, endDateTime, 1 + selectedPartnerIds.length) };
+      // Editing doesn't have per-partner guest inputs yet (see
+      // fn_update_shared_booking's header comment) — estimate assumes
+      // 0 guests for everyone, same as what actually gets charged here.
+      const participants = [booking.user_id, ...selectedPartnerIds].map((id) => ({ userId: id, guestCount: 0 }));
+      return { shared: true, ...calculateSharedSailCoins(startDateTime, endDateTime, participants, new Set(holidayMap.keys())) };
     }
-    return { shared: false, ...calculateBookingCoins(startDateTime, endDateTime, new Set(holidayMap.keys())) };
-  }, [bookingType, requiresPartners, startDateTime, endDateTime, holidayMap, selectedPartnerIds.length]);
+    return { shared: false, ...classifyHours(startDateTime, endDateTime, new Set(holidayMap.keys())) };
+  }, [bookingType, requiresPartners, startDateTime, endDateTime, holidayMap, selectedPartnerIds, booking?.user_id]);
 
   if (!isOpen || !booking) return null;
 
@@ -195,41 +199,51 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
       // newly picked) dates this booking now spans are synced first.
       await syncIsraeliHolidays(holidayMap);
 
-      const { data, error } = await supabase
-        .from('bookings')
-        .update({
-          start_time: startDateTime.toISOString(),
-          end_time: endDateTime.toISOString(),
-          booking_type: bookingType,
-          guests_count: guestsCount,
-          notes: notes.trim() ? notes.trim() : null,
-        })
-        .eq('id', booking.id)
-        .select();
-
-      if (error) throw error;
-      if (!data || data.length === 0) {
-        throw new Error('העדכון לא בוצע בפועל — ייתכן שאין לכם הרשאה לערוך הזמנה זו.');
-      }
-
-      // Simplest correct sync regardless of what changed (partners
-      // added/removed, or booking_type switched away from Shared
-      // entirely): clear whatever's attached, then re-attach the
-      // current selection.
-      const { error: clearError } = await supabase
-        .from('booking_participants')
-        .delete()
-        .eq('booking_id', booking.id);
-      if (clearError) throw clearError;
-
       if (requiresPartners) {
-        // The organizer is a participant too (0014_coin_quota_system.sql
-        // charges each participant, organizer included, individually).
-        const participantUserIds = [booking.user_id, ...selectedPartnerIds];
-        const { error: participantsError } = await supabase
+        // Atomic: updates the booking row, clears + re-attaches
+        // participants, and recomputes/recharges the proportional
+        // per-type cost, all in one transaction — see
+        // fn_update_shared_booking (0025_michael_method_update_shared_
+        // booking_rpc.sql). No per-partner guest editing here yet
+        // (guest_count 0 for everyone), matching the estimate above.
+        const participants = [booking.user_id, ...selectedPartnerIds].map((id) => ({
+          user_id: id,
+          guest_count: 0,
+        }));
+        const { error } = await supabase.rpc('fn_update_shared_booking', {
+          p_booking_id: booking.id,
+          p_booking_type: bookingType,
+          p_start: startDateTime.toISOString(),
+          p_end: endDateTime.toISOString(),
+          p_notes: notes.trim() ? notes.trim() : null,
+          p_participants: participants,
+        });
+        if (error) throw error;
+      } else {
+        const { data, error } = await supabase
+          .from('bookings')
+          .update({
+            start_time: startDateTime.toISOString(),
+            end_time: endDateTime.toISOString(),
+            booking_type: bookingType,
+            guests_count: guestsCount,
+            notes: notes.trim() ? notes.trim() : null,
+          })
+          .eq('id', booking.id)
+          .select();
+
+        if (error) throw error;
+        if (!data || data.length === 0) {
+          throw new Error('העדכון לא בוצע בפועל — ייתכן שאין לכם הרשאה לערוך הזמנה זו.');
+        }
+
+        // Booking_type may have switched AWAY from Shared/Cyprus to a
+        // solo type — clear any leftover participants from before.
+        const { error: clearError } = await supabase
           .from('booking_participants')
-          .insert(participantUserIds.map((partnerId) => ({ booking_id: booking.id, user_id: partnerId })));
-        if (participantsError) throw participantsError;
+          .delete()
+          .eq('booking_id', booking.id);
+        if (clearError) throw clearError;
       }
 
       await onBookingUpdated?.();
@@ -480,11 +494,15 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
               </div>
               {coinBreakdown ? coinBreakdown.shared ? (
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-medium">
-                    לכל משתתף: {coinBreakdown.perPerson} מטבעות ({coinBreakdown.hours} שעות × 1)
-                  </span>
+                  {Object.entries(COIN_TYPE_LABELS_HE).map(([key, label]) =>
+                    coinBreakdown.totalBreakdown[key] > 0 ? (
+                      <span key={key} className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-medium">
+                        {label}: {Math.round(coinBreakdown.totalBreakdown[key] * 100) / 100}
+                      </span>
+                    ) : null
+                  )}
                   <span className="px-2.5 py-1 rounded-full bg-blue-600 text-white text-xs font-semibold">
-                    סה"כ לקבוצה: {coinBreakdown.total} מטבעות
+                    סה"כ לקבוצה: {Math.round(coinBreakdown.totalBreakdown.total * 100) / 100} מטבעות
                   </span>
                 </div>
               ) : (
