@@ -162,6 +162,52 @@ function RowActionsMenu({
   );
 }
 
+function formatCoinAmount(n) {
+  if (n === null || n === undefined) return '0';
+  const rounded = Math.round(n * 100) / 100;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2);
+}
+
+// Michael's Method's 4 coin types (0021+) as a compact 2x2 grid — one
+// small labeled chip per type, so all four fit cleanly in a table row
+// instead of one flat number. A partner with no real account yet (no
+// wallet row — hasn't signed up) falls back to the legacy roster
+// balance as a single "starting point" figure, clearly labeled as such
+// rather than presented as if it were a real per-type balance.
+const COIN_CELLS = [
+  { key: 'coins_weekend_day', label: 'סופ"ש יום', className: 'bg-amber-50 text-amber-700' },
+  { key: 'coins_weekend_night', label: 'סופ"ש לילה', className: 'bg-indigo-50 text-indigo-700' },
+  { key: 'coins_midweek_day', label: 'אמצ"ש יום', className: 'bg-emerald-50 text-emerald-700' },
+  { key: 'coins_midweek_night', label: 'אמצ"ש לילה', className: 'bg-slate-100 text-slate-600' },
+];
+
+function PartnerCoinBalances({ partner }) {
+  if (!partner.wallet) {
+    return (
+      <div className="flex flex-col gap-0.5">
+        <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 text-xs font-medium w-fit">
+          {formatCoinAmount(partner.balance)} מטבעות (טרם נרשם)
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-2 gap-1 w-fit">
+      {COIN_CELLS.map((cell) => (
+        <span
+          key={cell.key}
+          title={cell.label}
+          className={`flex items-center justify-between gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold whitespace-nowrap ${cell.className}`}
+        >
+          <span className="font-normal opacity-80">{cell.label}</span>
+          <span>{formatCoinAmount(partner.wallet[cell.key])}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export default function PartnersPage() {
   const { currentUser } = useAuth();
   const [partners, setPartners] = useState([]);
@@ -172,6 +218,14 @@ export default function PartnersPage() {
   const [historyPartner, setHistoryPartner] = useState(null);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
 
+  // Michael's Method (0021+): real per-type balances live in
+  // user_wallets, keyed by user_id + period_id — partner_roster's old
+  // flat `balance` column no longer feeds them (see
+  // 0028_stop_roster_sync_touching_wallets.sql) and is only ever shown
+  // for a partner who hasn't signed up yet (no user_id to look a
+  // wallet up by at all). ensure_current_period() guarantees the
+  // current period + every real account's wallet row for it exist
+  // before reading — same pattern as Dashboard.jsx/CoinsPage.jsx.
   async function fetchPartners() {
     setIsLoading(true);
     setErrorMessage(null);
@@ -182,9 +236,35 @@ export default function PartnersPage() {
       console.error('Failed to load partners', error);
       setErrorMessage('אירעה שגיאה בטעינת רשימת השותפים.');
       setPartners([]);
-    } else {
-      setPartners(data);
+      setIsLoading(false);
+      return;
     }
+
+    const { error: ensureError } = await supabase.rpc('ensure_current_period');
+    if (ensureError) console.error('Failed to ensure current period', ensureError);
+
+    const { data: users, error: usersError } = await supabase.from('users').select('id, email');
+    if (usersError) console.error('Failed to load user accounts for wallet lookup', usersError);
+    const userIdByEmail = new Map((users ?? []).map((u) => [u.email.toLowerCase(), u.id]));
+
+    const { data: period } = await supabase.from('periods').select('id').eq('is_current', true).limit(1).maybeSingle();
+
+    let walletByUserId = new Map();
+    if (period) {
+      const { data: wallets, error: walletsError } = await supabase
+        .from('user_wallets')
+        .select('user_id, coins_weekend_day, coins_weekend_night, coins_midweek_day, coins_midweek_night')
+        .eq('period_id', period.id);
+      if (walletsError) console.error('Failed to load partner wallets', walletsError);
+      walletByUserId = new Map((wallets ?? []).map((w) => [w.user_id, w]));
+    }
+
+    setPartners(
+      data.map((partner) => {
+        const userId = userIdByEmail.get(partner.email.toLowerCase());
+        return { ...partner, wallet: userId ? walletByUserId.get(userId) ?? null : null };
+      })
+    );
     setIsLoading(false);
   }
 
@@ -334,16 +414,7 @@ export default function PartnersPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      {/*
-                        partner_roster only has one flat `balance` column
-                        (no weekday/weekend split — that lives on
-                        user_wallets, keyed by user_id, which most of
-                        these partners don't have yet). Showing the real
-                        number rather than fabricating a split.
-                      */}
-                      <span className="px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 text-xs font-semibold">
-                        {partner.balance ?? 0} מטבעות
-                      </span>
+                      <PartnerCoinBalances partner={partner} />
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1">

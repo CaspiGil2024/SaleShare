@@ -8,7 +8,6 @@ export default function EditPartnerModal({ isOpen, onClose, partner, onSaved }) 
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [roles, setRoles] = useState([]);
-  const [balance, setBalance] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
 
@@ -20,7 +19,6 @@ export default function EditPartnerModal({ isOpen, onClose, partner, onSaved }) 
     setEmail(partner.email ?? '');
     setPhone(partner.phone ?? '');
     setRoles(partner.roles ?? []);
-    setBalance(partner.balance ?? 0);
     setErrorMessage(null);
   }, [isOpen, partner]);
 
@@ -67,7 +65,6 @@ export default function EditPartnerModal({ isOpen, onClose, partner, onSaved }) 
           email: email.trim(),
           phone: phone.trim() ? phone.trim() : null,
           roles,
-          balance: Number(balance) || 0,
         })
         .eq('email', partner.email)
         .select();
@@ -149,16 +146,19 @@ export default function EditPartnerModal({ isOpen, onClose, partner, onSaved }) 
             0015_partner_freeze_and_delete_gates.sql. Leaving a status
             dropdown in this broader-access form would let
             ceo/lab_tester/maintenance bypass that narrower rule.
+
+            Coin balance is gone from this form too, for the same kind
+            of reason: under Michael's Method (0021+) real per-type
+            balances live in user_wallets, owned exclusively by the
+            period-allocation flow and the audited admin-adjustment
+            tool on the Parameters page (0027) — this form used to
+            write a flat number into partner_roster.balance that
+            fn_apply_partner_roster then piped straight into the
+            midweek_day wallet column, clobbering the real 4-type
+            allocation on every save (fixed in
+            0028_stop_roster_sync_touching_wallets.sql). Adjust a real
+            balance via Parameters, not here.
           */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-slate-700">יתרת מטבעות</label>
-            <input
-              type="number"
-              value={balance}
-              onChange={(e) => setBalance(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
 
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium text-slate-700">תפקידים</label>
