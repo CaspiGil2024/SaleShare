@@ -1,14 +1,138 @@
-import { useState } from 'react';
-import { FileBarChart, History, CalendarClock, Play, Download } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { FileBarChart, History, CalendarClock, Coins, Play, Download } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
-import { useAuth } from '../auth/AuthProvider';
-import { isManager } from '../lib/permissions';
-import { exportActivityReportToXlsx } from '../lib/xlsxExport';
+import { exportActivityReportToXlsx, exportPartnerBalancesToXlsx } from '../lib/xlsxExport';
 
 const TABS = [
   { key: 'past', label: 'דוח פעילות היסטורית', icon: History },
   { key: 'future', label: 'דוח פעילות עתידית', icon: CalendarClock },
+  { key: 'balances', label: 'יתרות שותפים', icon: Coins },
 ];
+
+function formatCoinAmount(n) {
+  if (n === null || n === undefined) return '0';
+  const rounded = Math.round(n * 100) / 100;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2);
+}
+
+// Every partner's real current-period balance across all 4 coin
+// types (0021+). Open to every partner, not just managers — see
+// 0029_open_reports_and_wallet_visibility.sql, which broadened
+// user_wallets' RLS to match; Michael's Method's own equality/
+// low-usage-priority goals depend on this being visible to everyone,
+// same as the activity report above already showing everyone's hours.
+async function fetchPartnerBalances() {
+  const { error: ensureError } = await supabase.rpc('ensure_current_period');
+  if (ensureError) console.error('Failed to ensure current period', ensureError);
+
+  const { data: users, error: usersError } = await supabase
+    .from('users')
+    .select('id, full_name, email')
+    .order('full_name');
+  if (usersError) throw usersError;
+
+  const { data: period } = await supabase.from('periods').select('id').eq('is_current', true).limit(1).maybeSingle();
+  if (!period) return users.map((u) => ({ userId: u.id, name: u.full_name ?? u.email, weekendDay: 0, weekendNight: 0, midweekDay: 0, midweekNight: 0 }));
+
+  const { data: wallets, error: walletsError } = await supabase
+    .from('user_wallets')
+    .select('user_id, coins_weekend_day, coins_weekend_night, coins_midweek_day, coins_midweek_night')
+    .eq('period_id', period.id);
+  if (walletsError) throw walletsError;
+
+  const walletByUserId = new Map(wallets.map((w) => [w.user_id, w]));
+
+  return users.map((u) => {
+    const w = walletByUserId.get(u.id);
+    return {
+      userId: u.id,
+      name: u.full_name ?? u.email,
+      weekendDay: w?.coins_weekend_day ?? 0,
+      weekendNight: w?.coins_weekend_night ?? 0,
+      midweekDay: w?.coins_midweek_day ?? 0,
+      midweekNight: w?.coins_midweek_night ?? 0,
+    };
+  });
+}
+
+function PartnerBalancesTab() {
+  const [rows, setRows] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState(null);
+
+  useEffect(() => {
+    let isCancelled = false;
+    async function load() {
+      setIsLoading(true);
+      setErrorMessage(null);
+      try {
+        const data = await fetchPartnerBalances();
+        if (!isCancelled) setRows(data);
+      } catch (err) {
+        console.error('Failed to load partner balances report', err);
+        if (!isCancelled) setErrorMessage('אירעה שגיאה בטעינת הדוח.');
+      } finally {
+        if (!isCancelled) setIsLoading(false);
+      }
+    }
+    load();
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-slate-400">יתרות נוכחיות לפי סוג מטבע, לתקופה הנוכחית</p>
+        <button
+          type="button"
+          onClick={() => exportPartnerBalancesToXlsx({ rows })}
+          disabled={isLoading || rows.length === 0}
+          className="flex items-center gap-1.5 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-semibold px-4 py-2.5 transition-colors"
+        >
+          <Download size={15} />
+          יצוא ל-EXCEL
+        </button>
+      </div>
+
+      {isLoading ? (
+        <p className="p-10 text-center text-sm text-slate-400">טוען...</p>
+      ) : errorMessage ? (
+        <p className="p-10 text-center text-sm text-rose-600">{errorMessage}</p>
+      ) : rows.length === 0 ? (
+        <p className="p-10 text-center text-sm text-slate-400">אין שותפים רשומים.</p>
+      ) : (
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 text-start text-slate-500">
+                  <th className="px-4 py-3 font-medium text-start">שותף</th>
+                  <th className="px-4 py-3 font-medium text-start">סופ"ש יום</th>
+                  <th className="px-4 py-3 font-medium text-start">סופ"ש לילה</th>
+                  <th className="px-4 py-3 font-medium text-start">אמצ"ש יום</th>
+                  <th className="px-4 py-3 font-medium text-start">אמצ"ש לילה</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.userId} className="border-b border-slate-50 last:border-0">
+                    <td className="px-4 py-3 font-medium text-slate-800 whitespace-nowrap">{r.name}</td>
+                    <td className="px-4 py-3 text-amber-700 font-semibold">{formatCoinAmount(r.weekendDay)}</td>
+                    <td className="px-4 py-3 text-indigo-700 font-semibold">{formatCoinAmount(r.weekendNight)}</td>
+                    <td className="px-4 py-3 text-emerald-700 font-semibold">{formatCoinAmount(r.midweekDay)}</td>
+                    <td className="px-4 py-3 text-slate-600 font-semibold">{formatCoinAmount(r.midweekNight)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function toInputDate(date) {
   return date.toISOString().slice(0, 10);
@@ -208,16 +332,7 @@ function ActivityReportTab({ defaultFrom, defaultTo, reportLabel }) {
 }
 
 export default function ReportsPage() {
-  const { currentUser } = useAuth();
   const [activeTab, setActiveTab] = useState('past');
-
-  if (!isManager(currentUser)) {
-    return (
-      <div className="p-10 text-center text-slate-400" dir="rtl">
-        <p className="text-lg font-medium text-slate-500">דוחות זמינים למנהלים בלבד.</p>
-      </div>
-    );
-  }
 
   return (
     <div className="flex flex-col gap-6 p-6" dir="rtl">
@@ -253,14 +368,15 @@ export default function ReportsPage() {
 
       {/* key= forces a clean remount when switching tabs, so each tab's
           own date-range state doesn't leak into the other's inputs. */}
-      {activeTab === 'past' ? (
+      {activeTab === 'past' && (
         <ActivityReportTab
           key="past"
           defaultFrom={new Date('2024-01-01')}
           defaultTo={new Date()}
           reportLabel="historical-activity"
         />
-      ) : (
+      )}
+      {activeTab === 'future' && (
         <ActivityReportTab
           key="future"
           defaultFrom={new Date()}
@@ -268,6 +384,7 @@ export default function ReportsPage() {
           reportLabel="future-activity"
         />
       )}
+      {activeTab === 'balances' && <PartnerBalancesTab key="balances" />}
     </div>
   );
 }

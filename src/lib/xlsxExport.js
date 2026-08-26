@@ -61,6 +61,25 @@ export function exportActivityReportToXlsx({ rows, fromDate, toDate, reportLabel
   XLSX.writeFile(wb, `SailShare-${safeLabel}-${fromDate}-to-${toDate}.xlsx`);
 }
 
+// All-partners coin-balance report (ReportsPage.jsx's "יתרות שותפים"
+// tab) — the 4 real coin-type balances per partner, current period.
+export function exportPartnerBalancesToXlsx({ rows }) {
+  const wb = XLSX.utils.book_new();
+
+  const sheetRows = rows.map((r) => ({
+    'שותף': r.name,
+    'סופ"ש יום': r.weekendDay,
+    'סופ"ש לילה': r.weekendNight,
+    'אמצ"ש יום': r.midweekDay,
+    'אמצ"ש לילה': r.midweekNight,
+  }));
+  const sheet = XLSX.utils.json_to_sheet(sheetRows);
+  XLSX.utils.book_append_sheet(wb, sheet, 'יתרות שותפים');
+
+  const timestamp = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(wb, `SailShare-partner-balances-${timestamp}.xlsx`);
+}
+
 // One partner's full booking history (organized + participated-in,
 // every status including Cancelled) — used by the "היסטוריית הזמנות"
 // row action in PartnersPage.jsx.
