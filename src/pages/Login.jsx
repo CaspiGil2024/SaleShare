@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Mail, Lock, Sailboat } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider';
-import { phoneToPassword } from '../lib/phonePassword';
 
 function GoogleIcon() {
   return (
@@ -42,14 +41,10 @@ export default function Login() {
     setInfoMessage(null);
     setSubmitting(true);
     try {
-      // Sign-in only: provisioned partner accounts use their phone
-      // number (digits only) as the password, so accept whatever
-      // format they type it in (dashes, spaces, +972...) and normalize
-      // it the same way the provisioning script set it up. Sign-up
-      // keeps whatever real password someone chooses, untouched.
+      // Direct sign-in using the exact password entered without phone masking
       const { error } =
         mode === 'signin'
-          ? await signInWithPassword(email, phoneToPassword(password) || password)
+          ? await signInWithPassword(email, password)
           : await signUpWithPassword(email, password);
       if (error) throw error;
       if (mode === 'signup') {
@@ -127,10 +122,10 @@ export default function Login() {
             <input
               type="password"
               required
-              autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
+              autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder={mode === 'signin' ? 'Phone number (as password)' : 'Password'}
+              placeholder="Password"
               className="w-full rounded-lg bg-blue-50 border border-blue-100 pr-9 pl-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
