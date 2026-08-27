@@ -16,7 +16,7 @@ function currentWeekRange() {
   return { start, end };
 }
 
-export default function SailingStatsChart() {
+export default function SailingStatsChart({ onClick }) {
   const [hoursByDay, setHoursByDay] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState(null);
@@ -83,7 +83,12 @@ export default function SailingStatsChart() {
   const maxHours = Math.max(...(hoursByDay ?? []), 1);
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+    <button
+      type="button"
+      onClick={onClick}
+      title="לחצו למעבר ליומן"
+      className="w-full text-start bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-md hover:border-slate-300 transition-shadow cursor-pointer"
+    >
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-base font-semibold text-slate-800">סטטיסטיקת הפלגות שבועית</h3>
         <span className="text-xs text-slate-400">שעות שיט</span>
@@ -112,6 +117,6 @@ export default function SailingStatsChart() {
           })}
         </div>
       )}
-    </div>
+    </button>
   );
 }

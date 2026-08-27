@@ -125,6 +125,28 @@ export function exportCoinAdjustmentAuditToXlsx({ rows }) {
   XLSX.writeFile(wb, `SailShare-coin-adjustment-audit-${timestamp}.xlsx`);
 }
 
+// Maintenance issues (text data only, per requirement — images are
+// never included in this export).
+export function exportMaintenanceIssuesToXlsx({ rows }) {
+  const wb = XLSX.utils.book_new();
+
+  const sheetRows = rows.map((r) => ({
+    'תקציר': r.summary,
+    'תיאור הבעיה': r.description,
+    'סטטוס': r.status === 'resolved' ? 'נפתרה' : 'פתוחה',
+    'דווח ע"י': r.createdByName ?? '',
+    'תאריך דיווח': r.created_at ? new Date(r.created_at).toLocaleString('he-IL') : '',
+    'פתרון הבעיה': r.resolution_notes ?? '',
+    'נפתרה ע"י': r.resolvedByName ?? '',
+    'תאריך פתרון': r.resolved_at ? new Date(r.resolved_at).toLocaleString('he-IL') : '',
+  }));
+  const sheet = XLSX.utils.json_to_sheet(sheetRows);
+  XLSX.utils.book_append_sheet(wb, sheet, 'תקלות תחזוקה');
+
+  const timestamp = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(wb, `SailShare-maintenance-issues-${timestamp}.xlsx`);
+}
+
 // Sailing & Boat-Closing Log (SailingLogPage.jsx) — every automatic
 // departure/closing entry in the selected date range.
 export function exportSailingLogToXlsx({ rows, fromDate, toDate }) {

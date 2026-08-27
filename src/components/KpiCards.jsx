@@ -16,15 +16,19 @@ const KPI_DEFS = [
   },
 ];
 
-export default function KpiCards({ stats }) {
+// onCardClick(key) — each card opens its own modal on Dashboard.jsx
+// (coin breakdown, upcoming sailings list, open maintenance issues).
+export default function KpiCards({ stats, onCardClick }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       {KPI_DEFS.map((kpi) => {
         const Icon = kpi.icon;
         return (
-          <div
+          <button
             key={kpi.key}
-            className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex items-center gap-4"
+            type="button"
+            onClick={() => onCardClick?.(kpi.key)}
+            className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex items-center gap-4 text-start hover:shadow-md hover:border-slate-300 transition-shadow cursor-pointer"
           >
             <span className={`w-11 h-11 shrink-0 rounded-xl flex items-center justify-center ${kpi.iconClass}`}>
               <Icon size={20} />
@@ -33,7 +37,7 @@ export default function KpiCards({ stats }) {
               <p className="text-xs text-slate-500 truncate">{kpi.label}</p>
               <p className="text-xl font-bold text-slate-800">{stats?.[kpi.key] ?? '—'}</p>
             </div>
-          </div>
+          </button>
         );
       })}
     </div>

@@ -6,9 +6,11 @@ import KpiCards from '../components/KpiCards';
 import WeatherWidget from '../components/WeatherWidget';
 import AnnouncementsPanel from '../components/AnnouncementsPanel';
 import NewBookingModal from '../components/NewBookingModal';
+import CoinBreakdownModal from '../components/CoinBreakdownModal';
+import UpcomingSailingsModal from '../components/UpcomingSailingsModal';
+import OpenMaintenanceIssuesModal from '../components/OpenMaintenanceIssuesModal';
 import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../lib/supabaseClient';
-import { mockKpiStats } from '../data/mockData';
 
 function defaultBookingRange() {
   const start = new Date();
@@ -27,6 +29,9 @@ export default function Dashboard({ onNavigate }) {
   // wipe whatever the user already typed).
   const [bookingRange, setBookingRange] = useState(null);
   const [walletCoins, setWalletCoins] = useState(null); // null while loading — KpiCards shows '—' until then
+  const [upcomingCount, setUpcomingCount] = useState(null);
+  const [openIssuesCount, setOpenIssuesCount] = useState(null);
+  const [openModal, setOpenModal] = useState(null); // null | 'totalCoins' | 'upcomingBookings' | 'openMaintenanceIssues'
 
   useEffect(() => {
     if (!currentUser?.id) return;
@@ -34,12 +39,12 @@ export default function Dashboard({ onNavigate }) {
 
     async function fetchWalletBalance() {
       // Ensures periods.is_current actually points at the real current
-      // calendar quarter (and that this partner has a wallet row for
-      // it, granted the 400-coin allowance) before reading it — without
-      // this, whoever opens the dashboard first after a quarter rolls
-      // over would see a stale prior-quarter balance until someone
-      // happens to make a booking (the only other thing that calls
-      // this). See 0014_coin_quota_system.sql.
+      // 20-week period (and that this partner has a wallet row for it,
+      // granted its allocation) before reading it — without this,
+      // whoever opens the dashboard first after a period rolls over
+      // would see a stale prior-period balance until someone happens
+      // to make a booking (the only other thing that calls this). See
+      // 0021/0024_michael_method_*.sql.
       const { error: ensureError } = await supabase.rpc('ensure_current_period');
       if (ensureError) {
         console.error('Failed to ensure current period', ensureError);
@@ -77,7 +82,27 @@ export default function Dashboard({ onNavigate }) {
       );
     }
 
+    async function fetchKpiCounts() {
+      const [{ count: bookingsCount, error: bookingsError }, { count: issuesCount, error: issuesError }] =
+        await Promise.all([
+          supabase
+            .from('bookings')
+            .select('id', { count: 'exact', head: true })
+            .neq('status', 'Cancelled')
+            .gte('start_time', new Date().toISOString()),
+          supabase.from('maintenance_issues').select('id', { count: 'exact', head: true }).eq('status', 'open'),
+        ]);
+
+      if (isCancelled) return;
+      if (bookingsError) console.error('Failed to count upcoming bookings', bookingsError);
+      else setUpcomingCount(bookingsCount ?? 0);
+
+      if (issuesError) console.error('Failed to count open maintenance issues', issuesError);
+      else setOpenIssuesCount(issuesCount ?? 0);
+    }
+
     fetchWalletBalance();
+    fetchKpiCounts();
 
     return () => {
       isCancelled = true;
@@ -95,9 +120,12 @@ export default function Dashboard({ onNavigate }) {
 
       <WeatherWidget />
 
-      <SailingStatsChart />
+      <SailingStatsChart onClick={() => onNavigate?.('calendar')} />
 
-      <KpiCards stats={{ ...mockKpiStats, totalCoins: walletCoins }} />
+      <KpiCards
+        stats={{ totalCoins: walletCoins, upcomingBookings: upcomingCount, openMaintenanceIssues: openIssuesCount }}
+        onCardClick={setOpenModal}
+      />
 
       <AnnouncementsPanel />
 
@@ -108,6 +136,17 @@ export default function Dashboard({ onNavigate }) {
         initialEnd={bookingRange?.end}
         currentUser={currentUser}
         onBookingCreated={() => setBookingRange(null)}
+      />
+
+      <CoinBreakdownModal
+        isOpen={openModal === 'totalCoins'}
+        onClose={() => setOpenModal(null)}
+        currentUser={currentUser}
+      />
+      <UpcomingSailingsModal isOpen={openModal === 'upcomingBookings'} onClose={() => setOpenModal(null)} />
+      <OpenMaintenanceIssuesModal
+        isOpen={openModal === 'openMaintenanceIssues'}
+        onClose={() => setOpenModal(null)}
       />
     </div>
   );
