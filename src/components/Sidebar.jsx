@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   Anchor,
   LayoutDashboard,
@@ -12,9 +13,11 @@ import {
   BookOpen,
   LogOut,
   X,
+  HelpCircle,
 } from 'lucide-react';
 import { roleLabelHe } from '../auth/AuthProvider';
 import { isAdminOrTreasurer } from '../lib/permissions';
+import WhatsNewModal from './WhatsNewModal';
 
 const NAV_ITEMS = [
   { key: 'dashboard', label: 'לוח בקרה', icon: LayoutDashboard },
@@ -35,6 +38,7 @@ const NAV_ITEMS = [
 ];
 
 function UserProfile({ user, onSignOut }) {
+  const [isWhatsNewOpen, setIsWhatsNewOpen] = useState(false);
   const displayName = user.full_name ?? user.email;
   const initials = displayName
     .split(' ')
@@ -44,24 +48,37 @@ function UserProfile({ user, onSignOut }) {
     .toUpperCase();
 
   return (
-    <div className="flex items-center gap-3 px-3 py-3 rounded-xl bg-slate-50">
-      <div className="w-10 h-10 shrink-0 rounded-full bg-blue-600 text-white flex items-center justify-center font-semibold">
-        {initials}
+    <>
+      <div className="flex items-center gap-3 px-3 py-3 rounded-xl bg-slate-50">
+        <div className="w-10 h-10 shrink-0 rounded-full bg-blue-600 text-white flex items-center justify-center font-semibold">
+          {initials}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-slate-800 truncate">{displayName}</p>
+          <p className="text-xs text-slate-500 truncate">{roleLabelHe(user.role)}</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setIsWhatsNewOpen(true)}
+          title="מה חדש?"
+          aria-label="מה חדש?"
+          className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-200 hover:text-slate-600"
+        >
+          <HelpCircle size={16} />
+        </button>
+        <button
+          type="button"
+          onClick={onSignOut}
+          title="התנתקות"
+          aria-label="התנתקות"
+          className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-200 hover:text-slate-600"
+        >
+          <LogOut size={16} />
+        </button>
       </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold text-slate-800 truncate">{displayName}</p>
-        <p className="text-xs text-slate-500 truncate">{roleLabelHe(user.role)}</p>
-      </div>
-      <button
-        type="button"
-        onClick={onSignOut}
-        title="התנתקות"
-        aria-label="התנתקות"
-        className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-200 hover:text-slate-600"
-      >
-        <LogOut size={16} />
-      </button>
-    </div>
+
+      <WhatsNewModal isOpen={isWhatsNewOpen} onClose={() => setIsWhatsNewOpen(false)} />
+    </>
   );
 }
 
