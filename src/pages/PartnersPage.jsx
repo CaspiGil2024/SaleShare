@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Phone,
   Mail,
@@ -56,7 +57,9 @@ function RowActionsMenu({
   onHardDelete,
 }) {
   const [isOpen, setIsOpen] = useState(false);
-  const containerRef = useRef(null);
+  const [menuPosition, setMenuPosition] = useState(null);
+  const buttonRef = useRef(null);
+  const menuRef = useRef(null);
 
   const isSelf = partner.email?.toLowerCase() === currentUser?.email?.toLowerCase();
   const canEditGeneral = isManager(currentUser);
@@ -64,21 +67,56 @@ function RowActionsMenu({
   const canHardDelete = isAdminRole(currentUser);
   const menuItems = buildMenuItems({ isSelf, canEditGeneral, canFreezeOrSoftDelete, canHardDelete });
 
+  const MENU_WIDTH = 192; // w-48
+
+  // Rendered via a portal into document.body (see below) rather than
+  // as a normally-positioned absolute child — this table sits inside
+  // an overflow-x-auto wrapper (needed for horizontal scroll on
+  // narrow screens), and an absolutely-positioned popover nested
+  // inside an overflow:auto/hidden ancestor gets CLIPPED by that
+  // ancestor regardless of z-index. Computing fixed (viewport-relative)
+  // coordinates from the button's own bounding rect sidesteps that
+  // entirely, and also fixes the menu rendering misaligned near the
+  // table's edges.
+  function openMenu() {
+    const rect = buttonRef.current.getBoundingClientRect();
+    let left = rect.right - MENU_WIDTH; // align menu's end with the button's end (natural RTL placement)
+    left = Math.max(8, Math.min(left, window.innerWidth - MENU_WIDTH - 8));
+    setMenuPosition({ top: rect.bottom + 4, left });
+    setIsOpen(true);
+  }
+
   useEffect(() => {
     if (!isOpen) return;
     function handleClickOutside(e) {
-      if (containerRef.current && !containerRef.current.contains(e.target)) {
+      if (
+        buttonRef.current &&
+        !buttonRef.current.contains(e.target) &&
+        menuRef.current &&
+        !menuRef.current.contains(e.target)
+      ) {
         setIsOpen(false);
       }
     }
     function handleEscape(e) {
       if (e.key === 'Escape') setIsOpen(false);
     }
+    function handleReposition() {
+      setIsOpen(false);
+    }
     document.addEventListener('mousedown', handleClickOutside);
     document.addEventListener('keydown', handleEscape);
+    // capture:true so this also fires for scroll on the table's own
+    // overflow-x-auto container, not just window-level scrolling —
+    // scroll events don't bubble, but capture-phase listeners on
+    // window still see them from any descendant.
+    window.addEventListener('scroll', handleReposition, true);
+    window.addEventListener('resize', handleReposition);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleEscape);
+      window.removeEventListener('scroll', handleReposition, true);
+      window.removeEventListener('resize', handleReposition);
     };
   }, [isOpen]);
 
@@ -128,37 +166,45 @@ function RowActionsMenu({
   }
 
   return (
-    <div ref={containerRef} className="relative">
+    <>
       <button
+        ref={buttonRef}
         type="button"
-        onClick={() => setIsOpen((prev) => !prev)}
+        onClick={() => (isOpen ? setIsOpen(false) : openMenu())}
         aria-label="פעולות נוספות"
         className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600"
       >
         <MoreVertical size={16} />
       </button>
 
-      {isOpen && (
-        <div className="absolute z-10 top-9 start-0 w-48 rounded-xl bg-white border border-slate-200 shadow-lg py-1.5">
-          {menuItems.map((item) => {
-            const Icon = item.icon;
-            return (
-              <button
-                key={item.key}
-                type="button"
-                onClick={() => handleAction(item.key)}
-                className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm text-start hover:bg-slate-50 ${
-                  item.destructive ? 'text-rose-600' : 'text-slate-700'
-                }`}
-              >
-                <Icon size={15} className={item.destructive ? 'text-rose-500' : 'text-slate-400'} />
-                <span>{item.key === 'freeze' && partner.is_frozen ? 'ביטול הקפאה' : item.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
+      {isOpen &&
+        menuPosition &&
+        createPortal(
+          <div
+            ref={menuRef}
+            style={{ position: 'fixed', top: menuPosition.top, left: menuPosition.left, width: MENU_WIDTH }}
+            className="z-50 rounded-xl bg-white border border-slate-200 shadow-lg py-1.5"
+          >
+            {menuItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => handleAction(item.key)}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm text-start hover:bg-slate-50 ${
+                    item.destructive ? 'text-rose-600' : 'text-slate-700'
+                  }`}
+                >
+                  <Icon size={15} className={item.destructive ? 'text-rose-500' : 'text-slate-400'} />
+                  <span>{item.key === 'freeze' && partner.is_frozen ? 'ביטול הקפאה' : item.label}</span>
+                </button>
+              );
+            })}
+          </div>,
+          document.body
+        )}
+    </>
   );
 }
 
@@ -193,16 +239,15 @@ function PartnerCoinBalances({ partner }) {
   }
 
   return (
-    <div className="grid grid-cols-2 gap-1 w-fit">
+    <div className="flex flex-col gap-1 min-w-[130px]">
       {COIN_CELLS.map((cell) => (
-        <span
+        <div
           key={cell.key}
-          title={cell.label}
-          className={`flex items-center justify-between gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold whitespace-nowrap ${cell.className}`}
+          className={`flex items-center justify-between gap-3 px-2.5 py-1 rounded-md text-xs whitespace-nowrap ${cell.className}`}
         >
           <span className="font-normal opacity-80">{cell.label}</span>
-          <span>{formatCoinAmount(partner.wallet[cell.key])}</span>
-        </span>
+          <span className="font-semibold">{formatCoinAmount(partner.wallet[cell.key])}</span>
+        </div>
       ))}
     </div>
   );

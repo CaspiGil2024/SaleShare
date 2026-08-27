@@ -375,9 +375,9 @@ function PartnerBalancesTable({ onAdjusted }) {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-100 text-start text-slate-500">
-                <th className="px-4 py-3 font-medium text-start">שותף</th>
+                <th className="px-4 py-3 font-medium text-start whitespace-nowrap">שותף</th>
                 {COIN_TYPE_OPTIONS.map((opt) => (
-                  <th key={opt.value} className="px-4 py-3 font-medium text-start">
+                  <th key={opt.value} className="px-4 py-3 font-medium text-start whitespace-nowrap min-w-[110px]">
                     {opt.label}
                   </th>
                 ))}
@@ -394,13 +394,13 @@ function PartnerBalancesTable({ onAdjusted }) {
                       const column = COIN_TYPE_COLUMN[opt.value];
                       const currentBalance = wallet ? wallet[column] : 0;
                       return (
-                        <td key={opt.value} className="px-4 py-3">
+                        <td key={opt.value} className="px-4 py-3 whitespace-nowrap">
                           <button
                             type="button"
                             onClick={() =>
                               setEditingCell({ partnerId: p.id, partnerName, coinType: opt.value, currentBalance })
                             }
-                            className="flex items-center gap-1.5 rounded-lg px-2 py-1 hover:bg-amber-50 text-amber-700 font-semibold transition-colors"
+                            className="flex items-center gap-1.5 rounded-lg px-2 py-1 hover:bg-amber-50 text-amber-700 font-semibold transition-colors whitespace-nowrap"
                             title="לחצו לעריכה"
                           >
                             {formatCoinAmount(currentBalance)}
