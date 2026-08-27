@@ -35,13 +35,26 @@ function getDisplayFirstName(currentUser) {
   return 'גיל';
 }
 
+// Based on the viewer's own local clock (new Date().getHours()), not a
+// server/UTC time — matches how every other date/time rule in this app
+// reads "now".
+function getTimeBasedGreeting(hour) {
+  if (hour >= 5 && hour < 12) return 'בוקר טוב';
+  if (hour >= 12 && hour < 17) return 'צהריים טובים';
+  if (hour >= 17 && hour < 21) return 'ערב טוב';
+  return 'לילה טוב'; // 21:00-04:59
+}
+
 export default function WelcomeHeader({ currentUser }) {
   const firstName = getDisplayFirstName(currentUser);
+  const greeting = getTimeBasedGreeting(new Date().getHours());
 
   return (
     <div className="rounded-2xl bg-gradient-to-l from-blue-600 to-sky-500 px-6 py-6 sm:px-8 sm:py-8 shadow-sm">
       <div className="flex items-center gap-3 flex-wrap">
-        <h2 className="text-xl sm:text-2xl font-bold text-white">שלום, {firstName}!</h2>
+        <h2 className="text-xl sm:text-2xl font-bold text-white">
+          {greeting}, {firstName}!
+        </h2>
         <RoleBadge role={currentUser?.role} />
       </div>
       <p className="mt-2 text-sm text-blue-50/90">הנה מה שקורה על הסירה השבוע</p>
