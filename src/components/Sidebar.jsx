@@ -9,6 +9,7 @@ import {
   FileBarChart,
   DatabaseBackup,
   Settings,
+  BookOpen,
   LogOut,
   X,
 } from 'lucide-react';
@@ -23,6 +24,9 @@ const NAV_ITEMS = [
   { key: 'info', label: 'מידע חשוב', icon: Info },
   { key: 'checklists', label: "צ'קליסטים", icon: ListChecks },
   { key: 'reports', label: 'דוחות', icon: FileBarChart },
+  // Universal access, same as reports — every partner should see and
+  // use this, not just managers.
+  { key: 'sailing-log', label: 'יומן הפלגות וסגירת סירה', icon: BookOpen },
   { key: 'maintenance-data', label: 'תחזוקה ונתונים', icon: DatabaseBackup },
   // Parameters is admin/treasurer-only (0024) — filtered into the
   // rendered list below rather than removed from this array outright,

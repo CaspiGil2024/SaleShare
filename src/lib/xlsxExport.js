@@ -125,6 +125,26 @@ export function exportCoinAdjustmentAuditToXlsx({ rows }) {
   XLSX.writeFile(wb, `SailShare-coin-adjustment-audit-${timestamp}.xlsx`);
 }
 
+// Sailing & Boat-Closing Log (SailingLogPage.jsx) — every automatic
+// departure/closing entry in the selected date range.
+export function exportSailingLogToXlsx({ rows, fromDate, toDate }) {
+  const wb = XLSX.utils.book_new();
+
+  const sheetRows = rows.map((r) => ({
+    'תאריך ושעה': r.logged_at ? new Date(r.logged_at).toLocaleString('he-IL') : '',
+    'פעולה': r.actionLabel,
+    'שותף': r.partnerName,
+    'סוג הפלגה': r.bookingTypeLabel,
+    'התחלת הפלגה': r.start_time ? new Date(r.start_time).toLocaleString('he-IL') : '',
+    'סיום הפלגה': r.end_time ? new Date(r.end_time).toLocaleString('he-IL') : '',
+    'סיבה': r.reasonLabel ?? '',
+  }));
+  const sheet = XLSX.utils.json_to_sheet(sheetRows);
+  XLSX.utils.book_append_sheet(wb, sheet, 'יומן הפלגות וסגירת סירה');
+
+  XLSX.writeFile(wb, `SailShare-sailing-log-${fromDate}-to-${toDate}.xlsx`);
+}
+
 // One partner's full booking history (organized + participated-in,
 // every status including Cancelled) — used by the "היסטוריית הזמנות"
 // row action in PartnersPage.jsx.
