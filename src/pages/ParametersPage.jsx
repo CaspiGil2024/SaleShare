@@ -553,7 +553,7 @@ export default function ParametersPage() {
           <Settings size={22} className="text-blue-600" />
           פרמטרים
         </h2>
-        <p className="text-sm text-slate-500">הגדרות מערכת שיטת חלוקת הזמן (שיטת מיכאל)</p>
+        <p className="text-sm text-slate-500">הגדרות מערכת שיטת חלוקת הזמן</p>
       </header>
 
       <SystemSettingsForm currentUser={currentUser} />

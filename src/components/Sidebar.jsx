@@ -94,7 +94,7 @@ function SidebarContent({ active, onNavigate, user, onSignOut }) {
           <Anchor size={24} className="text-white" strokeWidth={2.25} />
         </div>
         <p className="mt-2 text-lg font-extrabold tracking-tight text-blue-900">OBOR</p>
-        <p className="text-xs text-slate-400 mt-1">שיט משותף בשיטת מיכאל</p>
+        <p className="text-xs text-slate-400 mt-1">שיט משותף</p>
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
