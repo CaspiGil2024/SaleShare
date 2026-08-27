@@ -28,6 +28,8 @@ export default function EditPartnerModal({ isOpen, onClose, partner, onSaved }) 
   // account means no calendar to set a default for.
   const [userId, setUserId] = useState(null);
   const [defaultCalendarView, setDefaultCalendarView] = useState(null);
+  const [emailsEnabled, setEmailsEnabled] = useState(false);
+  const [receiveSharedSailNotifications, setReceiveSharedSailNotifications] = useState(false);
   const [calendarViewLoading, setCalendarViewLoading] = useState(false);
 
   // Re-seed the form whenever a different partner is opened for editing.
@@ -42,18 +44,22 @@ export default function EditPartnerModal({ isOpen, onClose, partner, onSaved }) 
 
     setUserId(null);
     setDefaultCalendarView(null);
+    setEmailsEnabled(false);
+    setReceiveSharedSailNotifications(false);
     setCalendarViewLoading(true);
     supabase
       .from('users')
-      .select('id, default_calendar_view')
+      .select('id, default_calendar_view, emails_enabled, receive_shared_sail_notifications')
       .ilike('email', partner.email)
       .maybeSingle()
       .then(({ data, error }) => {
         if (error) {
-          console.error('Failed to load calendar view preference', error);
+          console.error('Failed to load partner account settings', error);
         } else if (data) {
           setUserId(data.id);
           setDefaultCalendarView(data.default_calendar_view);
+          setEmailsEnabled(data.emails_enabled ?? false);
+          setReceiveSharedSailNotifications(data.receive_shared_sail_notifications ?? false);
         }
         setCalendarViewLoading(false);
       });
@@ -113,15 +119,19 @@ export default function EditPartnerModal({ isOpen, onClose, partner, onSaved }) 
         );
       }
 
-      if (userId && defaultCalendarView) {
-        const { data: viewData, error: viewError } = await supabase
+      if (userId) {
+        const { data: settingsData, error: settingsError } = await supabase
           .from('users')
-          .update({ default_calendar_view: defaultCalendarView })
+          .update({
+            default_calendar_view: defaultCalendarView,
+            emails_enabled: emailsEnabled,
+            receive_shared_sail_notifications: emailsEnabled && receiveSharedSailNotifications,
+          })
           .eq('id', userId)
           .select();
-        if (viewError) throw viewError;
-        if (!viewData || viewData.length === 0) {
-          throw new Error('פרטי השותף נשמרו, אך עדכון תצוגת היומן לא בוצע — ייתכן שאין לכם הרשאה לכך.');
+        if (settingsError) throw settingsError;
+        if (!settingsData || settingsData.length === 0) {
+          throw new Error('פרטי השותף נשמרו, אך עדכון הגדרות החשבון לא בוצע — ייתכן שאין לכם הרשאה לכך.');
         }
       }
 
@@ -255,6 +265,32 @@ export default function EditPartnerModal({ isOpen, onClose, partner, onSaved }) 
               </div>
             )}
           </div>
+
+          {!calendarViewLoading && userId && (
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-slate-700">הגדרות שותף</label>
+              <label className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 cursor-pointer hover:bg-slate-50">
+                <input
+                  type="checkbox"
+                  checked={emailsEnabled}
+                  onChange={(e) => setEmailsEnabled(e.target.checked)}
+                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                />
+                שליחת מיילים
+              </label>
+              {emailsEnabled && (
+                <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 ms-6 text-sm text-slate-700 cursor-pointer hover:bg-white">
+                  <input
+                    type="checkbox"
+                    checked={receiveSharedSailNotifications}
+                    onChange={(e) => setReceiveSharedSailNotifications(e.target.checked)}
+                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  קבלת עדכונים על הפלגות שותפים
+                </label>
+              )}
+            </div>
+          )}
 
           {errorMessage && (
             <p className="text-sm text-rose-600 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2">

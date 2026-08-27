@@ -1,0 +1,189 @@
+// =====================================================================
+// SailShare — EmailJS integration (booking confirmation + shared-sail
+// notifications)
+// =====================================================================
+// EmailJS is a BROWSER SDK — it sends mail directly from the client
+// using a public key (by design; that key isn't a secret the way a
+// service-role key is). There is no way to call it from a Postgres
+// trigger (no HTTP client in plpgsql here, and EmailJS doesn't offer a
+// server-callable REST endpoint suited to this without its own paid
+// backend features). So "send on booking creation" is implemented as
+// a plain function call made from NewBookingModal.jsx right after a
+// booking insert/RPC call succeeds — not a database trigger. Emails
+// are fire-and-forget: a failure here is logged and surfaced softly,
+// never blocks or unwinds an already-successful booking.
+//
+// Requires real EmailJS account setup this codebase can't do for you
+// (external SaaS, its own login) — see the 4 VITE_EMAILJS_* env vars
+// below and the template variable names each function documents.
+// Until those are set, every function here no-ops with a console.warn
+// rather than throwing, so a booking still works with email
+// notifications simply not configured yet.
+//
+// EmailJS's free tier caps outgoing mail at 200/month — sending one
+// shared-sail notification per opted-in partner on every shared
+// booking can add up fast with ~21 partners; worth knowing before
+// relying on this at scale.
+// =====================================================================
+
+import emailjs from '@emailjs/browser';
+import { bookingTypeLabelHe } from './bookingColors';
+
+const SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID;
+const PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
+const TEMPLATE_BOOKING_CONFIRMATION = import.meta.env.VITE_EMAILJS_TEMPLATE_BOOKING_CONFIRMATION;
+const TEMPLATE_SHARED_SAIL_NOTIFICATION = import.meta.env.VITE_EMAILJS_TEMPLATE_SHARED_SAIL_NOTIFICATION;
+
+let hasWarnedMissingConfig = false;
+
+function isConfigured() {
+  const configured = Boolean(SERVICE_ID && PUBLIC_KEY);
+  if (!configured && !hasWarnedMissingConfig) {
+    hasWarnedMissingConfig = true;
+    console.warn(
+      'EmailJS is not configured (VITE_EMAILJS_SERVICE_ID / VITE_EMAILJS_PUBLIC_KEY missing) — email notifications are disabled. See .env.example.'
+    );
+  }
+  return configured;
+}
+
+function formatIcsDate(date) {
+  // YYYYMMDDTHHMMSSZ, per RFC 5545 — must be UTC ("Z" suffix).
+  return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+}
+
+// A pre-filled Google Calendar "add event" link — works with zero
+// setup on either end (no attachment support needed), which is why
+// this is the primary "add to calendar" mechanism for these emails
+// rather than a true .ics attachment (EmailJS attachments need their
+// paid plan and a publicly hosted file URL per send, which this
+// project has no server to provide).
+export function buildGoogleCalendarLink({ title, description, startTime, endTime }) {
+  const params = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: title,
+    dates: `${formatIcsDate(new Date(startTime))}/${formatIcsDate(new Date(endTime))}`,
+    details: description ?? '',
+  });
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
+// Raw .ics content, in case it's ever wired into a "download calendar
+// file" link elsewhere in the app (not currently attached to the
+// EmailJS-sent mail itself — see the module header).
+export function buildIcsContent({ title, description, startTime, endTime }) {
+  return [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//SailShare//OBOR//HE',
+    'BEGIN:VEVENT',
+    `UID:${crypto.randomUUID()}@sailshare`,
+    `DTSTAMP:${formatIcsDate(new Date())}`,
+    `DTSTART:${formatIcsDate(new Date(startTime))}`,
+    `DTEND:${formatIcsDate(new Date(endTime))}`,
+    `SUMMARY:${title}`,
+    `DESCRIPTION:${(description ?? '').replace(/\n/g, '\\n')}`,
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].join('\r\n');
+}
+
+function formatHebrewDateTime(iso) {
+  return new Date(iso).toLocaleString('he-IL', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+// Sends the booking-confirmation email to the organizer. No-ops
+// silently (after one console.warn) if EmailJS isn't configured, or if
+// the organizer has emails disabled — callers don't need to check
+// either condition themselves.
+//
+// Template variables this expects to exist in your EmailJS template
+// (VITE_EMAILJS_TEMPLATE_BOOKING_CONFIRMATION):
+//   to_email, to_name, booking_type_label, start_time_he, end_time_he,
+//   duration_hours, google_calendar_link
+export async function sendBookingConfirmationEmail({ toEmail, toName, bookingType, startTime, endTime, emailsEnabled }) {
+  if (!emailsEnabled || !toEmail) return;
+  if (!isConfigured() || !TEMPLATE_BOOKING_CONFIRMATION) return;
+
+  const durationHours = Math.round((new Date(endTime).getTime() - new Date(startTime).getTime()) / 3_600_000);
+  const bookingTypeLabel = bookingTypeLabelHe(bookingType);
+
+  try {
+    await emailjs.send(
+      SERVICE_ID,
+      TEMPLATE_BOOKING_CONFIRMATION,
+      {
+        to_email: toEmail,
+        to_name: toName ?? toEmail,
+        booking_type_label: bookingTypeLabel,
+        start_time_he: formatHebrewDateTime(startTime),
+        end_time_he: formatHebrewDateTime(endTime),
+        duration_hours: durationHours,
+        google_calendar_link: buildGoogleCalendarLink({
+          title: `שיט: ${bookingTypeLabel}`,
+          description: 'הפלגה שנקבעה במערכת OBOR',
+          startTime,
+          endTime,
+        }),
+      },
+      { publicKey: PUBLIC_KEY }
+    );
+  } catch (err) {
+    console.error('Failed to send booking confirmation email', err);
+  }
+}
+
+// Sends the shared-sail notification to every recipient in the list,
+// independently (EmailJS has no batch-send — one call per recipient),
+// via Promise.allSettled so one failed address never blocks the rest.
+// Callers are responsible for filtering the recipient list down to
+// people who actually want mail — see NewBookingModal.jsx, which
+// queries emails_enabled (and, for the "everyone else" audience,
+// receive_shared_sail_notifications too).
+//
+// Template variables (VITE_EMAILJS_TEMPLATE_SHARED_SAIL_NOTIFICATION):
+//   to_email, to_name, organizer_name, booking_type_label,
+//   start_time_he, end_time_he, google_calendar_link
+export async function sendSharedSailNotificationEmails({ recipients, organizerName, bookingType, startTime, endTime }) {
+  if (!recipients?.length) return;
+  if (!isConfigured() || !TEMPLATE_SHARED_SAIL_NOTIFICATION) return;
+
+  const bookingTypeLabel = bookingTypeLabelHe(bookingType);
+  const googleCalendarLink = buildGoogleCalendarLink({
+    title: `שיט שותפים: ${bookingTypeLabel}`,
+    description: `מפליג/ה: ${organizerName}`,
+    startTime,
+    endTime,
+  });
+
+  const results = await Promise.allSettled(
+    recipients.map((r) =>
+      emailjs.send(
+        SERVICE_ID,
+        TEMPLATE_SHARED_SAIL_NOTIFICATION,
+        {
+          to_email: r.email,
+          to_name: r.name ?? r.email,
+          organizer_name: organizerName,
+          booking_type_label: bookingTypeLabel,
+          start_time_he: formatHebrewDateTime(startTime),
+          end_time_he: formatHebrewDateTime(endTime),
+          google_calendar_link: googleCalendarLink,
+        },
+        { publicKey: PUBLIC_KEY }
+      )
+    )
+  );
+
+  const failures = results.filter((r) => r.status === 'rejected');
+  if (failures.length > 0) {
+    console.error(`Failed to send ${failures.length}/${recipients.length} shared-sail notification emails`, failures);
+  }
+}

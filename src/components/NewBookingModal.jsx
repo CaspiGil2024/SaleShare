@@ -5,6 +5,7 @@ import { classifyHours, calculateSharedSailCoins, COIN_TYPE_LABELS_HE } from '..
 import { BOOKING_TYPE_OPTIONS, chargesCoins } from '../lib/bookingTypes';
 import { fetchIsraeliHolidayMap, syncIsraeliHolidays } from '../lib/israeliHolidays';
 import { friendlyBookingErrorMessage } from '../lib/bookingErrors';
+import { sendBookingConfirmationEmail, sendSharedSailNotificationEmails } from '../lib/emailNotifications';
 import PartnerPicker from './PartnerPicker';
 
 const MAX_TOTAL_PARTICIPANTS = 9;
@@ -313,6 +314,62 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
         };
         const { error } = await supabase.from('bookings').insert(payload);
         if (error) throw error;
+      }
+
+      // Fire-and-forget: email sends never gate the already-successful
+      // booking on third-party mail delivery, and run in the background
+      // rather than being awaited so the modal closes immediately. See
+      // src/lib/emailNotifications.js's header for why this is a plain
+      // post-success call rather than a DB trigger (EmailJS is a
+      // browser-only SDK).
+      sendBookingConfirmationEmail({
+        toEmail: authUser.email,
+        toName: currentUser?.full_name,
+        bookingType,
+        startTime: startDateTime.toISOString(),
+        endTime: endDateTime.toISOString(),
+        emailsEnabled: currentUser?.emails_enabled,
+      });
+
+      // §40/spec wording said "shared/group/dockside sail", but
+      // Dockside has never been a multi-partner booking type anywhere
+      // else in this system (no participant list, solo like Private) —
+      // treating that as a wording slip and notifying for the actual
+      // multi-partner types (Shared/Cyprus, i.e. requiresPartners) only.
+      if (requiresPartners) {
+        (async () => {
+          try {
+            const { data: participantUsers } = await supabase
+              .from('users')
+              .select('id, email, full_name, emails_enabled')
+              .in('id', selectedPartnerIds.length > 0 ? selectedPartnerIds : [authUser.id]);
+
+            const { data: interestedPartners } = await supabase
+              .from('users')
+              .select('id, email, full_name')
+              .eq('emails_enabled', true)
+              .eq('receive_shared_sail_notifications', true);
+
+            const excludedIds = new Set([authUser.id, ...selectedPartnerIds]);
+            const recipientsById = new Map();
+            for (const u of participantUsers ?? []) {
+              if (u.emails_enabled) recipientsById.set(u.id, { email: u.email, name: u.full_name ?? u.email });
+            }
+            for (const u of interestedPartners ?? []) {
+              if (!excludedIds.has(u.id)) recipientsById.set(u.id, { email: u.email, name: u.full_name ?? u.email });
+            }
+
+            await sendSharedSailNotificationEmails({
+              recipients: Array.from(recipientsById.values()),
+              organizerName: currentUser?.full_name ?? authUser.email,
+              bookingType,
+              startTime: startDateTime.toISOString(),
+              endTime: endDateTime.toISOString(),
+            });
+          } catch (err) {
+            console.error('Failed to send shared-sail notification emails', err);
+          }
+        })();
       }
 
       // Re-fetch from the DB rather than locally patching in the new

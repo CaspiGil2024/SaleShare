@@ -56,7 +56,7 @@ export function AuthProvider({ children }) {
     setProfileLoading(true);
     supabase
       .from('users')
-      .select('id, full_name, email, role, default_calendar_view')
+      .select('id, full_name, email, role, default_calendar_view, emails_enabled, receive_shared_sail_notifications')
       .eq('id', authUser.id)
       .single()
       .then(({ data, error }) => {
@@ -121,6 +121,8 @@ export function AuthProvider({ children }) {
         full_name: profile?.full_name ?? null,
         role: profile?.role ?? 'partner',
         default_calendar_view: profile?.default_calendar_view ?? 'week',
+        emails_enabled: profile?.emails_enabled ?? false,
+        receive_shared_sail_notifications: profile?.receive_shared_sail_notifications ?? false,
         roles,
       }
     : null;
