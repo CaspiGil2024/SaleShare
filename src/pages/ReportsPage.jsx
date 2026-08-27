@@ -161,7 +161,9 @@ async function fetchPartnerActivity(fromDate, toDate) {
 
   const { data: standardBookings, error: bookingsError } = await supabase
     .from('bookings')
-    .select('user_id, start_time, end_time, booking_type, coins_charged, booker:users(full_name, email)')
+    .select(
+      'user_id, start_time, end_time, booking_type, coins_charged, coins_charged_weekend_day, coins_charged_weekend_night, coins_charged_midweek_day, coins_charged_midweek_night, booker:users(full_name, email)'
+    )
     .neq('status', 'Cancelled')
     .not('booking_type', 'in', '(Shared,Cyprus)')
     .gte('start_time', fromIso)
@@ -171,7 +173,7 @@ async function fetchPartnerActivity(fromDate, toDate) {
   const { data: participantRows, error: participantsError } = await supabase
     .from('booking_participants')
     .select(
-      'user_id, coins_charged, users(full_name, email), bookings!inner(start_time, end_time, status, booking_type, user_id)'
+      'user_id, coins_charged, coins_charged_weekend_day, coins_charged_weekend_night, coins_charged_midweek_day, coins_charged_midweek_night, users(full_name, email), bookings!inner(start_time, end_time, status, booking_type, user_id)'
     )
     .gte('bookings.start_time', fromIso)
     .lte('bookings.start_time', toIso)
@@ -200,6 +202,12 @@ async function fetchPartnerActivity(fromDate, toDate) {
       end_time: b.end_time,
       hours,
       coins: b.coins_charged ?? 0,
+      coinBreakdown: {
+        weekendDay: b.coins_charged_weekend_day ?? 0,
+        weekendNight: b.coins_charged_weekend_night ?? 0,
+        midweekDay: b.coins_charged_midweek_day ?? 0,
+        midweekNight: b.coins_charged_midweek_night ?? 0,
+      },
     });
   }
 
@@ -216,6 +224,12 @@ async function fetchPartnerActivity(fromDate, toDate) {
       end_time: p.bookings.end_time,
       hours,
       coins: p.coins_charged ?? 0,
+      coinBreakdown: {
+        weekendDay: p.coins_charged_weekend_day ?? 0,
+        weekendNight: p.coins_charged_weekend_night ?? 0,
+        midweekDay: p.coins_charged_midweek_day ?? 0,
+        midweekNight: p.coins_charged_midweek_night ?? 0,
+      },
     });
   }
 
@@ -407,7 +421,10 @@ function ActivityReportTab({ defaultFrom, defaultTo, reportLabel }) {
                     <th className="px-4 py-2 font-medium text-start">התחלה</th>
                     <th className="px-4 py-2 font-medium text-start">סיום</th>
                     <th className="px-4 py-2 font-medium text-start">שעות</th>
-                    <th className="px-4 py-2 font-medium text-start">מטבעות</th>
+                    <th className="px-4 py-2 font-medium text-start whitespace-nowrap">סופ"ש יום</th>
+                    <th className="px-4 py-2 font-medium text-start whitespace-nowrap">סופ"ש לילה</th>
+                    <th className="px-4 py-2 font-medium text-start whitespace-nowrap">אמצ"ש יום</th>
+                    <th className="px-4 py-2 font-medium text-start whitespace-nowrap">אמצ"ש לילה</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -434,7 +451,18 @@ function ActivityReportTab({ defaultFrom, defaultTo, reportLabel }) {
                         })}
                       </td>
                       <td className="px-4 py-2 text-slate-600">{e.hours.toFixed(1)}</td>
-                      <td className="px-4 py-2 text-amber-700 font-semibold">{e.coins}</td>
+                      <td className="px-4 py-2 text-amber-700 font-medium whitespace-nowrap">
+                        {e.coinBreakdown.weekendDay || '—'}
+                      </td>
+                      <td className="px-4 py-2 text-indigo-700 font-medium whitespace-nowrap">
+                        {e.coinBreakdown.weekendNight || '—'}
+                      </td>
+                      <td className="px-4 py-2 text-emerald-700 font-medium whitespace-nowrap">
+                        {e.coinBreakdown.midweekDay || '—'}
+                      </td>
+                      <td className="px-4 py-2 text-slate-600 font-medium whitespace-nowrap">
+                        {e.coinBreakdown.midweekNight || '—'}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

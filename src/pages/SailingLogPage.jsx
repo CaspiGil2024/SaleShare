@@ -17,14 +17,64 @@ function toInputDate(date) {
   return date.toISOString().slice(0, 10);
 }
 
+const ZERO_BREAKDOWN = { weekendDay: 0, weekendNight: 0, midweekDay: 0, midweekNight: 0 };
+
+// Coin-type breakdown per TRIP (booking_id), not per log entry — the
+// same booking can have both a 'departure' and a later 'closing' row,
+// and they share the same underlying charge. Total per type = that
+// booking's own coins_charged_* (real for Private/Dockside/Maintenance,
+// always 0 for Shared/Cyprus) + the SUM of every participant's
+// coins_charged_* for that booking (real for Shared/Cyprus, empty for
+// the others) — same formula MaintenanceDataPage.jsx's DB export
+// already uses, safe against double-counting either way.
+async function fetchCoinBreakdownByBookingId(bookingIds) {
+  const breakdownByBookingId = new Map();
+  if (bookingIds.length === 0) return breakdownByBookingId;
+
+  const { data: bookingRows, error: bookingsError } = await supabase
+    .from('bookings')
+    .select('id, coins_charged_weekend_day, coins_charged_weekend_night, coins_charged_midweek_day, coins_charged_midweek_night')
+    .in('id', bookingIds);
+  if (bookingsError) throw bookingsError;
+
+  for (const b of bookingRows) {
+    breakdownByBookingId.set(b.id, {
+      weekendDay: b.coins_charged_weekend_day ?? 0,
+      weekendNight: b.coins_charged_weekend_night ?? 0,
+      midweekDay: b.coins_charged_midweek_day ?? 0,
+      midweekNight: b.coins_charged_midweek_night ?? 0,
+    });
+  }
+
+  const { data: participantRows, error: participantsError } = await supabase
+    .from('booking_participants')
+    .select('booking_id, coins_charged_weekend_day, coins_charged_weekend_night, coins_charged_midweek_day, coins_charged_midweek_night')
+    .in('booking_id', bookingIds);
+  if (participantsError) throw participantsError;
+
+  for (const p of participantRows) {
+    const entry = breakdownByBookingId.get(p.booking_id) ?? { ...ZERO_BREAKDOWN };
+    entry.weekendDay += p.coins_charged_weekend_day ?? 0;
+    entry.weekendNight += p.coins_charged_weekend_night ?? 0;
+    entry.midweekDay += p.coins_charged_midweek_day ?? 0;
+    entry.midweekNight += p.coins_charged_midweek_night ?? 0;
+    breakdownByBookingId.set(p.booking_id, entry);
+  }
+
+  return breakdownByBookingId;
+}
+
 async function fetchSailingLog(fromDate, toDate) {
   const { data, error } = await supabase
     .from('sailing_log')
-    .select('id, action, reason, booking_type, start_time, end_time, logged_at, users(full_name, email)')
+    .select('id, booking_id, action, reason, booking_type, start_time, end_time, logged_at, users(full_name, email)')
     .gte('logged_at', fromDate.toISOString())
     .lte('logged_at', toDate.toISOString())
     .order('logged_at', { ascending: false });
   if (error) throw error;
+
+  const bookingIds = [...new Set(data.map((r) => r.booking_id).filter((id) => id !== null))];
+  const breakdownByBookingId = await fetchCoinBreakdownByBookingId(bookingIds);
 
   return data.map((r) => ({
     id: r.id,
@@ -36,6 +86,7 @@ async function fetchSailingLog(fromDate, toDate) {
     bookingTypeLabel: r.booking_type ? bookingTypeLabelHe(r.booking_type) : '—',
     start_time: r.start_time,
     end_time: r.end_time,
+    coins: breakdownByBookingId.get(r.booking_id) ?? ZERO_BREAKDOWN,
   }));
 }
 
@@ -139,6 +190,10 @@ export default function SailingLogPage() {
                   <th className="px-4 py-3 font-medium text-start">התחלת הפלגה</th>
                   <th className="px-4 py-3 font-medium text-start">סיום הפלגה</th>
                   <th className="px-4 py-3 font-medium text-start">סיבה</th>
+                  <th className="px-4 py-3 font-medium text-start whitespace-nowrap">סופ"ש יום</th>
+                  <th className="px-4 py-3 font-medium text-start whitespace-nowrap">סופ"ש לילה</th>
+                  <th className="px-4 py-3 font-medium text-start whitespace-nowrap">אמצ"ש יום</th>
+                  <th className="px-4 py-3 font-medium text-start whitespace-nowrap">אמצ"ש לילה</th>
                 </tr>
               </thead>
               <tbody>
@@ -185,6 +240,18 @@ export default function SailingLogPage() {
                         : '—'}
                     </td>
                     <td className="px-4 py-3 text-slate-500">{r.reasonLabel ?? '—'}</td>
+                    <td className="px-4 py-3 text-amber-700 font-medium whitespace-nowrap">
+                      {r.coins.weekendDay || '—'}
+                    </td>
+                    <td className="px-4 py-3 text-indigo-700 font-medium whitespace-nowrap">
+                      {r.coins.weekendNight || '—'}
+                    </td>
+                    <td className="px-4 py-3 text-emerald-700 font-medium whitespace-nowrap">
+                      {r.coins.midweekDay || '—'}
+                    </td>
+                    <td className="px-4 py-3 text-slate-600 font-medium whitespace-nowrap">
+                      {r.coins.midweekNight || '—'}
+                    </td>
                   </tr>
                 ))}
               </tbody>

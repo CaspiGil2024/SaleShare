@@ -58,7 +58,11 @@ export function exportDetailedActivityReportToXlsx({ rows, fromDate, toDate, rep
       'תאריך התחלה': e.start_time ? new Date(e.start_time).toLocaleString('he-IL') : '',
       'תאריך סיום': e.end_time ? new Date(e.end_time).toLocaleString('he-IL') : '',
       'שעות': Number(e.hours.toFixed(1)),
-      'מטבעות': e.coins,
+      'סופ"ש יום': e.coinBreakdown?.weekendDay ?? 0,
+      'סופ"ש לילה': e.coinBreakdown?.weekendNight ?? 0,
+      'אמצ"ש יום': e.coinBreakdown?.midweekDay ?? 0,
+      'אמצ"ש לילה': e.coinBreakdown?.midweekNight ?? 0,
+      'סה"כ מטבעות': e.coins,
     }))
   );
   const sheet = XLSX.utils.json_to_sheet(sheetRows);
@@ -160,6 +164,10 @@ export function exportSailingLogToXlsx({ rows, fromDate, toDate }) {
     'התחלת הפלגה': r.start_time ? new Date(r.start_time).toLocaleString('he-IL') : '',
     'סיום הפלגה': r.end_time ? new Date(r.end_time).toLocaleString('he-IL') : '',
     'סיבה': r.reasonLabel ?? '',
+    'סופ"ש יום': r.coins?.weekendDay ?? 0,
+    'סופ"ש לילה': r.coins?.weekendNight ?? 0,
+    'אמצ"ש יום': r.coins?.midweekDay ?? 0,
+    'אמצ"ש לילה': r.coins?.midweekNight ?? 0,
   }));
   const sheet = XLSX.utils.json_to_sheet(sheetRows);
   XLSX.utils.book_append_sheet(wb, sheet, 'יומן הפלגות וסגירת סירה');
