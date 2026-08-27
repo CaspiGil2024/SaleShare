@@ -103,9 +103,25 @@ function holidayMapToBackgroundEvents(holidayMap) {
   return events;
 }
 
-export default function YachtCalendar({ bookings, onSelectRange, onEventClick }) {
+// Maps the friendly value stored in public.users.default_calendar_view
+// (0031_partner_calendar_view_preference.sql) to/from FullCalendar's
+// own view names — keeps the DB/preference API decoupled from this
+// specific calendar library's naming.
+export const VIEW_PREFERENCE_TO_FULLCALENDAR = {
+  day: 'timeGridDay',
+  week: 'timeGridWeek',
+  month: 'dayGridMonth',
+};
+const FULLCALENDAR_TO_VIEW_PREFERENCE = {
+  timeGridDay: 'day',
+  timeGridWeek: 'week',
+  dayGridMonth: 'month',
+};
+
+export default function YachtCalendar({ bookings, onSelectRange, onEventClick, initialView = 'timeGridWeek', onViewChange }) {
   const calendarRef = useRef(null);
   const fetchTokenRef = useRef(0);
+  const lastViewTypeRef = useRef(initialView);
   const [holidayMap, setHolidayMap] = useState(new Map());
 
   const holidayEvents = useMemo(() => holidayMapToBackgroundEvents(holidayMap), [holidayMap]);
@@ -120,32 +136,45 @@ export default function YachtCalendar({ bookings, onSelectRange, onEventClick })
     [bookings, holidayEvents]
   );
 
-  const handleDatesSet = useCallback((arg) => {
-    // Pad a week either side so an erev-chag just outside the visible
-    // range (or a holiday whose "eve" background needs the prior day)
-    // is still available without a second fetch on the next nav click.
-    const rangeStart = new Date(arg.start);
-    rangeStart.setDate(rangeStart.getDate() - 7);
-    const rangeEnd = new Date(arg.end);
-    rangeEnd.setDate(rangeEnd.getDate() + 7);
+  const handleDatesSet = useCallback(
+    (arg) => {
+      // Pad a week either side so an erev-chag just outside the visible
+      // range (or a holiday whose "eve" background needs the prior day)
+      // is still available without a second fetch on the next nav click.
+      const rangeStart = new Date(arg.start);
+      rangeStart.setDate(rangeStart.getDate() - 7);
+      const rangeEnd = new Date(arg.end);
+      rangeEnd.setDate(rangeEnd.getDate() + 7);
 
-    const token = ++fetchTokenRef.current;
-    fetchIsraeliHolidayMap(rangeStart, rangeEnd)
-      .then((map) => {
-        if (fetchTokenRef.current !== token) return; // a newer request superseded this one
-        setHolidayMap(map);
-      })
-      .catch((err) => {
-        console.error('Failed to load Israeli holidays', err);
-      });
-  }, []);
+      const token = ++fetchTokenRef.current;
+      fetchIsraeliHolidayMap(rangeStart, rangeEnd)
+        .then((map) => {
+          if (fetchTokenRef.current !== token) return; // a newer request superseded this one
+          setHolidayMap(map);
+        })
+        .catch((err) => {
+          console.error('Failed to load Israeli holidays', err);
+        });
+
+      // datesSet also fires on every prev/next/today click, not just an
+      // actual view switch — only persist when the view TYPE itself
+      // changed, so navigating dates within the same view doesn't spam
+      // writes to the partner's saved preference.
+      if (arg.view.type !== lastViewTypeRef.current) {
+        lastViewTypeRef.current = arg.view.type;
+        const preference = FULLCALENDAR_TO_VIEW_PREFERENCE[arg.view.type];
+        if (preference) onViewChange?.(preference);
+      }
+    },
+    [onViewChange]
+  );
 
   return (
     <div className="flex flex-col h-[calc(100vh-140px)] overflow-hidden bg-white rounded-2xl shadow-sm border border-slate-200 p-2 sm:p-4">
       <FullCalendar
         ref={calendarRef}
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-        initialView="timeGridWeek"
+        initialView={initialView}
         locale={heLocale}
         direction="rtl"
         firstDay={0}

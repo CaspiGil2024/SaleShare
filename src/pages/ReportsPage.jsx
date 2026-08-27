@@ -1,7 +1,12 @@
 import { useEffect, useState } from 'react';
 import { FileBarChart, History, CalendarClock, Coins, Play, Download } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
-import { exportActivityReportToXlsx, exportPartnerBalancesToXlsx } from '../lib/xlsxExport';
+import { bookingTypeLabelHe } from '../lib/bookingColors';
+import {
+  exportActivityReportToXlsx,
+  exportDetailedActivityReportToXlsx,
+  exportPartnerBalancesToXlsx,
+} from '../lib/xlsxExport';
 
 const TABS = [
   { key: 'past', label: 'דוח פעילות היסטורית', icon: History },
@@ -165,7 +170,9 @@ async function fetchPartnerActivity(fromDate, toDate) {
 
   const { data: participantRows, error: participantsError } = await supabase
     .from('booking_participants')
-    .select('user_id, coins_charged, users(full_name, email), bookings!inner(start_time, end_time, status)')
+    .select(
+      'user_id, coins_charged, users(full_name, email), bookings!inner(start_time, end_time, status, booking_type, user_id)'
+    )
     .gte('bookings.start_time', fromIso)
     .lte('bookings.start_time', toIso)
     .neq('bookings.status', 'Cancelled');
@@ -174,7 +181,7 @@ async function fetchPartnerActivity(fromDate, toDate) {
   const byPartner = new Map();
   function entryFor(userId, name) {
     if (!byPartner.has(userId)) {
-      byPartner.set(userId, { userId, name, sailCount: 0, hours: 0, coins: 0 });
+      byPartner.set(userId, { userId, name, sailCount: 0, hours: 0, coins: 0, entries: [] });
     }
     return byPartner.get(userId);
   }
@@ -186,6 +193,14 @@ async function fetchPartnerActivity(fromDate, toDate) {
     entry.sailCount += 1;
     entry.hours += hours;
     entry.coins += b.coins_charged ?? 0;
+    entry.entries.push({
+      role: 'מארגן',
+      bookingTypeLabel: bookingTypeLabelHe(b.booking_type),
+      start_time: b.start_time,
+      end_time: b.end_time,
+      hours,
+      coins: b.coins_charged ?? 0,
+    });
   }
 
   for (const p of participantRows) {
@@ -194,6 +209,18 @@ async function fetchPartnerActivity(fromDate, toDate) {
     entry.sailCount += 1;
     entry.hours += hours;
     entry.coins += p.coins_charged ?? 0;
+    entry.entries.push({
+      role: p.bookings.user_id === p.user_id ? 'מארגן' : 'משתתף',
+      bookingTypeLabel: bookingTypeLabelHe(p.bookings.booking_type),
+      start_time: p.bookings.start_time,
+      end_time: p.bookings.end_time,
+      hours,
+      coins: p.coins_charged ?? 0,
+    });
+  }
+
+  for (const entry of byPartner.values()) {
+    entry.entries.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
   }
 
   return Array.from(byPartner.values()).sort((a, b) => b.hours - a.hours);
@@ -209,6 +236,10 @@ function ActivityReportTab({ defaultFrom, defaultTo, reportLabel }) {
   // every date-picker change. null = never generated yet (distinct
   // from an empty [] result, which means "generated, found nothing").
   const [hasGenerated, setHasGenerated] = useState(false);
+  // מקוצר (summary) = the existing aggregated ranking; מפורט (detailed)
+  // = every individual sailing per partner, same underlying data
+  // (fetchPartnerActivity already collects both in one query pass).
+  const [viewMode, setViewMode] = useState('summary');
 
   async function handleGenerate() {
     setIsLoading(true);
@@ -227,7 +258,11 @@ function ActivityReportTab({ defaultFrom, defaultTo, reportLabel }) {
   }
 
   function handleExport() {
-    exportActivityReportToXlsx({ rows, fromDate, toDate, reportLabel });
+    if (viewMode === 'detailed') {
+      exportDetailedActivityReportToXlsx({ rows, fromDate, toDate, reportLabel });
+    } else {
+      exportActivityReportToXlsx({ rows, fromDate, toDate, reportLabel });
+    }
   }
 
   const maxHours = Math.max(...rows.map((r) => r.hours), 1);
@@ -271,6 +306,29 @@ function ActivityReportTab({ defaultFrom, defaultTo, reportLabel }) {
           <Download size={15} />
           יצוא ל-EXCEL
         </button>
+
+        <div className="flex items-center gap-3 ms-auto rounded-lg border border-slate-200 px-3 py-2">
+          <label className="flex items-center gap-1.5 text-sm text-slate-700 cursor-pointer">
+            <input
+              type="radio"
+              name={`${reportLabel}-view-mode`}
+              checked={viewMode === 'summary'}
+              onChange={() => setViewMode('summary')}
+              className="text-blue-600 focus:ring-blue-500"
+            />
+            מקוצר
+          </label>
+          <label className="flex items-center gap-1.5 text-sm text-slate-700 cursor-pointer">
+            <input
+              type="radio"
+              name={`${reportLabel}-view-mode`}
+              checked={viewMode === 'detailed'}
+              onChange={() => setViewMode('detailed')}
+              className="text-blue-600 focus:ring-blue-500"
+            />
+            מפורט
+          </label>
+        </div>
       </div>
 
       {!hasGenerated ? (
@@ -281,7 +339,7 @@ function ActivityReportTab({ defaultFrom, defaultTo, reportLabel }) {
         <p className="p-10 text-center text-sm text-rose-600">{errorMessage}</p>
       ) : rows.length === 0 ? (
         <p className="p-10 text-center text-sm text-slate-400">אין נתוני פעילות בטווח התאריכים שנבחר.</p>
-      ) : (
+      ) : viewMode === 'summary' ? (
         <>
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
             <p className="text-xs text-slate-400 mb-4">שעות הפלגה לפי שותף (מהגבוה לנמוך)</p>
@@ -326,6 +384,61 @@ function ActivityReportTab({ defaultFrom, defaultTo, reportLabel }) {
             </table>
           </div>
         </>
+      ) : (
+        // מפורט: every partner, in the same order as the summary
+        // ranking, each followed by their own complete itemized log.
+        <div className="flex flex-col gap-4">
+          {rows.map((r) => (
+            <div key={r.userId} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+                <h4 className="font-bold text-slate-800">{r.name}</h4>
+                <p className="text-xs text-slate-400">
+                  {r.sailCount} הפלגות · {r.hours.toFixed(1)} שעות · {r.coins} מטבעות
+                </p>
+              </div>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-100 text-start text-slate-500">
+                    <th className="px-4 py-2 font-medium text-start">תפקיד</th>
+                    <th className="px-4 py-2 font-medium text-start">סוג</th>
+                    <th className="px-4 py-2 font-medium text-start">התחלה</th>
+                    <th className="px-4 py-2 font-medium text-start">סיום</th>
+                    <th className="px-4 py-2 font-medium text-start">שעות</th>
+                    <th className="px-4 py-2 font-medium text-start">מטבעות</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {r.entries.map((e, idx) => (
+                    <tr key={idx} className="border-b border-slate-50 last:border-0">
+                      <td className="px-4 py-2 text-slate-600 whitespace-nowrap">{e.role}</td>
+                      <td className="px-4 py-2 text-slate-800 font-medium whitespace-nowrap">{e.bookingTypeLabel}</td>
+                      <td className="px-4 py-2 text-slate-600 whitespace-nowrap">
+                        {new Date(e.start_time).toLocaleString('he-IL', {
+                          day: 'numeric',
+                          month: 'numeric',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </td>
+                      <td className="px-4 py-2 text-slate-600 whitespace-nowrap">
+                        {new Date(e.end_time).toLocaleString('he-IL', {
+                          day: 'numeric',
+                          month: 'numeric',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </td>
+                      <td className="px-4 py-2 text-slate-600">{e.hours.toFixed(1)}</td>
+                      <td className="px-4 py-2 text-amber-700 font-semibold">{e.coins}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );

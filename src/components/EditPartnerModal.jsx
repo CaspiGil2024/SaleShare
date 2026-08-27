@@ -3,6 +3,12 @@ import { X } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { ALL_PARTNER_ROLES, roleLabelHe } from '../lib/partnerRoles';
 
+const CALENDAR_VIEW_OPTIONS = [
+  { value: 'day', label: 'יומי' },
+  { value: 'week', label: 'שבועי' },
+  { value: 'month', label: 'חודשי' },
+];
+
 export default function EditPartnerModal({ isOpen, onClose, partner, onSaved }) {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -10,6 +16,19 @@ export default function EditPartnerModal({ isOpen, onClose, partner, onSaved }) 
   const [roles, setRoles] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
+
+  // default_calendar_view lives on public.users (keyed by real account),
+  // not partner_roster — written directly to that user's row on save
+  // (see 0033_admin_edit_partner_calendar_view.sql), never through the
+  // roster-sync pipeline the other fields use. Routing it through
+  // roster sync would risk clobbering whatever view the partner most
+  // recently picked themselves via the calendar toolbar, since roster
+  // never learns about that self-service change. userId is null (and
+  // this control disabled) if the partner hasn't signed up yet — no
+  // account means no calendar to set a default for.
+  const [userId, setUserId] = useState(null);
+  const [defaultCalendarView, setDefaultCalendarView] = useState(null);
+  const [calendarViewLoading, setCalendarViewLoading] = useState(false);
 
   // Re-seed the form whenever a different partner is opened for editing.
   useEffect(() => {
@@ -20,6 +39,24 @@ export default function EditPartnerModal({ isOpen, onClose, partner, onSaved }) 
     setPhone(partner.phone ?? '');
     setRoles(partner.roles ?? []);
     setErrorMessage(null);
+
+    setUserId(null);
+    setDefaultCalendarView(null);
+    setCalendarViewLoading(true);
+    supabase
+      .from('users')
+      .select('id, default_calendar_view')
+      .ilike('email', partner.email)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (error) {
+          console.error('Failed to load calendar view preference', error);
+        } else if (data) {
+          setUserId(data.id);
+          setDefaultCalendarView(data.default_calendar_view);
+        }
+        setCalendarViewLoading(false);
+      });
   }, [isOpen, partner]);
 
   useEffect(() => {
@@ -74,6 +111,18 @@ export default function EditPartnerModal({ isOpen, onClose, partner, onSaved }) 
         throw new Error(
           'העדכון לא בוצע בפועל — ייתכן שאין לכם הרשאה לערוך שותף זה, או שהרשומה כבר לא קיימת. אנא רעננו את הדף ונסו שוב.'
         );
+      }
+
+      if (userId && defaultCalendarView) {
+        const { data: viewData, error: viewError } = await supabase
+          .from('users')
+          .update({ default_calendar_view: defaultCalendarView })
+          .eq('id', userId)
+          .select();
+        if (viewError) throw viewError;
+        if (!viewData || viewData.length === 0) {
+          throw new Error('פרטי השותף נשמרו, אך עדכון תצוגת היומן לא בוצע — ייתכן שאין לכם הרשאה לכך.');
+        }
       }
 
       await onSaved?.();
@@ -178,6 +227,33 @@ export default function EditPartnerModal({ isOpen, onClose, partner, onSaved }) 
                 </label>
               ))}
             </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-slate-700">תצוגת יומן ברירת מחדל</label>
+            {calendarViewLoading ? (
+              <p className="text-xs text-slate-400">טוען...</p>
+            ) : !userId ? (
+              <p className="text-xs text-slate-400">השותף טרם נרשם למערכת — אין יומן להגדיר עבורו כרגע.</p>
+            ) : (
+              <div className="grid grid-cols-3 gap-2">
+                {CALENDAR_VIEW_OPTIONS.map((opt) => (
+                  <label
+                    key={opt.value}
+                    className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 cursor-pointer hover:bg-slate-50"
+                  >
+                    <input
+                      type="radio"
+                      name="default_calendar_view"
+                      checked={defaultCalendarView === opt.value}
+                      onChange={() => setDefaultCalendarView(opt.value)}
+                      className="text-blue-600 focus:ring-blue-500"
+                    />
+                    {opt.label}
+                  </label>
+                ))}
+              </div>
+            )}
           </div>
 
           {errorMessage && (

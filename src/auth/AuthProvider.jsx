@@ -16,6 +16,7 @@ export function roleLabelHe(role) {
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
+  const [profileLoading, setProfileLoading] = useState(true);
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -47,13 +48,15 @@ export function AuthProvider({ children }) {
     const authUser = session?.user;
     if (!authUser) {
       setProfile(null);
+      setProfileLoading(false);
       return;
     }
 
     let isCancelled = false;
+    setProfileLoading(true);
     supabase
       .from('users')
-      .select('id, full_name, email, role')
+      .select('id, full_name, email, role, default_calendar_view')
       .eq('id', authUser.id)
       .single()
       .then(({ data, error }) => {
@@ -61,9 +64,10 @@ export function AuthProvider({ children }) {
         if (error) {
           console.error('Failed to load user profile', error);
           setProfile(null);
-          return;
+        } else {
+          setProfile(data);
         }
-        setProfile(data);
+        setProfileLoading(false);
       });
 
     return () => {
@@ -116,15 +120,32 @@ export function AuthProvider({ children }) {
         email: authUser.email,
         full_name: profile?.full_name ?? null,
         role: profile?.role ?? 'partner',
+        default_calendar_view: profile?.default_calendar_view ?? 'week',
         roles,
       }
     : null;
 
+  // Writes the preference AND updates local profile state immediately
+  // — without this, currentUser.default_calendar_view would stay
+  // stale (still the old value) until a full reload, since `profile`
+  // is only fetched once per session on sign-in.
+  async function updateDefaultCalendarView(view) {
+    if (!authUser) return;
+    const { error } = await supabase.from('users').update({ default_calendar_view: view }).eq('id', authUser.id);
+    if (error) {
+      console.error('Failed to save calendar view preference', error);
+      return;
+    }
+    setProfile((prev) => (prev ? { ...prev, default_calendar_view: view } : prev));
+  }
+
   const value = {
     session,
+    updateDefaultCalendarView,
     user: authUser,
     currentUser,
     loading,
+    profileLoading,
     signInWithPassword: (email, password) => supabase.auth.signInWithPassword({ email, password }),
     signUpWithPassword: (email, password) => supabase.auth.signUp({ email, password }),
     signInWithGoogle: () =>

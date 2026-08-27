@@ -43,6 +43,31 @@ export function exportDatabaseToXlsx({ partners, bookings }) {
   XLSX.writeFile(wb, `SailShare-backup-${timestamp}.xlsx`);
 }
 
+// Detailed (מפורט) activity report — every partner's name followed by
+// each of their individual sailings, flattened into one sheet (one row
+// per sailing, partner name repeated) since XLSX has no native
+// "section header per group" concept.
+export function exportDetailedActivityReportToXlsx({ rows, fromDate, toDate, reportLabel }) {
+  const wb = XLSX.utils.book_new();
+
+  const sheetRows = rows.flatMap((r) =>
+    r.entries.map((e) => ({
+      'שותף': r.name,
+      'תפקיד': e.role,
+      'סוג הפלגה': e.bookingTypeLabel,
+      'תאריך התחלה': e.start_time ? new Date(e.start_time).toLocaleString('he-IL') : '',
+      'תאריך סיום': e.end_time ? new Date(e.end_time).toLocaleString('he-IL') : '',
+      'שעות': Number(e.hours.toFixed(1)),
+      'מטבעות': e.coins,
+    }))
+  );
+  const sheet = XLSX.utils.json_to_sheet(sheetRows);
+  XLSX.utils.book_append_sheet(wb, sheet, 'דוח מפורט');
+
+  const safeLabel = (reportLabel ?? 'report').replace(/[\\/:*?"<>|]/g, '_');
+  XLSX.writeFile(wb, `SailShare-${safeLabel}-detailed-${fromDate}-to-${toDate}.xlsx`);
+}
+
 // Activity report rows (ReportsPage.jsx) — per-partner sail count/
 // hours/coins for a date range, past or future.
 export function exportActivityReportToXlsx({ rows, fromDate, toDate, reportLabel }) {
@@ -78,6 +103,26 @@ export function exportPartnerBalancesToXlsx({ rows }) {
 
   const timestamp = new Date().toISOString().slice(0, 10);
   XLSX.writeFile(wb, `SailShare-partner-balances-${timestamp}.xlsx`);
+}
+
+// Parameters page's manual coin-adjustment audit log.
+export function exportCoinAdjustmentAuditToXlsx({ rows }) {
+  const wb = XLSX.utils.book_new();
+
+  const sheetRows = rows.map((r) => ({
+    'תאריך ושעה': r.created_at ? new Date(r.created_at).toLocaleString('he-IL') : '',
+    'בוצע ע"י': r.actor?.full_name ?? r.actor?.email ?? '',
+    'שותף': r.partner?.full_name ?? r.partner?.email ?? '',
+    'סוג מטבע': r.coinTypeLabel,
+    'יתרה קודמת': r.balance_before,
+    'יתרה חדשה': r.balance_after,
+    'הערה': r.note ?? '',
+  }));
+  const sheet = XLSX.utils.json_to_sheet(sheetRows);
+  XLSX.utils.book_append_sheet(wb, sheet, 'יומן ביקורת מטבעות');
+
+  const timestamp = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(wb, `SailShare-coin-adjustment-audit-${timestamp}.xlsx`);
 }
 
 // One partner's full booking history (organized + participated-in,

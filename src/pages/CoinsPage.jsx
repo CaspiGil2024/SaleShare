@@ -89,7 +89,7 @@ export default function CoinsPage() {
       const { data, error } = await supabase
         .from('coin_transactions')
         .select(
-          'id, delta, reason, coin_type, related_booking_id, created_at, user_id, users(full_name, email), bookings(booking_type, start_time, end_time)'
+          'id, delta, reason, coin_type, related_booking_id, created_at, user_id, users!coin_transactions_user_id_fkey(full_name, email), bookings(booking_type, start_time, end_time)'
         )
         .order('created_at', { ascending: false })
         .limit(100);

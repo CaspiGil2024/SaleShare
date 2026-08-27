@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Settings, SlidersHorizontal, History } from 'lucide-react';
+import { Settings, SlidersHorizontal, History, Pencil, X, Table2, Download } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../auth/AuthProvider';
 import { isAdminOrTreasurer } from '../lib/permissions';
+import { exportCoinAdjustmentAuditToXlsx } from '../lib/xlsxExport';
 
 const COIN_TYPE_OPTIONS = [
   { value: 'weekend_day', label: 'סופ"ש יום' },
@@ -165,69 +166,30 @@ function SystemSettingsForm({ currentUser }) {
   );
 }
 
-function AdminCoinAdjustment({ onAdjusted }) {
-  const [partners, setPartners] = useState([]);
-  const [selectedPartnerId, setSelectedPartnerId] = useState('');
-  const [selectedCoinType, setSelectedCoinType] = useState('midweek_day');
-  const [currentBalance, setCurrentBalance] = useState(null);
+// Opens pre-filled with one specific partner+coin-type cell from the
+// table below. The actual write always goes through
+// fn_admin_adjust_coin_balance (never a raw UPDATE on user_wallets) so
+// every change is unconditionally audited — there is no other path to
+// change a balance from this screen.
+function EditBalanceModal({ cell, onClose, onSaved }) {
   const [newBalance, setNewBalance] = useState('');
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
-  const [successMessage, setSuccessMessage] = useState(null);
 
   useEffect(() => {
-    supabase
-      .from('users')
-      .select('id, full_name, email')
-      .order('full_name')
-      .then(({ data, error }) => {
-        if (error) {
-          console.error('Failed to load partner list', error);
-          return;
-        }
-        setPartners(data ?? []);
-      });
-  }, []);
+    if (!cell) return;
+    setNewBalance(String(cell.currentBalance ?? 0));
+    setNote('');
+    setErrorMessage(null);
+  }, [cell]);
 
-  // Show the current balance for whatever partner+type is selected, so
-  // an admin can see what they're actually changing before submitting.
-  useEffect(() => {
-    if (!selectedPartnerId) {
-      setCurrentBalance(null);
-      return;
-    }
-    let isCancelled = false;
-    async function loadBalance() {
-      const { data: period } = await supabase.from('periods').select('id').eq('is_current', true).limit(1).maybeSingle();
-      if (!period) {
-        if (!isCancelled) setCurrentBalance(null);
-        return;
-      }
-      const column = COIN_TYPE_COLUMN[selectedCoinType];
-      const { data: wallet } = await supabase
-        .from('user_wallets')
-        .select(column)
-        .eq('user_id', selectedPartnerId)
-        .eq('period_id', period.id)
-        .maybeSingle();
-      if (!isCancelled) setCurrentBalance(wallet ? wallet[column] : 0);
-    }
-    loadBalance();
-    return () => {
-      isCancelled = true;
-    };
-  }, [selectedPartnerId, selectedCoinType]);
+  if (!cell) return null;
 
   async function handleSubmit(e) {
     e.preventDefault();
     setErrorMessage(null);
-    setSuccessMessage(null);
 
-    if (!selectedPartnerId) {
-      setErrorMessage('יש לבחור שותף.');
-      return;
-    }
     if (newBalance === '' || Number.isNaN(Number(newBalance))) {
       setErrorMessage('יש להזין יתרה חדשה תקינה.');
       return;
@@ -236,113 +198,227 @@ function AdminCoinAdjustment({ onAdjusted }) {
     setSubmitting(true);
     try {
       const { error } = await supabase.rpc('fn_admin_adjust_coin_balance', {
-        p_user_id: selectedPartnerId,
-        p_coin_type: selectedCoinType,
+        p_user_id: cell.partnerId,
+        p_coin_type: cell.coinType,
         p_new_balance: Number(newBalance),
         p_note: note.trim() ? note.trim() : null,
       });
       if (error) throw error;
-
-      setSuccessMessage('היתרה עודכנה בהצלחה.');
-      setNewBalance('');
-      setNote('');
-      setCurrentBalance(Number(newBalance));
-      await onAdjusted?.();
+      await onSaved?.();
     } catch (err) {
       console.error('Failed to adjust coin balance', err);
       setErrorMessage(err.message ?? 'אירעה שגיאה בעדכון היתרה.');
-    } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col gap-5 max-w-xl">
-      <div className="flex items-center gap-2 text-slate-800 font-bold">
-        <Settings size={18} className="text-blue-600" />
-        <h3>שינוי ידני של יתרת מטבעות</h3>
-      </div>
-      <p className="text-xs text-slate-400 -mt-3">
-        שינוי זה עוקף את מגבלת האוברדרפט (תיקון מנהלי מפורש) ומתועד באופן מלא ביומן הביקורת למטה.
-      </p>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium text-slate-700">שותף</label>
-          <select
-            value={selectedPartnerId}
-            onChange={(e) => setSelectedPartnerId(e.target.value)}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div dir="rtl" className="w-full max-w-sm rounded-2xl bg-white shadow-xl">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+          <div>
+            <h3 className="text-base font-bold text-slate-800">שינוי יתרה</h3>
+            <p className="text-xs text-slate-500">
+              {cell.partnerName} · {COIN_TYPE_LABELS_HE[cell.coinType]}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            aria-label="סגור"
           >
-            <option value="">בחרו שותף...</option>
-            {partners.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.full_name ?? p.email}
-              </option>
-            ))}
-          </select>
+            <X size={18} />
+          </button>
         </div>
-        <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium text-slate-700">סוג מטבע</label>
-          <select
-            value={selectedCoinType}
-            onChange={(e) => setSelectedCoinType(e.target.value)}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            {COIN_TYPE_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+
+        <form onSubmit={handleSubmit} className="px-5 py-4 flex flex-col gap-4">
+          <p className="text-sm text-slate-600">
+            יתרה נוכחית: <span className="font-semibold text-slate-800">{formatCoinAmount(cell.currentBalance)}</span>
+          </p>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-slate-700">יתרה חדשה</label>
+            <input
+              type="number"
+              step="0.01"
+              autoFocus
+              value={newBalance}
+              onChange={(e) => setNewBalance(e.target.value)}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-slate-700">הערה (אופציונלי)</label>
+            <input
+              type="text"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="סיבת השינוי..."
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <p className="text-xs text-slate-400">
+            שינוי זה עוקף את מגבלת האוברדרפט (תיקון מנהלי מפורש) ומתועד באופן מלא ביומן הביקורת, כולל שם
+            המבצע, יתרה קודמת/חדשה, וחותמת זמן.
+          </p>
+
+          {errorMessage && (
+            <p className="text-sm text-rose-600 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2">{errorMessage}</p>
+          )}
+
+          <div className="flex items-center gap-3 pt-1">
+            <button
+              type="submit"
+              disabled={submitting}
+              className="flex-1 rounded-lg bg-amber-600 hover:bg-amber-700 disabled:bg-amber-300 disabled:cursor-not-allowed text-white text-sm font-semibold py-2.5 transition-colors"
+            >
+              {submitting ? 'מעדכן...' : 'שמירה'}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={submitting}
+              className="flex-1 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-semibold py-2.5 transition-colors"
+            >
+              ביטול
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// The dedicated table this feature is actually about: every partner,
+// all 4 coin-type balances at once, each one directly editable.
+// Clicking a balance cell opens EditBalanceModal pre-filled with that
+// exact partner+type+current value — there's no separate dropdown-
+// based form anymore, this table IS the adjustment UI.
+function PartnerBalancesTable({ onAdjusted }) {
+  const [partners, setPartners] = useState([]);
+  const [walletByUserId, setWalletByUserId] = useState({});
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState(null);
+  const [editingCell, setEditingCell] = useState(null); // { partnerId, partnerName, coinType, currentBalance }
+
+  async function load() {
+    setIsLoading(true);
+    setErrorMessage(null);
+    try {
+      const { error: ensureError } = await supabase.rpc('ensure_current_period');
+      if (ensureError) console.error('Failed to ensure current period', ensureError);
+
+      const { data: users, error: usersError } = await supabase
+        .from('users')
+        .select('id, full_name, email')
+        .order('full_name');
+      if (usersError) throw usersError;
+
+      const { data: period } = await supabase.from('periods').select('id').eq('is_current', true).limit(1).maybeSingle();
+
+      let wallets = [];
+      if (period) {
+        const { data, error: walletsError } = await supabase
+          .from('user_wallets')
+          .select('user_id, coins_weekend_day, coins_weekend_night, coins_midweek_day, coins_midweek_night')
+          .eq('period_id', period.id);
+        if (walletsError) throw walletsError;
+        wallets = data ?? [];
+      }
+
+      setPartners(users ?? []);
+      setWalletByUserId(Object.fromEntries(wallets.map((w) => [w.user_id, w])));
+    } catch (err) {
+      console.error('Failed to load partner balances', err);
+      setErrorMessage('אירעה שגיאה בטעינת יתרות השותפים.');
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  async function handleSaved() {
+    setEditingCell(null);
+    await load();
+    await onAdjusted?.();
+  }
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
+        <Table2 size={18} className="text-blue-600" />
+        <div>
+          <h3 className="text-base font-bold text-slate-800">יתרות שותפים - עריכה ידנית</h3>
+          <p className="text-xs text-slate-400">לחצו על עיפרון ליד כל יתרה כדי לשנות אותה</p>
         </div>
       </div>
 
-      {selectedPartnerId && (
-        <p className="text-sm text-slate-600">
-          יתרה נוכחית: <span className="font-semibold text-slate-800">{formatCoinAmount(currentBalance)}</span>
-        </p>
+      {isLoading ? (
+        <p className="p-10 text-center text-sm text-slate-400">טוען...</p>
+      ) : errorMessage ? (
+        <p className="p-10 text-center text-sm text-rose-600">{errorMessage}</p>
+      ) : partners.length === 0 ? (
+        <p className="p-10 text-center text-sm text-slate-400">אין שותפים רשומים.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-100 text-start text-slate-500">
+                <th className="px-4 py-3 font-medium text-start">שותף</th>
+                {COIN_TYPE_OPTIONS.map((opt) => (
+                  <th key={opt.value} className="px-4 py-3 font-medium text-start">
+                    {opt.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {partners.map((p) => {
+                const wallet = walletByUserId[p.id];
+                const partnerName = p.full_name ?? p.email;
+                return (
+                  <tr key={p.id} className="border-b border-slate-50 last:border-0">
+                    <td className="px-4 py-3 font-medium text-slate-800 whitespace-nowrap">{partnerName}</td>
+                    {COIN_TYPE_OPTIONS.map((opt) => {
+                      const column = COIN_TYPE_COLUMN[opt.value];
+                      const currentBalance = wallet ? wallet[column] : 0;
+                      return (
+                        <td key={opt.value} className="px-4 py-3">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setEditingCell({ partnerId: p.id, partnerName, coinType: opt.value, currentBalance })
+                            }
+                            className="flex items-center gap-1.5 rounded-lg px-2 py-1 hover:bg-amber-50 text-amber-700 font-semibold transition-colors"
+                            title="לחצו לעריכה"
+                          >
+                            {formatCoinAmount(currentBalance)}
+                            <Pencil size={12} className="text-amber-400" />
+                          </button>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
 
-      <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-medium text-slate-700">יתרה חדשה</label>
-        <input
-          type="number"
-          step="0.01"
-          value={newBalance}
-          onChange={(e) => setNewBalance(e.target.value)}
-          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-medium text-slate-700">הערה (אופציונלי)</label>
-        <input
-          type="text"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          placeholder="סיבת השינוי..."
-          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-      </div>
-
-      {errorMessage && (
-        <p className="text-sm text-rose-600 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2">{errorMessage}</p>
-      )}
-      {successMessage && (
-        <p className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
-          {successMessage}
-        </p>
-      )}
-
-      <button
-        type="submit"
-        disabled={submitting}
-        className="self-start rounded-lg bg-amber-600 hover:bg-amber-700 disabled:bg-amber-300 disabled:cursor-not-allowed text-white text-sm font-semibold px-5 py-2.5 transition-colors"
-      >
-        {submitting ? 'מעדכן...' : 'עדכון יתרה'}
-      </button>
-    </form>
+      <EditBalanceModal cell={editingCell} onClose={() => setEditingCell(null)} onSaved={handleSaved} />
+    </div>
   );
 }
 
@@ -380,11 +456,28 @@ function AdjustmentAuditLog({ refreshToken }) {
     };
   }, [refreshToken]);
 
+  function handleExport() {
+    exportCoinAdjustmentAuditToXlsx({
+      rows: rows.map((r) => ({ ...r, coinTypeLabel: COIN_TYPE_LABELS_HE[r.coin_type] })),
+    });
+  }
+
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-      <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
-        <History size={18} className="text-slate-500" />
-        <h3 className="text-base font-bold text-slate-800">יומן ביקורת - שינויים ידניים ביתרות</h3>
+      <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <History size={18} className="text-slate-500" />
+          <h3 className="text-base font-bold text-slate-800">יומן ביקורת - שינויים ידניים ביתרות</h3>
+        </div>
+        <button
+          type="button"
+          onClick={handleExport}
+          disabled={isLoading || rows.length === 0}
+          className="flex items-center gap-1.5 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-semibold px-3.5 py-2 transition-colors"
+        >
+          <Download size={15} />
+          יצוא ל-EXCEL
+        </button>
       </div>
 
       {isLoading ? (
@@ -464,7 +557,7 @@ export default function ParametersPage() {
       </header>
 
       <SystemSettingsForm currentUser={currentUser} />
-      <AdminCoinAdjustment onAdjusted={() => setAuditRefreshToken((n) => n + 1)} />
+      <PartnerBalancesTable onAdjusted={() => setAuditRefreshToken((n) => n + 1)} />
       <AdjustmentAuditLog refreshToken={auditRefreshToken} />
     </div>
   );

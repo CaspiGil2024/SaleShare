@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import YachtCalendar from '../components/YachtCalendar';
+import YachtCalendar, { VIEW_PREFERENCE_TO_FULLCALENDAR } from '../components/YachtCalendar';
 import NewBookingModal from '../components/NewBookingModal';
 import EditBookingModal from '../components/EditBookingModal';
 import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../lib/supabaseClient';
 
 export default function CalendarPage() {
-  const { currentUser } = useAuth();
+  const { currentUser, profileLoading, updateDefaultCalendarView } = useAuth();
   const [bookings, setBookings] = useState([]);
   const [selectedRange, setSelectedRange] = useState(null); // { start: Date, end: Date }
   const [editingBooking, setEditingBooking] = useState(null);
@@ -72,7 +72,26 @@ export default function CalendarPage() {
         <p className="text-sm text-slate-500">לחצו וגררו על משבצת פנויה כדי לפתוח הזמנה חדשה, או לחצו על הפלגה קיימת לעריכה</p>
       </header>
 
-      <YachtCalendar bookings={bookings} onSelectRange={handleSelectRange} onEventClick={handleEventClick} />
+      {/*
+        FullCalendar only reads initialView once, at mount — waiting
+        for profileLoading here (rather than rendering immediately with
+        a fallback) means the calendar mounts already knowing the
+        partner's real saved preference instead of locking in "day" and
+        never correcting itself.
+      */}
+      {profileLoading ? (
+        <div className="flex items-center justify-center h-[calc(100vh-140px)] bg-white rounded-2xl shadow-sm border border-slate-200 text-sm text-slate-400">
+          טוען...
+        </div>
+      ) : (
+        <YachtCalendar
+          bookings={bookings}
+          onSelectRange={handleSelectRange}
+          onEventClick={handleEventClick}
+          initialView={VIEW_PREFERENCE_TO_FULLCALENDAR[currentUser?.default_calendar_view] ?? 'timeGridWeek'}
+          onViewChange={updateDefaultCalendarView}
+        />
+      )}
 
       <NewBookingModal
         isOpen={selectedRange !== null}
