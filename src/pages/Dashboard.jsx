@@ -5,7 +5,6 @@ import QuickActions from '../components/QuickActions';
 import SailingStatsChart from '../components/SailingStatsChart';
 import KpiCards from '../components/KpiCards';
 import WeatherWidget from '../components/WeatherWidget';
-import AnnouncementsPanel from '../components/AnnouncementsPanel';
 import NewBookingModal from '../components/NewBookingModal';
 import CoinBreakdownModal from '../components/CoinBreakdownModal';
 import UpcomingSailingsModal from '../components/UpcomingSailingsModal';
@@ -129,8 +128,6 @@ export default function Dashboard({ onNavigate }) {
         stats={{ totalCoins: walletCoins, upcomingBookings: upcomingCount, openMaintenanceIssues: openIssuesCount }}
         onCardClick={setOpenModal}
       />
-
-      <AnnouncementsPanel />
 
       <NewBookingModal
         isOpen={bookingRange !== null}
