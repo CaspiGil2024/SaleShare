@@ -26,9 +26,10 @@
 //   3. For everyone else, creates a real Supabase Auth account via the
 //      Admin API: email_confirm:true (no confirmation email sent — no
 //      manual invites, per the request this was built for), password =
-//      their phone number with all non-digit characters stripped (see
-//      src/lib/phonePassword.js — imported directly so this can never
-//      drift from what the login form actually sends).
+//      their phone number with all non-digit characters stripped, e.g.
+//      hyphens (see src/lib/phonePassword.js, imported directly below
+//      rather than re-implemented here so there's only one place this
+//      logic lives).
 //   4. The existing handle_new_auth_user trigger fires automatically on
 //      account creation (it's a real INSERT into auth.users under the
 //      hood), so public.users / user_wallets / user_roles and the
