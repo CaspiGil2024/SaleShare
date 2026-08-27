@@ -131,7 +131,14 @@ export default function Sidebar({ active, onNavigate, user, onSignOut, isMobileO
       {isMobileOpen && (
         <div className="fixed inset-0 z-40 md:hidden">
           <div className="absolute inset-0 bg-slate-900/40" onClick={onCloseMobile} />
-          <aside className="absolute inset-y-0 end-0 w-72 max-w-[85vw] bg-white border-s border-slate-200 flex flex-col shadow-xl">
+          {/*
+            start-0, not end-0: this app is RTL (dir="rtl" at the App
+            root), where CSS logical "end" resolves to the LEFT edge —
+            the drawer was opening on the wrong side. "start" is the
+            right edge in RTL, matching the desktop rail's own
+            placement (border-s further down = border on the right).
+          */}
+          <aside className="absolute inset-y-0 start-0 w-72 max-w-[85vw] bg-white border-e border-slate-200 flex flex-col shadow-xl">
             <button
               type="button"
               onClick={onCloseMobile}

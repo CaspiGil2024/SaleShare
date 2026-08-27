@@ -362,26 +362,28 @@ function ActivityReportTab({ defaultFrom, defaultTo, reportLabel }) {
           </div>
 
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-100 text-start text-slate-500">
-                  <th className="px-4 py-3 font-medium text-start">שותף</th>
-                  <th className="px-4 py-3 font-medium text-start">מספר הפלגות</th>
-                  <th className="px-4 py-3 font-medium text-start">סה"כ שעות</th>
-                  <th className="px-4 py-3 font-medium text-start">סה"כ מטבעות</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => (
-                  <tr key={r.userId} className="border-b border-slate-50 last:border-0">
-                    <td className="px-4 py-3 font-medium text-slate-800">{r.name}</td>
-                    <td className="px-4 py-3 text-slate-600">{r.sailCount}</td>
-                    <td className="px-4 py-3 text-slate-600">{r.hours.toFixed(1)}</td>
-                    <td className="px-4 py-3 text-slate-600">{r.coins}</td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-100 text-start text-slate-500">
+                    <th className="px-4 py-3 font-medium text-start">שותף</th>
+                    <th className="px-4 py-3 font-medium text-start">מספר הפלגות</th>
+                    <th className="px-4 py-3 font-medium text-start">סה"כ שעות</th>
+                    <th className="px-4 py-3 font-medium text-start">סה"כ מטבעות</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {rows.map((r) => (
+                    <tr key={r.userId} className="border-b border-slate-50 last:border-0">
+                      <td className="px-4 py-3 font-medium text-slate-800">{r.name}</td>
+                      <td className="px-4 py-3 text-slate-600">{r.sailCount}</td>
+                      <td className="px-4 py-3 text-slate-600">{r.hours.toFixed(1)}</td>
+                      <td className="px-4 py-3 text-slate-600">{r.coins}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </>
       ) : (
@@ -396,6 +398,7 @@ function ActivityReportTab({ defaultFrom, defaultTo, reportLabel }) {
                   {r.sailCount} הפלגות · {r.hours.toFixed(1)} שעות · {r.coins} מטבעות
                 </p>
               </div>
+              <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-slate-100 text-start text-slate-500">
@@ -436,6 +439,7 @@ function ActivityReportTab({ defaultFrom, defaultTo, reportLabel }) {
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
           ))}
         </div>
