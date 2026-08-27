@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import WelcomeHeader from '../components/WelcomeHeader';
+import SystemNoticesBanner from '../components/SystemNoticesBanner';
 import QuickActions from '../components/QuickActions';
 import SailingStatsChart from '../components/SailingStatsChart';
 import KpiCards from '../components/KpiCards';
@@ -112,6 +113,8 @@ export default function Dashboard({ onNavigate }) {
   return (
     <div className="flex flex-col gap-6 p-6 bg-slate-50 min-h-screen">
       <WelcomeHeader currentUser={currentUser} />
+
+      <SystemNoticesBanner />
 
       <QuickActions
         onAddBooking={() => setBookingRange(defaultBookingRange())}

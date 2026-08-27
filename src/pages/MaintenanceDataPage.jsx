@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { DatabaseBackup, Download, Plus, Wrench, CheckCircle2, ImagePlus } from 'lucide-react';
+import { DatabaseBackup, Download, Plus, Wrench, CheckCircle2, ImagePlus, Megaphone, Pencil, X } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../auth/AuthProvider';
 import { isManager } from '../lib/permissions';
@@ -7,6 +7,290 @@ import { bookingTypeLabelHe } from '../lib/bookingColors';
 import { exportDatabaseToXlsx, exportMaintenanceIssuesToXlsx } from '../lib/xlsxExport';
 
 const IMAGES_BUCKET = 'maintenance-images';
+
+// ---------------------------------------------------------------------
+// General System Notices (0036) — content-only (no title/summary),
+// closed rather than deleted. Separate from the AnnouncementsPanel
+// feed shown elsewhere on the dashboard — see the migration's header
+// comment for why these are two distinct systems.
+// ---------------------------------------------------------------------
+function NoticeCard({ notice, canManage, onChanged }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [content, setContent] = useState(notice.content);
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState(null);
+
+  async function handleSaveEdit(e) {
+    e.preventDefault();
+    if (!content.trim()) return;
+    setSubmitting(true);
+    setErrorMessage(null);
+    const { data, error } = await supabase
+      .from('system_notices')
+      .update({ content: content.trim() })
+      .eq('id', notice.id)
+      .select();
+    setSubmitting(false);
+    if (error) {
+      console.error('Failed to update notice', error);
+      setErrorMessage(error.message ?? 'אירעה שגיאה בעדכון ההודעה.');
+      return;
+    }
+    if (!data || data.length === 0) {
+      setErrorMessage('העדכון לא בוצע — ייתכן שאין לכם הרשאה.');
+      return;
+    }
+    setIsEditing(false);
+    await onChanged();
+  }
+
+  async function handleClose() {
+    if (!window.confirm('לסגור את ההודעה? היא תפסיק להופיע ללוח הבקרה של השותפים.')) return;
+    setErrorMessage(null);
+    const {
+      data: { user: authUser },
+    } = await supabase.auth.getUser();
+
+    const { data, error } = await supabase
+      .from('system_notices')
+      .update({
+        is_active: false,
+        closed_by: authUser?.id ?? null,
+        closed_by_name: authUser?.email ?? null,
+        closed_at: new Date().toISOString(),
+      })
+      .eq('id', notice.id)
+      .select();
+    if (error) {
+      console.error('Failed to close notice', error);
+      setErrorMessage(error.message ?? 'אירעה שגיאה בסגירת ההודעה.');
+      return;
+    }
+    if (!data || data.length === 0) {
+      setErrorMessage('הסגירה לא בוצעה — ייתכן שאין לכם הרשאה.');
+      return;
+    }
+    await onChanged();
+  }
+
+  return (
+    <div className="border border-slate-200 rounded-xl p-4 flex flex-col gap-2">
+      {isEditing ? (
+        <form onSubmit={handleSaveEdit} className="flex flex-col gap-2">
+          <textarea
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            rows={2}
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          {errorMessage && <p className="text-xs text-rose-600">{errorMessage}</p>}
+          <div className="flex items-center gap-2">
+            <button
+              type="submit"
+              disabled={submitting}
+              className="rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white text-sm font-semibold px-3.5 py-1.5 transition-colors"
+            >
+              {submitting ? 'שומר...' : 'שמירה'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setIsEditing(false);
+                setContent(notice.content);
+              }}
+              className="rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 text-sm font-semibold px-3.5 py-1.5 transition-colors"
+            >
+              ביטול
+            </button>
+          </div>
+        </form>
+      ) : (
+        <div className="flex items-start justify-between gap-3">
+          <p className="text-sm text-slate-700 whitespace-pre-wrap">{notice.content}</p>
+          <span
+            className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
+              notice.is_active ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-500'
+            }`}
+          >
+            {notice.is_active ? 'פעילה' : 'סגורה'}
+          </span>
+        </div>
+      )}
+
+      <p className="text-xs text-slate-400">
+        {notice.created_by_name ?? 'שותף'} · {new Date(notice.created_at).toLocaleDateString('he-IL')}
+        {!notice.is_active && notice.closed_at && (
+          <> · נסגרה ע"י {notice.closed_by_name ?? 'שותף'} ב-{new Date(notice.closed_at).toLocaleDateString('he-IL')}</>
+        )}
+      </p>
+
+      {canManage && !isEditing && (
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setIsEditing(true)}
+            className="flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700"
+          >
+            <Pencil size={14} />
+            עריכה
+          </button>
+          {notice.is_active && (
+            <button
+              type="button"
+              onClick={handleClose}
+              className="flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-700"
+            >
+              <X size={14} />
+              סגירת הודעה
+            </button>
+          )}
+        </div>
+      )}
+      {errorMessage && !isEditing && <p className="text-xs text-rose-600">{errorMessage}</p>}
+    </div>
+  );
+}
+
+function NewNoticeForm({ onCreated }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [content, setContent] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState(null);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!content.trim()) {
+      setErrorMessage('יש להזין תוכן להודעה.');
+      return;
+    }
+    setSubmitting(true);
+    setErrorMessage(null);
+
+    const {
+      data: { user: authUser },
+    } = await supabase.auth.getUser();
+
+    const { error } = await supabase.from('system_notices').insert({
+      content: content.trim(),
+      created_by: authUser?.id ?? null,
+      created_by_name: authUser?.email ?? null,
+    });
+
+    setSubmitting(false);
+    if (error) {
+      console.error('Failed to create notice', error);
+      setErrorMessage(error.message ?? 'אירעה שגיאה בפרסום ההודעה.');
+      return;
+    }
+    setContent('');
+    setIsOpen(false);
+    await onCreated();
+  }
+
+  if (!isOpen) {
+    return (
+      <button
+        type="button"
+        onClick={() => setIsOpen(true)}
+        className="flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 transition-colors self-start"
+      >
+        <Plus size={16} />
+        הודעה חדשה
+      </button>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="bg-slate-50 rounded-xl border border-slate-200 p-4 flex flex-col gap-3">
+      <div className="flex flex-col gap-1.5">
+        <label className="text-sm font-medium text-slate-700">תוכן ההודעה</label>
+        <textarea
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          rows={3}
+          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+      </div>
+      {errorMessage && (
+        <p className="text-sm text-rose-600 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2">{errorMessage}</p>
+      )}
+      <div className="flex items-center gap-2">
+        <button
+          type="submit"
+          disabled={submitting}
+          className="rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed text-white text-sm font-semibold px-4 py-2 transition-colors"
+        >
+          {submitting ? 'מפרסם...' : 'פרסום הודעה'}
+        </button>
+        <button
+          type="button"
+          onClick={() => setIsOpen(false)}
+          disabled={submitting}
+          className="rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 text-sm font-semibold px-4 py-2 transition-colors"
+        >
+          ביטול
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function SystemNoticesSection({ currentUser }) {
+  const canManage = isManager(currentUser);
+  const [notices, setNotices] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState(null);
+
+  async function fetchNotices() {
+    setIsLoading(true);
+    setErrorMessage(null);
+    const { data, error } = await supabase
+      .from('system_notices')
+      .select('*')
+      .order('is_active', { ascending: false })
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Failed to load system notices', error);
+      setErrorMessage('אירעה שגיאה בטעינת ההודעות.');
+    } else {
+      setNotices(data);
+    }
+    setIsLoading(false);
+  }
+
+  useEffect(() => {
+    fetchNotices();
+  }, []);
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col gap-4">
+      <div>
+        <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+          <Megaphone size={18} className="text-blue-600" />
+          הודעות מערכת כלליות
+        </h3>
+        <p className="text-sm text-slate-500 mt-1">הודעות פעילות מוצגות ללוח הבקרה של כל השותפים</p>
+      </div>
+
+      {canManage && <NewNoticeForm onCreated={fetchNotices} />}
+
+      {isLoading ? (
+        <p className="p-10 text-center text-sm text-slate-400">טוען...</p>
+      ) : errorMessage ? (
+        <p className="p-10 text-center text-sm text-rose-600">{errorMessage}</p>
+      ) : notices.length === 0 ? (
+        <p className="p-10 text-center text-sm text-slate-400">אין הודעות מערכת.</p>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {notices.map((notice) => (
+            <NoticeCard key={notice.id} notice={notice} canManage={canManage} onChanged={fetchNotices} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function imagePublicUrl(storagePath) {
   return supabase.storage.from(IMAGES_BUCKET).getPublicUrl(storagePath).data.publicUrl;
@@ -497,6 +781,8 @@ export default function MaintenanceDataPage() {
         </h2>
         <p className="text-sm text-slate-500">תקלות תחזוקה וכלי גיבוי וייצוא נתונים</p>
       </header>
+
+      <SystemNoticesSection currentUser={currentUser} />
 
       <MaintenanceIssuesSection currentUser={currentUser} />
 
