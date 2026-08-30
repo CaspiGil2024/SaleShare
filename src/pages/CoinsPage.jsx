@@ -181,9 +181,9 @@ export default function CoinsPage() {
         ) : transactions.length === 0 ? (
           <p className="p-10 text-center text-sm text-slate-400">אין עדיין תנועות מטבעות.</p>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-auto max-h-[65vh]">
             <table className="w-full text-sm">
-              <thead>
+              <thead className="sticky-thead">
                 <tr className="border-b border-slate-100 text-start text-slate-500">
                   <th className="px-4 py-3 font-medium text-start">תאריך פעולה</th>
                   {canViewAll && <th className="px-4 py-3 font-medium text-start">שותף</th>}

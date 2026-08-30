@@ -261,9 +261,9 @@ export default function SailingLogPage() {
         <p className="p-10 text-center text-sm text-slate-400">אין רשומות יומן בטווח התאריכים שנבחר.</p>
       ) : (
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="overflow-auto max-h-[65vh]">
             <table className="w-full text-sm">
-              <thead>
+              <thead className="sticky-thead">
                 <tr className="border-b border-slate-100 text-start text-slate-500">
                   <th className="px-4 py-3 font-medium text-start">תאריך ושעה</th>
                   <th className="px-4 py-3 font-medium text-start">פעולה</th>

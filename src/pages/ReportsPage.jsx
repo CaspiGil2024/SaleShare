@@ -109,9 +109,9 @@ function PartnerBalancesTab() {
         <p className="p-10 text-center text-sm text-slate-400">אין שותפים רשומים.</p>
       ) : (
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="overflow-auto max-h-[65vh]">
             <table className="w-full text-sm">
-              <thead>
+              <thead className="sticky-thead">
                 <tr className="border-b border-slate-100 text-start text-slate-500">
                   <th className="px-4 py-3 font-medium text-start">שותף</th>
                   <th className="px-4 py-3 font-medium text-start">סופ"ש יום</th>
@@ -376,9 +376,9 @@ function ActivityReportTab({ defaultFrom, defaultTo, reportLabel }) {
           </div>
 
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="overflow-x-auto">
+            <div className="overflow-auto max-h-[65vh]">
               <table className="w-full text-sm">
-                <thead>
+                <thead className="sticky-thead">
                   <tr className="border-b border-slate-100 text-start text-slate-500">
                     <th className="px-4 py-3 font-medium text-start">שותף</th>
                     <th className="px-4 py-3 font-medium text-start">מספר הפלגות</th>
@@ -412,9 +412,9 @@ function ActivityReportTab({ defaultFrom, defaultTo, reportLabel }) {
                   {r.sailCount} הפלגות · {r.hours.toFixed(1)} שעות · {r.coins} מטבעות
                 </p>
               </div>
-              <div className="overflow-x-auto">
+              <div className="overflow-auto max-h-[40vh]">
               <table className="w-full text-sm">
-                <thead>
+                <thead className="sticky-thead">
                   <tr className="border-b border-slate-100 text-start text-slate-500">
                     <th className="px-4 py-2 font-medium text-start">תפקיד</th>
                     <th className="px-4 py-2 font-medium text-start">סוג</th>

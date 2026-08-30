@@ -400,9 +400,9 @@ function PartnerBalancesTable({ onAdjusted }) {
       ) : partners.length === 0 ? (
         <p className="p-10 text-center text-sm text-slate-400">אין שותפים רשומים.</p>
       ) : (
-        <div className={`overflow-x-auto transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
+        <div className={`overflow-auto max-h-[65vh] transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
           <table className="w-full text-sm">
-            <thead>
+            <thead className="sticky-thead">
               <tr className="border-b border-slate-100 text-start text-slate-500">
                 <th className="px-4 py-3 font-medium text-start whitespace-nowrap">שותף</th>
                 {COIN_TYPE_OPTIONS.map((opt) => (
@@ -514,9 +514,9 @@ function AdjustmentAuditLog({ refreshToken }) {
       ) : rows.length === 0 ? (
         <p className="p-10 text-center text-sm text-slate-400">אין עדיין שינויים ידניים רשומים.</p>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="overflow-auto max-h-[65vh]">
           <table className="w-full text-sm">
-            <thead>
+            <thead className="sticky-thead">
               <tr className="border-b border-slate-100 text-start text-slate-500">
                 <th className="px-4 py-3 font-medium text-start">תאריך ושעה</th>
                 <th className="px-4 py-3 font-medium text-start">בוצע ע"י</th>

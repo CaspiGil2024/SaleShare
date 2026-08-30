@@ -164,9 +164,9 @@ export default function BookingHistoryModal({ isOpen, onClose, partner }) {
           ) : rows.length === 0 ? (
             <p className="p-10 text-center text-sm text-slate-400">לא נמצאו הזמנות עבור שותף זה.</p>
           ) : (
-            <div className="overflow-x-auto rounded-2xl border border-slate-200">
+            <div className="overflow-auto max-h-[60vh] rounded-2xl border border-slate-200">
               <table className="w-full text-sm">
-                <thead>
+                <thead className="sticky-thead">
                   <tr className="border-b border-slate-100 text-start text-slate-500 bg-slate-50">
                     <th className="px-4 py-3 font-medium text-start">תפקיד</th>
                     <th className="px-4 py-3 font-medium text-start">סוג</th>

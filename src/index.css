@@ -14,6 +14,26 @@
 }
 
 /* =====================================================================
+   Sticky table headers — shared by every scrollable data table
+   (PartnersPage, ParametersPage, CoinsPage, SailingLogPage,
+   ReportsPage, BookingHistoryModal). Each table's own scroll wrapper
+   gets a bounded max-height + overflow-y-auto (varies per table, so
+   that part stays inline); this class just pins every header cell to
+   that container's own top edge with an opaque background so scrolled
+   rows don't show through underneath it. Applied to <thead>, not
+   individual <th>s — the selector below targets the actual cells,
+   since position:sticky on <thead> itself is inconsistently honored
+   across browsers in table layout, but sticky <th>s inside it works
+   reliably everywhere.
+   ===================================================================== */
+.sticky-thead th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background-color: white;
+}
+
+/* =====================================================================
    FullCalendar — "Michael's Method" visual coin indicators
    These target the background events defined in YachtCalendar.jsx.
    Two-tier weekend/holiday distinction:

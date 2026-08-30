@@ -92,7 +92,22 @@ function RowActionsMenu({
     const rect = buttonRef.current.getBoundingClientRect();
     let left = rect.right - MENU_WIDTH; // align menu's end with the button's end (natural RTL placement)
     left = Math.max(8, Math.min(left, window.innerWidth - MENU_WIDTH - 8));
-    setMenuPosition({ top: rect.bottom + 4, left });
+
+    // Estimated rather than measured post-render (no flash/reflow):
+    // each item is px-3 py-2 (~36px incl. line height) plus the
+    // container's own py-1.5 (12px). Flips upward only when there's
+    // actually more room above than below — a row near the TOP of a
+    // short list stays downward even if space below is tight, rather
+    // than flipping into negative space.
+    const estimatedHeight = menuItems.length * 36 + 12;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    const openUpward = spaceBelow < estimatedHeight + 8 && spaceAbove > spaceBelow;
+    const top = openUpward
+      ? Math.max(8, rect.top - estimatedHeight - 4)
+      : rect.bottom + 4;
+
+    setMenuPosition({ top, left });
     setIsOpen(true);
   }
 
@@ -471,7 +486,7 @@ export default function PartnersPage() {
         ) : partners.length === 0 ? (
           <p className="p-10 text-center text-sm text-slate-400">לא נמצאו שותפים.</p>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-auto max-h-[65vh]">
             {/*
               Column order follows normal source order under dir="rtl":
               the FIRST column below lands on the visual right, the
@@ -480,7 +495,7 @@ export default function PartnersPage() {
               Contact&Name) without fighting the RTL flow.
             */}
             <table className="w-full text-sm">
-              <thead>
+              <thead className="sticky-thead">
                 <tr className="border-b border-slate-100 text-start text-slate-500">
                   <th className="px-4 py-3 font-medium text-start">שם מלא</th>
                   <th className="px-4 py-3 font-medium text-start">אימייל</th>
