@@ -63,8 +63,11 @@ function RowActionsMenu({
 
   const isSelf = partner.email?.toLowerCase() === currentUser?.email?.toLowerCase();
   const canEditGeneral = isManager(currentUser);
-  const canFreezeOrSoftDelete = isAdminOrTreasurer(currentUser);
-  const canHardDelete = isAdminRole(currentUser);
+  // Freeze/soft-delete/hard-delete all write to partner_roster by
+  // email — meaningless (and would silently no-op) for an orphan
+  // account that has no roster row at all (see fetchPartners below).
+  const canFreezeOrSoftDelete = isAdminOrTreasurer(currentUser) && partner.inRoster;
+  const canHardDelete = isAdminRole(currentUser) && partner.inRoster;
   const menuItems = buildMenuItems({ isSelf, canEditGeneral, canFreezeOrSoftDelete, canHardDelete });
 
   const MENU_WIDTH = 192; // w-48
@@ -288,7 +291,7 @@ export default function PartnersPage() {
     const { error: ensureError } = await supabase.rpc('ensure_current_period');
     if (ensureError) console.error('Failed to ensure current period', ensureError);
 
-    const { data: users, error: usersError } = await supabase.from('users').select('id, email');
+    const { data: users, error: usersError } = await supabase.from('users').select('id, email, full_name, phone');
     if (usersError) console.error('Failed to load user accounts for wallet lookup', usersError);
     const userIdByEmail = new Map((users ?? []).map((u) => [u.email.toLowerCase(), u.id]));
 
@@ -304,12 +307,33 @@ export default function PartnersPage() {
       walletByUserId = new Map((wallets ?? []).map((w) => [w.user_id, w]));
     }
 
-    setPartners(
-      data.map((partner) => {
-        const userId = userIdByEmail.get(partner.email.toLowerCase());
-        return { ...partner, wallet: userId ? walletByUserId.get(userId) ?? null : null };
-      })
-    );
+    const rosterPartners = data.map((partner) => {
+      const userId = userIdByEmail.get(partner.email.toLowerCase());
+      return { ...partner, inRoster: true, wallet: userId ? walletByUserId.get(userId) ?? null : null };
+    });
+
+    // Real accounts that signed up (old self-service flow, since
+    // removed) but were never added to partner_roster — invisible on
+    // this page otherwise, and with no sync mechanism to ever correct
+    // full_name if it's still whatever handle_new_auth_user's fallback
+    // set it to (the email's local part) at sign-up. Surfaced here so
+    // there's at least one way to fix that, even though none of the
+    // roster-only actions (freeze/soft-delete/roles/status) apply.
+    const rosterEmails = new Set(data.map((p) => p.email.toLowerCase()));
+    const orphanPartners = (users ?? [])
+      .filter((u) => !rosterEmails.has(u.email.toLowerCase()))
+      .map((u) => ({
+        email: u.email,
+        full_name: u.full_name,
+        phone: u.phone ?? null,
+        roles: [],
+        is_active: true,
+        is_frozen: false,
+        inRoster: false,
+        wallet: walletByUserId.get(u.id) ?? null,
+      }));
+
+    setPartners([...rosterPartners, ...orphanPartners]);
     setIsLoading(false);
   }
 
@@ -442,19 +466,30 @@ export default function PartnersPage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1.5">
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                            partner.is_active
-                              ? 'bg-green-50 text-green-700'
-                              : 'bg-slate-100 text-slate-500'
-                          }`}
-                        >
-                          {partner.is_active ? 'פעיל' : 'לא פעיל'}
-                        </span>
-                        {partner.is_frozen && (
-                          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-sky-50 text-sky-700">
-                            מוקפא
+                        {!partner.inRoster ? (
+                          <span
+                            className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700"
+                            title="נרשם/ה ישירות למערכת ולא נוסף/ה לרשימת השותפים — ניתן לתקן כאן רק את השם המלא."
+                          >
+                            לא ברשימת שותפים
                           </span>
+                        ) : (
+                          <>
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                                partner.is_active
+                                  ? 'bg-green-50 text-green-700'
+                                  : 'bg-slate-100 text-slate-500'
+                              }`}
+                            >
+                              {partner.is_active ? 'פעיל' : 'לא פעיל'}
+                            </span>
+                            {partner.is_frozen && (
+                              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-sky-50 text-sky-700">
+                                מוקפא
+                              </span>
+                            )}
+                          </>
                         )}
                       </div>
                     </td>

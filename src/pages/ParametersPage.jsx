@@ -166,44 +166,66 @@ function SystemSettingsForm({ currentUser }) {
   );
 }
 
-// Opens pre-filled with one specific partner+coin-type cell from the
-// table below. The actual write always goes through
-// fn_admin_adjust_coin_balance (never a raw UPDATE on user_wallets) so
-// every change is unconditionally audited — there is no other path to
-// change a balance from this screen.
-function EditBalanceModal({ cell, onClose, onSaved }) {
-  const [newBalance, setNewBalance] = useState('');
+// Opens pre-filled with all 4 of one partner's coin-type balances at
+// once. Deliberately batches every field behind a single Save button
+// instead of committing per-field: each field used to open its own
+// single-value modal that wrote + reloaded the whole partner table
+// immediately, so adjusting all 4 types for one person meant 4 separate
+// full-table reloads back to back — that's the "locks up / takes
+// forever" UI freeze this replaces. The actual write still always goes
+// through fn_admin_adjust_coin_balance (never a raw UPDATE on
+// user_wallets), once per type that actually changed, so every change
+// stays individually audited — Save just batches the calls into one
+// user action and one reload afterward instead of one each.
+function EditBalanceModal({ partner, onClose, onSaved }) {
+  const [values, setValues] = useState({});
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
 
   useEffect(() => {
-    if (!cell) return;
-    setNewBalance(String(cell.currentBalance ?? 0));
+    if (!partner) return;
+    setValues(Object.fromEntries(COIN_TYPE_OPTIONS.map((opt) => [opt.value, String(partner.balances[opt.value] ?? 0)])));
     setNote('');
     setErrorMessage(null);
-  }, [cell]);
+  }, [partner]);
 
-  if (!cell) return null;
+  if (!partner) return null;
 
   async function handleSubmit(e) {
     e.preventDefault();
     setErrorMessage(null);
 
-    if (newBalance === '' || Number.isNaN(Number(newBalance))) {
-      setErrorMessage('יש להזין יתרה חדשה תקינה.');
+    const parsed = {};
+    for (const opt of COIN_TYPE_OPTIONS) {
+      const raw = values[opt.value];
+      if (raw === '' || raw === undefined || Number.isNaN(Number(raw))) {
+        setErrorMessage(`יש להזין יתרה תקינה עבור ${opt.label}.`);
+        return;
+      }
+      parsed[opt.value] = Number(raw);
+    }
+
+    // Only types whose value actually changed get written/audited —
+    // re-submitting an untouched field as a no-op "change" would just
+    // add noise to the audit log for nothing.
+    const changedTypes = COIN_TYPE_OPTIONS.filter((opt) => parsed[opt.value] !== (partner.balances[opt.value] ?? 0));
+    if (changedTypes.length === 0) {
+      onClose();
       return;
     }
 
     setSubmitting(true);
     try {
-      const { error } = await supabase.rpc('fn_admin_adjust_coin_balance', {
-        p_user_id: cell.partnerId,
-        p_coin_type: cell.coinType,
-        p_new_balance: Number(newBalance),
-        p_note: note.trim() ? note.trim() : null,
-      });
-      if (error) throw error;
+      for (const opt of changedTypes) {
+        const { error } = await supabase.rpc('fn_admin_adjust_coin_balance', {
+          p_user_id: partner.partnerId,
+          p_coin_type: opt.value,
+          p_new_balance: parsed[opt.value],
+          p_note: note.trim() ? note.trim() : null,
+        });
+        if (error) throw error;
+      }
       await onSaved?.();
     } catch (err) {
       console.error('Failed to adjust coin balance', err);
@@ -219,13 +241,11 @@ function EditBalanceModal({ cell, onClose, onSaved }) {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div dir="rtl" className="w-full max-w-sm rounded-2xl bg-white shadow-xl">
+      <div dir="rtl" className="w-full max-w-md rounded-2xl bg-white shadow-xl">
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
           <div>
-            <h3 className="text-base font-bold text-slate-800">שינוי יתרה</h3>
-            <p className="text-xs text-slate-500">
-              {cell.partnerName} · {COIN_TYPE_LABELS_HE[cell.coinType]}
-            </p>
+            <h3 className="text-base font-bold text-slate-800">שינוי יתרות</h3>
+            <p className="text-xs text-slate-500">{partner.partnerName}</p>
           </div>
           <button
             type="button"
@@ -238,24 +258,24 @@ function EditBalanceModal({ cell, onClose, onSaved }) {
         </div>
 
         <form onSubmit={handleSubmit} className="px-5 py-4 flex flex-col gap-4">
-          <p className="text-sm text-slate-600">
-            יתרה נוכחית: <span className="font-semibold text-slate-800">{formatCoinAmount(cell.currentBalance)}</span>
-          </p>
-
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-slate-700">יתרה חדשה</label>
-            <input
-              type="number"
-              step="0.01"
-              autoFocus
-              value={newBalance}
-              onChange={(e) => setNewBalance(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+          <div className="grid grid-cols-2 gap-3">
+            {COIN_TYPE_OPTIONS.map((opt, i) => (
+              <div key={opt.value} className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-slate-700">{opt.label}</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  autoFocus={i === 0}
+                  value={values[opt.value] ?? ''}
+                  onChange={(e) => setValues((prev) => ({ ...prev, [opt.value]: e.target.value }))}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            ))}
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-slate-700">הערה (אופציונלי)</label>
+            <label className="text-sm font-medium text-slate-700">הערה (אופציונלי, חלה על כל שדה ששונה)</label>
             <input
               type="text"
               value={note}
@@ -267,7 +287,7 @@ function EditBalanceModal({ cell, onClose, onSaved }) {
 
           <p className="text-xs text-slate-400">
             שינוי זה עוקף את מגבלת האוברדרפט (תיקון מנהלי מפורש) ומתועד באופן מלא ביומן הביקורת, כולל שם
-            המבצע, יתרה קודמת/חדשה, וחותמת זמן.
+            המבצע, יתרה קודמת/חדשה, וחותמת זמן — לכל שדה ששונה בנפרד.
           </p>
 
           {errorMessage && (
@@ -299,18 +319,26 @@ function EditBalanceModal({ cell, onClose, onSaved }) {
 
 // The dedicated table this feature is actually about: every partner,
 // all 4 coin-type balances at once, each one directly editable.
-// Clicking a balance cell opens EditBalanceModal pre-filled with that
-// exact partner+type+current value — there's no separate dropdown-
-// based form anymore, this table IS the adjustment UI.
+// Clicking any balance cell opens EditBalanceModal pre-filled with
+// that partner's full set of 4 balances, saved together behind one
+// Save button — there's no separate dropdown-based form anymore, this
+// table IS the adjustment UI.
 function PartnerBalancesTable({ onAdjusted }) {
   const [partners, setPartners] = useState([]);
   const [walletByUserId, setWalletByUserId] = useState({});
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
-  const [editingCell, setEditingCell] = useState(null); // { partnerId, partnerName, coinType, currentBalance }
+  const [editingPartner, setEditingPartner] = useState(null); // { partnerId, partnerName, balances }
 
-  async function load() {
-    setIsLoading(true);
+  // isLoading only ever gates the FIRST load (replaces the table with a
+  // spinner, since there's nothing to show yet); every reload after
+  // that — e.g. right after EditBalanceModal saves — uses isRefreshing
+  // instead, which keeps the existing rows on screen (just dimmed) so
+  // saving one balance doesn't blank/flash the whole table each time.
+  async function load({ isInitial = false } = {}) {
+    if (isInitial) setIsLoading(true);
+    else setIsRefreshing(true);
     setErrorMessage(null);
     try {
       const { error: ensureError } = await supabase.rpc('ensure_current_period');
@@ -341,15 +369,16 @@ function PartnerBalancesTable({ onAdjusted }) {
       setErrorMessage('אירעה שגיאה בטעינת יתרות השותפים.');
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   }
 
   useEffect(() => {
-    load();
+    load({ isInitial: true });
   }, []);
 
   async function handleSaved() {
-    setEditingCell(null);
+    setEditingPartner(null);
     await load();
     await onAdjusted?.();
   }
@@ -360,7 +389,7 @@ function PartnerBalancesTable({ onAdjusted }) {
         <Table2 size={18} className="text-blue-600" />
         <div>
           <h3 className="text-base font-bold text-slate-800">יתרות שותפים - עריכה ידנית</h3>
-          <p className="text-xs text-slate-400">לחצו על עיפרון ליד כל יתרה כדי לשנות אותה</p>
+          <p className="text-xs text-slate-400">לחצו על עיפרון ליד כל יתרה כדי לערוך את כל 4 היתרות של אותו שותף יחד</p>
         </div>
       </div>
 
@@ -371,7 +400,7 @@ function PartnerBalancesTable({ onAdjusted }) {
       ) : partners.length === 0 ? (
         <p className="p-10 text-center text-sm text-slate-400">אין שותפים רשומים.</p>
       ) : (
-        <div className="overflow-x-auto">
+        <div className={`overflow-x-auto transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-100 text-start text-slate-500">
@@ -387,28 +416,26 @@ function PartnerBalancesTable({ onAdjusted }) {
               {partners.map((p) => {
                 const wallet = walletByUserId[p.id];
                 const partnerName = p.full_name ?? p.email;
+                const balances = Object.fromEntries(
+                  COIN_TYPE_OPTIONS.map((opt) => [opt.value, wallet ? wallet[COIN_TYPE_COLUMN[opt.value]] : 0])
+                );
                 return (
                   <tr key={p.id} className="border-b border-slate-50 last:border-0">
                     <td className="px-4 py-3 font-medium text-slate-800 whitespace-nowrap">{partnerName}</td>
-                    {COIN_TYPE_OPTIONS.map((opt) => {
-                      const column = COIN_TYPE_COLUMN[opt.value];
-                      const currentBalance = wallet ? wallet[column] : 0;
-                      return (
-                        <td key={opt.value} className="px-4 py-3 whitespace-nowrap">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setEditingCell({ partnerId: p.id, partnerName, coinType: opt.value, currentBalance })
-                            }
-                            className="flex items-center gap-1.5 rounded-lg px-2 py-1 hover:bg-amber-50 text-amber-700 font-semibold transition-colors whitespace-nowrap"
-                            title="לחצו לעריכה"
-                          >
-                            {formatCoinAmount(currentBalance)}
-                            <Pencil size={12} className="text-amber-400" />
-                          </button>
-                        </td>
-                      );
-                    })}
+                    {COIN_TYPE_OPTIONS.map((opt) => (
+                      <td key={opt.value} className="px-4 py-3 whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={() => setEditingPartner({ partnerId: p.id, partnerName, balances })}
+                          disabled={isRefreshing}
+                          className="flex items-center gap-1.5 rounded-lg px-2 py-1 hover:bg-amber-50 text-amber-700 font-semibold transition-colors whitespace-nowrap disabled:cursor-not-allowed"
+                          title="לחצו לעריכת כל היתרות של שותף זה"
+                        >
+                          {formatCoinAmount(balances[opt.value])}
+                          <Pencil size={12} className="text-amber-400" />
+                        </button>
+                      </td>
+                    ))}
                   </tr>
                 );
               })}
@@ -417,7 +444,7 @@ function PartnerBalancesTable({ onAdjusted }) {
         </div>
       )}
 
-      <EditBalanceModal cell={editingCell} onClose={() => setEditingCell(null)} onSaved={handleSaved} />
+      <EditBalanceModal partner={editingPartner} onClose={() => setEditingPartner(null)} onSaved={handleSaved} />
     </div>
   );
 }

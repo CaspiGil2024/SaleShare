@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { X, Calendar as CalendarIcon, Clock, Coins as CoinsIcon, Anchor } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
-import { classifyHours, calculateSharedSailCoins, COIN_TYPE_LABELS_HE } from '../lib/coinCalculator';
+import { classifyHours, COIN_TYPE_LABELS_HE } from '../lib/coinCalculator';
 import { BOOKING_TYPE_OPTIONS, chargesCoins } from '../lib/bookingTypes';
 import { fetchIsraeliHolidayMap, syncIsraeliHolidays } from '../lib/israeliHolidays';
 import { friendlyBookingErrorMessage } from '../lib/bookingErrors';
-import PartnerPicker from './PartnerPicker';
 
 const MAX_TOTAL_PARTICIPANTS = 9;
 // Matches trg_fn_enforce_day_night_hour_limit's Cyprus branch
@@ -70,16 +69,6 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
   const [guestsCount, setGuestsCount] = useState(0);
   const [isAnchor, setIsAnchor] = useState(false);
   const [notes, setNotes] = useState('');
-  const [selectedPartnerIds, setSelectedPartnerIds] = useState([]);
-  // Name lookup for the per-partner guest list below — PartnerPicker
-  // only reports back selected ids, not names, so this is fetched
-  // separately rather than showing a raw UUID for anyone but yourself.
-  const [partnerNamesById, setPartnerNamesById] = useState({});
-  // Per-partner guest counts for Shared/Cyprus (§40 — a guest increases
-  // the relative share of whoever brought them, so it has to be
-  // attributed to a specific participant, not one flat number for the
-  // whole booking). Keyed by user_id, including the organizer.
-  const [guestCountByUserId, setGuestCountByUserId] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
 
@@ -101,29 +90,8 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
     setGuestsCount(0);
     setIsAnchor(false);
     setNotes('');
-    setSelectedPartnerIds([]);
-    setGuestCountByUserId({});
     setErrorMessage(null);
   }, [isOpen, initialStart, initialEnd]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    let isCancelled = false;
-    supabase
-      .from('users')
-      .select('id, full_name, email')
-      .then(({ data, error }) => {
-        if (isCancelled) return;
-        if (error) {
-          console.error('Failed to load partner names', error);
-          return;
-        }
-        setPartnerNamesById(Object.fromEntries(data.map((u) => [u.id, u.full_name ?? u.email])));
-      });
-    return () => {
-      isCancelled = true;
-    };
-  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -164,7 +132,12 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
   }, [isOpen, startDateTime.getTime(), endDateTime.getTime()]);
 
   const isCyprusType = bookingType === 'Cyprus';
-  const requiresPartners = bookingType === 'Shared' || isCyprusType;
+  // Shared/Cyprus still route through fn_create_shared_booking (its
+  // participants array is now always just the organizer — see
+  // 0040_guests_free_and_shared_sail_solo_pricing.sql), but no longer
+  // literally "require" other partners — kept as its own flag purely
+  // to pick the right insert path in handleSubmit below.
+  const isSharedType = bookingType === 'Shared' || isCyprusType;
 
   const exceedsMaxDuration = isCyprusType
     ? durationHours > CYPRUS_MAX_DURATION_DAYS * 24
@@ -183,35 +156,21 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
   const exceedsNightHourLimit =
     !!dayNightBreakdown && dayNightBreakdown.weekendNight + dayNightBreakdown.midweekNight > MAX_NIGHT_HOURS;
 
-  function guestCountFor(userId) {
-    return guestCountByUserId[userId] ?? 0;
-  }
-  function setGuestCountFor(userId, count) {
-    setGuestCountByUserId((prev) => ({ ...prev, [userId]: Math.max(0, count) }));
-  }
-
-  const sharedParticipantIds = useMemo(
-    () => (currentUser?.id ? [currentUser.id, ...selectedPartnerIds] : selectedPartnerIds),
-    [currentUser?.id, selectedPartnerIds]
-  );
-  const totalGuestsAcrossParticipants = requiresPartners
-    ? sharedParticipantIds.reduce((sum, id) => sum + guestCountFor(id), 0)
-    : guestsCount;
-  const totalParticipants = requiresPartners
-    ? sharedParticipantIds.length + totalGuestsAcrossParticipants
-    : 1 + guestsCount;
+  // Guests never cost coins and are no longer attributed to a specific
+  // partner (there's only ever one participant — the organizer — since
+  // partners can no longer be added to a booking at all), so headcount
+  // is the same flat "1 + guestsCount" for every type.
+  const totalParticipants = 1 + guestsCount;
   const exceedsCapacity = totalParticipants > MAX_TOTAL_PARTICIPANTS;
-  const missingPartners = requiresPartners && selectedPartnerIds.length === 0;
 
   const coinBreakdown = useMemo(() => {
     if (!chargesCoins(bookingType)) return null;
-    if (requiresPartners) {
-      const participants = sharedParticipantIds.map((id) => ({ userId: id, guestCount: guestCountFor(id) }));
-      return { shared: true, ...calculateSharedSailCoins(startDateTime, endDateTime, participants, new Set(holidayMap.keys())) };
-    }
-    return { shared: false, ...classifyHours(startDateTime, endDateTime, new Set(holidayMap.keys())) };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bookingType, requiresPartners, startDateTime, endDateTime, holidayMap, sharedParticipantIds, guestCountByUserId]);
+    // Full classifyHours cost either way: for Private/Dockside the
+    // organizer always pays it all, and for Shared/Cyprus the
+    // proportional-share RPC formula degrades to the same 100% share
+    // once there's only one participant (see coinCalculator.js header).
+    return classifyHours(startDateTime, endDateTime, new Set(holidayMap.keys()));
+  }, [bookingType, startDateTime, endDateTime, holidayMap]);
 
   const formattedDateHe = startDateTime.toLocaleDateString('he-IL', {
     weekday: 'long',
@@ -254,13 +213,9 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
       setErrorMessage(`הזמנה בודדת מוגבלת ל-${MAX_NIGHT_HOURS} שעות לילה לכל היותר.`);
       return;
     }
-    if (missingPartners) {
-      setErrorMessage('יש לבחור לפחות שותף אחד נוסף להפלגה זו.');
-      return;
-    }
     if (exceedsCapacity) {
       setErrorMessage(
-        `סך המשתתפים (שותפים ואורחים) הוא ${totalParticipants}, ומעל המקסימום המותר של ${MAX_TOTAL_PARTICIPANTS}. הסירו שותפים או אורחים.`
+        `סך המשתתפים (כולל אורחים) הוא ${totalParticipants}, ומעל המקסימום המותר של ${MAX_TOTAL_PARTICIPANTS}. הסירו אורחים.`
       );
       return;
     }
@@ -288,17 +243,16 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
       // spans are synced before the insert/RPC call that needs them.
       await syncIsraeliHolidays(holidayMap);
 
-      if (requiresPartners) {
-        const participants = sharedParticipantIds.map((id) => ({
-          user_id: id,
-          guest_count: guestCountFor(id),
-        }));
+      if (isSharedType) {
+        // Organizer is always the sole participant now — see
+        // 0040_guests_free_and_shared_sail_solo_pricing.sql, which
+        // makes this equivalent to a full-price Private-rate charge.
         const { error } = await supabase.rpc('fn_create_shared_booking', {
           p_booking_type: bookingType,
           p_start: startDateTime.toISOString(),
           p_end: endDateTime.toISOString(),
           p_notes: notes.trim() ? notes.trim() : null,
-          p_participants: participants,
+          p_participants: [{ user_id: authUser.id, guest_count: guestsCount }],
         });
         if (error) throw error;
       } else {
@@ -500,67 +454,27 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
             </div>
           </div>
 
-          {/* Partners sail — pick who's joining */}
-          {requiresPartners && (
-            <PartnerPicker
-              excludeUserId={currentUser?.id}
-              selectedIds={selectedPartnerIds}
-              onChange={setSelectedPartnerIds}
-            />
-          )}
-
-          {/* Guests */}
-          {requiresPartners ? (
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-slate-700">
-                אורחים לכל שותף <span className="font-normal text-slate-400">(מגדיל את חלקו היחסי בעלות)</span>
-              </label>
-              <div className="flex flex-col gap-1 max-h-24 overflow-y-auto">
-                {sharedParticipantIds.map((id) => {
-                  const isSelf = id === currentUser?.id;
-                  return (
-                    <div
-                      key={id}
-                      className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-2.5 py-1"
-                    >
-                      <span className="text-xs text-slate-700 truncate">
-                        {isSelf ? currentUser?.full_name ?? currentUser?.email ?? 'אני' : partnerNamesById[id] ?? id}
-                      </span>
-                      <select
-                        value={guestCountFor(id)}
-                        onChange={(e) => setGuestCountFor(id, Number(e.target.value))}
-                        className="rounded-lg border border-slate-300 px-2 py-0.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        {GUEST_OPTIONS.map((count) => (
-                          <option key={count} value={count}>
-                            {formatGuestsLabel(count)}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  );
-                })}
-              </div>
+          {/* Guests — never cost coins, for any booking type (see
+              0040_guests_free_and_shared_sail_solo_pricing.sql) */}
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-slate-700">מספר אורחים</label>
+            <select
+              value={guestsCount}
+              onChange={(e) => setGuestsCount(Number(e.target.value))}
+              className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {GUEST_OPTIONS.map((count) => (
+                <option key={count} value={count}>
+                  {formatGuestsLabel(count)}
+                </option>
+              ))}
+            </select>
+            {isSharedType && (
               <p className={`text-xs ${exceedsCapacity ? 'text-rose-600 font-medium' : 'text-slate-400'}`}>
                 סה"כ משתתפים: {totalParticipants} / {MAX_TOTAL_PARTICIPANTS}
               </p>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-slate-700">מספר אורחים</label>
-              <select
-                value={guestsCount}
-                onChange={(e) => setGuestsCount(Number(e.target.value))}
-                className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {GUEST_OPTIONS.map((count) => (
-                  <option key={count} value={count}>
-                    {formatGuestsLabel(count)}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+            )}
+          </div>
 
           {/* Notes */}
           <div className="flex flex-col gap-1">
@@ -580,25 +494,7 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
               <CoinsIcon size={14} className="text-amber-500" />
               <span>עלות משוערת</span>
             </div>
-            {coinBreakdown ? coinBreakdown.shared ? (
-              <div className="flex flex-col gap-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  {Object.entries(COIN_TYPE_LABELS_HE).map(([key, label]) =>
-                    coinBreakdown.totalBreakdown[key] > 0 ? (
-                      <span key={key} className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-medium">
-                        {label}: {formatCoinAmount(coinBreakdown.totalBreakdown[key])}
-                      </span>
-                    ) : null
-                  )}
-                  <span className="px-2.5 py-1 rounded-full bg-blue-600 text-white text-xs font-semibold">
-                    סה"כ לקבוצה: {formatCoinAmount(coinBreakdown.totalBreakdown.total)} מטבעות
-                  </span>
-                </div>
-                <p className="text-xs text-slate-500">
-                  {isSelfShareLabel(coinBreakdown, currentUser?.id)}
-                </p>
-              </div>
-            ) : (
+            {coinBreakdown ? (
               <div className="flex flex-wrap items-center gap-2">
                 {Object.entries(COIN_TYPE_LABELS_HE).map(([key, label]) =>
                   coinBreakdown[key] > 0 ? (
@@ -632,7 +528,6 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
                 exceedsDayHourLimit ||
                 exceedsNightHourLimit ||
                 exceedsCapacity ||
-                missingPartners ||
                 insufficientCyprusDuration
               }
               className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed text-white text-sm font-semibold py-2 transition-colors"
@@ -655,10 +550,4 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
       </div>
     </div>
   );
-}
-
-function isSelfShareLabel(coinBreakdown, selfId) {
-  const mine = coinBreakdown.perParticipant?.find((p) => p.userId === selfId);
-  if (!mine) return '';
-  return `החלק שלכם (כולל האורחים שהבאתם): ${formatCoinAmount(mine.total)} מטבעות`;
 }

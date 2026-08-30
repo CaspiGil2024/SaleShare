@@ -51,7 +51,7 @@ const NIGHT_BACKGROUND_EVENTS = [
 ];
 
 function mapBookingToEvent(booking) {
-  const { backgroundColor, borderColor } = getBookingTypeColors(booking.booking_type);
+  const { backgroundColor, borderColor, textColor } = getBookingTypeColors(booking.booking_type);
   return {
     id: booking.id,
     title: booking.title,
@@ -59,6 +59,7 @@ function mapBookingToEvent(booking) {
     end: booking.end,
     backgroundColor,
     borderColor,
+    textColor,
     extendedProps: {
       bookingType: booking.booking_type,
       bookedBy: booking.title,
@@ -206,7 +207,11 @@ export default function YachtCalendar({ bookings, onSelectRange, onEventClick, i
           const typeLabel = bookingTypeLabelHe(bookingType);
           return (
             <div className="px-1.5 py-1 leading-tight overflow-hidden">
-              <div className="font-semibold text-xs truncate">{typeLabel}</div>
+              {/* Booker's name is the primary line — the type is already
+                  conveyed by the event's own color (see bookingColors.js),
+                  so it's kept as a secondary line rather than the headline. */}
+              <div className="font-semibold text-xs truncate">{arg.event.title}</div>
+              <div className="text-[10px] opacity-80 truncate">{typeLabel}</div>
               <div className="text-[11px] opacity-90 truncate">
                 {formatEventClock(arg.event.start)} - {formatEventClock(arg.event.end)}
               </div>

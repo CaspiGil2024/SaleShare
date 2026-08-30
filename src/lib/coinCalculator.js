@@ -1,16 +1,22 @@
-// Mirrors public.fn_classify_hours() / trg_fn_charge_booking_coins() /
-// fn_create_shared_booking() (0021-0023_michael_method_*.sql) — a
-// client-side *estimate* for instant UI feedback. The database
-// functions are the real source of truth at insert/update time; this
-// is purely for display and light client-side validation.
+// Mirrors public.fn_classify_hours() / trg_fn_charge_booking_coins()
+// (0021_michael_method_coin_engine.sql) — a client-side *estimate* for
+// instant UI feedback. The database functions are the real source of
+// truth at insert/update time; this is purely for display and light
+// client-side validation.
 //
 // Michael's Method (§10/30/40): 4 coin types — weekend/weekday ×
-// day/night — each hour costs exactly 1 coin of its own type. A
-// shared sail's total cost is the SAME per-type breakdown a private
-// booking of that duration would get, split among participants
-// proportionally to (1 + their own guest_count) — a guest increases
-// the relative share of whoever brought them, not a flat per-head
-// split.
+// day/night — each hour costs exactly 1 coin of its own type. Guests
+// never pay or consume coins (0040_guests_free_and_shared_sail_solo_
+// pricing.sql), and the booking form no longer lets partners be added
+// at creation/edit (see NewBookingModal.jsx/EditBookingModal.jsx) — so
+// every chargeable booking, Shared/Cyprus included, is a single payer
+// (the organizer) for the FULL classifyHours breakdown of its
+// duration. That's why there's no separate "shared sail split"
+// calculation here anymore: fn_create_shared_booking/fn_update_shared_
+// booking's own proportional-share formula already degrades to "100%
+// to the one participant" whenever there's only the organizer, which
+// is every case reachable from the UI today — see that migration's
+// header for the reasoning if partners-joining-later ever comes back.
 //
 // Day/night boundary (20:00-08:00) and weekend/holiday classification
 // match every other rule in this project — Asia/Jerusalem local time,
@@ -60,29 +66,6 @@ export function classifyHours(start, end, holidayDates = new Set()) {
 // call sites read naturally either way.
 export function calculateBookingCoins(start, end, holidayDates = new Set()) {
   return classifyHours(start, end, holidayDates);
-}
-
-// participants: [{ userId, guestCount }], must include the organizer.
-// Returns the total breakdown plus each participant's own share
-// (proportional to 1 + their guest_count), for display before submit.
-export function calculateSharedSailCoins(start, end, participants, holidayDates = new Set()) {
-  const totalBreakdown = classifyHours(start, end, holidayDates);
-  const totalShares = participants.reduce((sum, p) => sum + 1 + (p.guestCount ?? 0), 0) || 1;
-
-  const perParticipant = participants.map((p) => {
-    const share = (1 + (p.guestCount ?? 0)) / totalShares;
-    return {
-      userId: p.userId,
-      guestCount: p.guestCount ?? 0,
-      weekendDay: totalBreakdown.weekendDay * share,
-      weekendNight: totalBreakdown.weekendNight * share,
-      midweekDay: totalBreakdown.midweekDay * share,
-      midweekNight: totalBreakdown.midweekNight * share,
-      total: totalBreakdown.total * share,
-    };
-  });
-
-  return { totalBreakdown, perParticipant, totalShares };
 }
 
 export const COIN_TYPE_LABELS_HE = {

@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { BookOpen, Play, Download } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { BookOpen, Play, Download, Coins } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
+import { useAuth } from '../auth/AuthProvider';
 import { bookingTypeLabelHe } from '../lib/bookingColors';
 import { exportSailingLogToXlsx } from '../lib/xlsxExport';
 
@@ -15,6 +16,18 @@ const REASON_LABELS_HE = {
 
 function toInputDate(date) {
   return date.toISOString().slice(0, 10);
+}
+
+function addDays(date, days) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+function formatCoinDisplay(n) {
+  if (n === null || n === undefined) return '—';
+  const rounded = Math.round(n * 100) / 100;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2);
 }
 
 const ZERO_BREAKDOWN = { weekendDay: 0, weekendNight: 0, midweekDay: 0, midweekNight: 0 };
@@ -90,9 +103,76 @@ async function fetchSailingLog(fromDate, toDate) {
   }));
 }
 
+// Compact top-row balance strip so it's visible while scanning the log
+// below, without duplicating CoinsPage's full rates/history screen —
+// same ensure_current_period + user_wallets fetch pattern as there.
+function CoinBalanceSummary({ currentUser }) {
+  const [wallet, setWallet] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    let isCancelled = false;
+
+    async function load() {
+      setIsLoading(true);
+      const { error: ensureError } = await supabase.rpc('ensure_current_period');
+      if (ensureError) console.error('Failed to ensure current period', ensureError);
+
+      const { data: period } = await supabase.from('periods').select('id').eq('is_current', true).limit(1).maybeSingle();
+      if (period) {
+        const { data: walletRow, error } = await supabase
+          .from('user_wallets')
+          .select('coins_weekend_day, coins_weekend_night, coins_midweek_day, coins_midweek_night')
+          .eq('user_id', currentUser.id)
+          .eq('period_id', period.id)
+          .maybeSingle();
+        if (!isCancelled) {
+          if (error) console.error('Failed to load wallet balance', error);
+          else setWallet(walletRow);
+        }
+      }
+      if (!isCancelled) setIsLoading(false);
+    }
+
+    load();
+    return () => {
+      isCancelled = true;
+    };
+  }, [currentUser?.id]);
+
+  return (
+    <div className="rounded-2xl bg-gradient-to-l from-amber-500 to-orange-400 px-5 py-3 shadow-sm text-white flex flex-wrap items-center gap-3">
+      <span className="w-9 h-9 shrink-0 rounded-lg bg-white/20 flex items-center justify-center">
+        <Coins size={18} />
+      </span>
+      <span className="text-sm text-amber-50 shrink-0">היתרה שלי:</span>
+      {isLoading ? (
+        <span className="text-sm text-amber-50">טוען...</span>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="px-2.5 py-1 rounded-lg bg-white/15 text-xs font-semibold">
+            אמצ"ש יום: {formatCoinDisplay(wallet?.coins_midweek_day)}
+          </span>
+          <span className="px-2.5 py-1 rounded-lg bg-white/15 text-xs font-semibold">
+            אמצ"ש לילה: {formatCoinDisplay(wallet?.coins_midweek_night)}
+          </span>
+          <span className="px-2.5 py-1 rounded-lg bg-white/15 text-xs font-semibold">
+            סופ"ש יום: {formatCoinDisplay(wallet?.coins_weekend_day)}
+          </span>
+          <span className="px-2.5 py-1 rounded-lg bg-white/15 text-xs font-semibold">
+            סופ"ש לילה: {formatCoinDisplay(wallet?.coins_weekend_night)}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function SailingLogPage() {
-  const [fromDate, setFromDate] = useState(toInputDate(new Date(new Date().setDate(new Date().getDate() - 30))));
-  const [toDate, setToDate] = useState(toInputDate(new Date()));
+  const { currentUser } = useAuth();
+  const [fromDate, setFromDate] = useState(toInputDate(addDays(new Date(), -7)));
+  const [toDate, setToDate] = useState(toInputDate(addDays(new Date(), 7)));
   const [rows, setRows] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
@@ -129,6 +209,8 @@ export default function SailingLogPage() {
           רישום אוטומטי של כל יציאה להפלגה וסגירת הסירה (ביטול הפלגה או תחזוקה)
         </p>
       </header>
+
+      <CoinBalanceSummary currentUser={currentUser} />
 
       <div className="flex flex-wrap items-end gap-3">
         <div className="flex flex-col gap-1.5">

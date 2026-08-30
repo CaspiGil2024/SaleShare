@@ -1,13 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { X, Calendar as CalendarIcon, Clock, Coins as CoinsIcon, User } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
-import { classifyHours, calculateSharedSailCoins, COIN_TYPE_LABELS_HE } from '../lib/coinCalculator';
+import { classifyHours, COIN_TYPE_LABELS_HE } from '../lib/coinCalculator';
 import { BOOKING_TYPE_OPTIONS, chargesCoins } from '../lib/bookingTypes';
 import { bookingTypeLabelHe } from '../lib/bookingColors';
 import { fetchIsraeliHolidayMap, syncIsraeliHolidays } from '../lib/israeliHolidays';
 import { friendlyBookingErrorMessage } from '../lib/bookingErrors';
 import { isManager } from '../lib/permissions';
-import PartnerPicker from './PartnerPicker';
 
 const MAX_TOTAL_PARTICIPANTS = 9;
 // Matches check_max_24_hours' Cyprus branch (0013_cyprus_duration.sql):
@@ -56,12 +55,15 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
   const [bookingType, setBookingType] = useState('Private');
   const [guestsCount, setGuestsCount] = useState(0);
   const [notes, setNotes] = useState('');
-  const [selectedPartnerIds, setSelectedPartnerIds] = useState([]);
   const [holidayMap, setHolidayMap] = useState(new Map());
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
 
-  // Re-seed the form whenever a different booking is opened.
+  // Re-seed the form whenever a different booking is opened. Shared/
+  // Cyprus track guests on the organizer's booking_participants row
+  // instead of bookings.guests_count (always 0 for those types — see
+  // fn_create_shared_booking/fn_update_shared_booking), so guestsCount
+  // for those is loaded separately below instead of from here.
   useEffect(() => {
     if (!isOpen || !booking) return;
     const start = new Date(booking.start_time);
@@ -71,33 +73,38 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
     setStartHour(start.getHours());
     setDurationHours(Math.max(1, Math.round((end.getTime() - start.getTime()) / 3_600_000)));
     setBookingType(booking.booking_type ?? 'Private');
-    setGuestsCount(booking.guests_count ?? 0);
     setNotes(booking.notes ?? '');
     setErrorMessage(null);
+
+    const isShared = booking.booking_type === 'Shared' || booking.booking_type === 'Cyprus';
+    if (!isShared) {
+      setGuestsCount(booking.guests_count ?? 0);
+    }
   }, [isOpen, booking]);
 
-  // Load whoever's already attached to this booking as participants.
+  // Shared/Cyprus only: load the organizer's own guest_count from
+  // booking_participants — there's no longer any other participant to
+  // load, since partners can't be added to a booking anymore (see
+  // 0040_guests_free_and_shared_sail_solo_pricing.sql).
   useEffect(() => {
     if (!isOpen || !booking) return;
+    const isShared = booking.booking_type === 'Shared' || booking.booking_type === 'Cyprus';
+    if (!isShared) return;
     let isCancelled = false;
 
     supabase
       .from('booking_participants')
-      .select('user_id')
+      .select('guest_count')
       .eq('booking_id', booking.id)
+      .eq('user_id', booking.user_id)
+      .maybeSingle()
       .then(({ data, error }) => {
         if (isCancelled) return;
         if (error) {
-          console.error('Failed to load booking participants', error);
-          setSelectedPartnerIds([]);
+          console.error('Failed to load booking participant guest count', error);
           return;
         }
-        // Excludes the organizer's own row — the organizer is now
-        // always stored as a participant too (for individual coin
-        // charging), but selectedPartnerIds/totalParticipants treat
-        // the organizer as implicit ("+1"), separate from this list.
-        // Including it here would double-count them.
-        setSelectedPartnerIds(data.map((row) => row.user_id).filter((id) => id !== booking.user_id));
+        setGuestsCount(data?.guest_count ?? 0);
       });
 
     return () => {
@@ -142,28 +149,33 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
     ? durationHours > CYPRUS_MAX_DURATION_DAYS * 24
     : durationHours > 24;
   const insufficientCyprusDuration = isCyprusType && durationHours < CYPRUS_MIN_DURATION_DAYS * 24;
-  // Cyprus is a partners sail too — same picker, same minimum-1-partner
-  // and 9-person-cap rules as Shared. Zero-overlap for the whole
-  // duration needs no extra code — prevent_overlap already covers any
-  // booking length.
-  const requiresPartners = bookingType === 'Shared' || isCyprusType;
-  const totalParticipants = 1 + (requiresPartners ? selectedPartnerIds.length : 0) + guestsCount;
+  // Shared/Cyprus still route through fn_update_shared_booking (its
+  // participants array is now always just the organizer — see
+  // 0040_guests_free_and_shared_sail_solo_pricing.sql), but no longer
+  // literally "require" other partners — kept as its own flag purely
+  // to pick the right update path in handleSave below.
+  const isSharedType = bookingType === 'Shared' || isCyprusType;
+  // Guests never cost coins and there's only ever one participant (the
+  // organizer) now, so headcount is the same flat "1 + guestsCount"
+  // for every type.
+  const totalParticipants = 1 + guestsCount;
   const exceedsCapacity = totalParticipants > MAX_TOTAL_PARTICIPANTS;
-  const missingPartners = requiresPartners && selectedPartnerIds.length === 0;
 
   const coinBreakdown = useMemo(() => {
     if (!chargesCoins(bookingType)) return null;
-    if (requiresPartners) {
-      // Editing doesn't have per-partner guest inputs yet (see
-      // fn_update_shared_booking's header comment) — estimate assumes
-      // 0 guests for everyone, same as what actually gets charged here.
-      const participants = [booking.user_id, ...selectedPartnerIds].map((id) => ({ userId: id, guestCount: 0 }));
-      return { shared: true, ...calculateSharedSailCoins(startDateTime, endDateTime, participants, new Set(holidayMap.keys())) };
-    }
-    return { shared: false, ...classifyHours(startDateTime, endDateTime, new Set(holidayMap.keys())) };
-  }, [bookingType, requiresPartners, startDateTime, endDateTime, holidayMap, selectedPartnerIds, booking?.user_id]);
+    // Full classifyHours cost either way — see coinCalculator.js header.
+    return classifyHours(startDateTime, endDateTime, new Set(holidayMap.keys()));
+  }, [bookingType, startDateTime, endDateTime, holidayMap]);
 
   if (!isOpen || !booking) return null;
+
+  // Cancelling refunds coins in full (see trg_fn_refund_participants_
+  // on_cancel / the private-booking refund trigger) — blocking it once
+  // the sailing has started stops a free refund for a sail that
+  // already happened. Enforced server-side too (0041_block_past_
+  // sailing_cancellation.sql); this is just the matching UI guard so
+  // the button doesn't invite an attempt that's always going to fail.
+  const isPastSailing = new Date(booking.start_time) <= new Date();
 
   async function handleSave(e) {
     e.preventDefault();
@@ -181,13 +193,9 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
       setErrorMessage(`שייט לקפריסין חייב להימשך לפחות ${CYPRUS_MIN_DURATION_DAYS} ימים.`);
       return;
     }
-    if (missingPartners) {
-      setErrorMessage('יש לבחור לפחות שותף אחד נוסף להפלגה זו.');
-      return;
-    }
     if (exceedsCapacity) {
       setErrorMessage(
-        `סך המשתתפים (שותפים ואורחים) הוא ${totalParticipants}, ומעל המקסימום המותר של ${MAX_TOTAL_PARTICIPANTS}. הסירו שותפים או אורחים.`
+        `סך המשתתפים (כולל אורחים) הוא ${totalParticipants}, ומעל המקסימום המותר של ${MAX_TOTAL_PARTICIPANTS}. הסירו אורחים.`
       );
       return;
     }
@@ -199,24 +207,20 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
       // newly picked) dates this booking now spans are synced first.
       await syncIsraeliHolidays(holidayMap);
 
-      if (requiresPartners) {
-        // Atomic: updates the booking row, clears + re-attaches
-        // participants, and recomputes/recharges the proportional
-        // per-type cost, all in one transaction — see
-        // fn_update_shared_booking (0025_michael_method_update_shared_
-        // booking_rpc.sql). No per-partner guest editing here yet
-        // (guest_count 0 for everyone), matching the estimate above.
-        const participants = [booking.user_id, ...selectedPartnerIds].map((id) => ({
-          user_id: id,
-          guest_count: 0,
-        }));
+      if (isSharedType) {
+        // Atomic: updates the booking row, clears + re-attaches the
+        // (sole) participant, and recomputes/recharges the cost, all
+        // in one transaction — see fn_update_shared_booking. Organizer
+        // is always the sole participant now — see 0040_guests_free_
+        // and_shared_sail_solo_pricing.sql, which makes this
+        // equivalent to a full-price Private-rate charge.
         const { error } = await supabase.rpc('fn_update_shared_booking', {
           p_booking_id: booking.id,
           p_booking_type: bookingType,
           p_start: startDateTime.toISOString(),
           p_end: endDateTime.toISOString(),
           p_notes: notes.trim() ? notes.trim() : null,
-          p_participants: participants,
+          p_participants: [{ user_id: booking.user_id, guest_count: guestsCount }],
         });
         if (error) throw error;
       } else {
@@ -257,6 +261,7 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
   }
 
   async function handleCancelSail() {
+    if (isPastSailing) return;
     if (!window.confirm('לבטל את ההפלגה הזו?')) return;
     setErrorMessage(null);
     setSubmitting(true);
@@ -341,6 +346,12 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
         ) : (
           <form onSubmit={handleSave} className="px-6 py-5 flex flex-col gap-5">
             <div className="rounded-xl bg-blue-50 border border-blue-100 px-4 py-4 flex flex-col gap-2">
+              {booking.bookedByName && (
+                <div className="flex items-center gap-2 text-blue-900 font-semibold">
+                  <User size={16} />
+                  <span>{booking.bookedByName}</span>
+                </div>
+              )}
               <div className="flex items-center gap-2 text-blue-900 font-semibold">
                 <CalendarIcon size={16} />
                 <span>
@@ -447,15 +458,8 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
               </div>
             </div>
 
-            {/* Partners sail — pick who's joining */}
-            {requiresPartners && (
-              <PartnerPicker
-                excludeUserId={booking.user_id}
-                selectedIds={selectedPartnerIds}
-                onChange={setSelectedPartnerIds}
-              />
-            )}
-
+            {/* Guests — never cost coins, for any booking type (see
+                0040_guests_free_and_shared_sail_solo_pricing.sql) */}
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium text-slate-700">מספר אורחים</label>
               <select
@@ -469,7 +473,7 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
                   </option>
                 ))}
               </select>
-              {requiresPartners && (
+              {isSharedType && (
                 <p className={`text-xs ${exceedsCapacity ? 'text-rose-600 font-medium' : 'text-slate-400'}`}>
                   סה"כ משתתפים (כולל אתכם): {totalParticipants} / {MAX_TOTAL_PARTICIPANTS}
                 </p>
@@ -492,20 +496,7 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
                 <CoinsIcon size={16} className="text-amber-500" />
                 <span>עלות משוערת</span>
               </div>
-              {coinBreakdown ? coinBreakdown.shared ? (
-                <div className="flex flex-wrap items-center gap-2">
-                  {Object.entries(COIN_TYPE_LABELS_HE).map(([key, label]) =>
-                    coinBreakdown.totalBreakdown[key] > 0 ? (
-                      <span key={key} className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-medium">
-                        {label}: {Math.round(coinBreakdown.totalBreakdown[key] * 100) / 100}
-                      </span>
-                    ) : null
-                  )}
-                  <span className="px-2.5 py-1 rounded-full bg-blue-600 text-white text-xs font-semibold">
-                    סה"כ לקבוצה: {Math.round(coinBreakdown.totalBreakdown.total * 100) / 100} מטבעות
-                  </span>
-                </div>
-              ) : (
+              {coinBreakdown ? (
                 <div className="flex flex-wrap items-center gap-2">
                   {Object.entries(COIN_TYPE_LABELS_HE).map(([key, label]) =>
                     coinBreakdown[key] > 0 ? (
@@ -535,9 +526,7 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
             <div className="flex items-center gap-3 pt-2">
               <button
                 type="submit"
-                disabled={
-                  submitting || exceedsMaxDuration || exceedsCapacity || missingPartners || insufficientCyprusDuration
-                }
+                disabled={submitting || exceedsMaxDuration || exceedsCapacity || insufficientCyprusDuration}
                 className="flex-1 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed text-white text-sm font-semibold py-2.5 transition-colors"
               >
                 {submitting ? 'שומר...' : 'שמור שינויים'}
@@ -555,11 +544,15 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
             <button
               type="button"
               onClick={handleCancelSail}
-              disabled={submitting}
+              disabled={submitting || isPastSailing}
+              title={isPastSailing ? 'לא ניתן לבטל הפלגה שכבר החלה או הסתיימה.' : undefined}
               className="rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-semibold py-2.5 transition-colors"
             >
               ביטול ההפלגה
             </button>
+            {isPastSailing && (
+              <p className="text-xs text-slate-400 text-center -mt-1">לא ניתן לבטל הפלגה שכבר החלה או הסתיימה.</p>
+            )}
           </form>
         )}
       </div>

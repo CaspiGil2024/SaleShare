@@ -88,7 +88,7 @@ export default function CalendarPage() {
           bookings={bookings}
           onSelectRange={handleSelectRange}
           onEventClick={handleEventClick}
-          initialView={VIEW_PREFERENCE_TO_FULLCALENDAR[currentUser?.default_calendar_view] ?? 'timeGridWeek'}
+          initialView={VIEW_PREFERENCE_TO_FULLCALENDAR[currentUser?.default_calendar_view] ?? 'timeGridDay'}
           onViewChange={updateDefaultCalendarView}
         />
       )}

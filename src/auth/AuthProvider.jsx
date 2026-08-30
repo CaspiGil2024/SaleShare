@@ -122,7 +122,7 @@ export function AuthProvider({ children }) {
         email: authUser.email,
         full_name: profile?.full_name ?? null,
         role: profile?.role ?? 'partner',
-        default_calendar_view: profile?.default_calendar_view ?? 'week',
+        default_calendar_view: profile?.default_calendar_view ?? 'day',
         emails_enabled: profile?.emails_enabled ?? false,
         receive_shared_sail_notifications: profile?.receive_shared_sail_notifications ?? false,
         must_change_password: profile?.must_change_password ?? false,
