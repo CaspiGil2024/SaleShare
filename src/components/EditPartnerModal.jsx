@@ -84,39 +84,61 @@ export default function EditPartnerModal({ isOpen, onClose, partner, onSaved }) 
     e.preventDefault();
     setErrorMessage(null);
 
-    if (!fullName.trim() || !email.trim()) {
-      setErrorMessage('שם מלא ואימייל הם שדות חובה.');
+    if (!fullName.trim() || (partner.inRoster && !email.trim())) {
+      setErrorMessage('שם מלא הוא שדה חובה.');
       return;
     }
 
     setSubmitting(true);
     try {
-      // partner.email (not the possibly-edited `email` state) identifies
-      // the row being updated, since email is partner_roster's primary key.
-      //
-      // .select() here is load-bearing, not cosmetic: without it, an
-      // UPDATE that matches zero rows (e.g. because RLS's WITH CHECK
-      // silently filtered it) still comes back as { error: null } —
-      // PostgREST has no way to distinguish "updated nothing" from
-      // "updated successfully" unless you ask for the affected rows.
-      // That's what was making role changes (and anything else) look
-      // like they saved when they silently didn't.
-      const { data, error } = await supabase
-        .from('partner_roster')
-        .update({
-          full_name: fullName.trim(),
-          email: email.trim(),
-          phone: phone.trim() ? phone.trim() : null,
-          roles,
-        })
-        .eq('email', partner.email)
-        .select();
+      if (partner.inRoster) {
+        // partner.email (not the possibly-edited `email` state)
+        // identifies the row being updated, since email is
+        // partner_roster's primary key.
+        //
+        // .select() here is load-bearing, not cosmetic: without it, an
+        // UPDATE that matches zero rows (e.g. because RLS's WITH CHECK
+        // silently filtered it) still comes back as { error: null } —
+        // PostgREST has no way to distinguish "updated nothing" from
+        // "updated successfully" unless you ask for the affected rows.
+        // That's what was making role changes (and anything else) look
+        // like they saved when they silently didn't.
+        const { data, error } = await supabase
+          .from('partner_roster')
+          .update({
+            full_name: fullName.trim(),
+            email: email.trim(),
+            phone: phone.trim() ? phone.trim() : null,
+            roles,
+          })
+          .eq('email', partner.email)
+          .select();
 
-      if (error) throw error;
-      if (!data || data.length === 0) {
-        throw new Error(
-          'העדכון לא בוצע בפועל — ייתכן שאין לכם הרשאה לערוך שותף זה, או שהרשומה כבר לא קיימת. אנא רעננו את הדף ונסו שוב.'
-        );
+        if (error) throw error;
+        if (!data || data.length === 0) {
+          throw new Error(
+            'העדכון לא בוצע בפועל — ייתכן שאין לכם הרשאה לערוך שותף זה, או שהרשומה כבר לא קיימת. אנא רעננו את הדף ונסו שוב.'
+          );
+        }
+      } else {
+        // Orphan account — no partner_roster row exists at all (see
+        // PartnersPage.jsx's fetchPartners), so there's nothing to sync
+        // full_name FROM the way fn_apply_partner_roster normally does.
+        // Write straight to public.users instead — the only field this
+        // reduced form exposes for that reason.
+        if (!userId) {
+          throw new Error('לא נמצא חשבון תואם לשותף זה. רעננו את הדף ונסו שוב.');
+        }
+        const { data, error } = await supabase
+          .from('users')
+          .update({ full_name: fullName.trim() })
+          .eq('id', userId)
+          .select();
+
+        if (error) throw error;
+        if (!data || data.length === 0) {
+          throw new Error('העדכון לא בוצע בפועל — ייתכן שאין לכם הרשאה לערוך שותף זה.');
+        }
       }
 
       if (userId) {
@@ -166,6 +188,13 @@ export default function EditPartnerModal({ isOpen, onClose, partner, onSaved }) 
         </div>
 
         <form onSubmit={handleSubmit} className="px-6 py-5 flex flex-col gap-5">
+          {!partner.inRoster && (
+            <p className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+              חשבון זה נרשם ישירות למערכת ואינו ברשימת השותפים הרשמית (partner_roster) — ניתן לתקן כאן רק
+              את השם המלא. כדי לנהל תפקידים/סטטוס/טלפון עבורו, יש להוסיף אותו לרשימת השותפים תחילה.
+            </p>
+          )}
+
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium text-slate-700">שם מלא</label>
             <input
@@ -176,26 +205,28 @@ export default function EditPartnerModal({ isOpen, onClose, partner, onSaved }) 
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-slate-700">אימייל</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+          {partner.inRoster && (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-slate-700">אימייל</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-slate-700">טלפון</label>
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
             </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-slate-700">טלפון</label>
-              <input
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
+          )}
 
           {/*
             Status (is_active) and Freeze (is_frozen) are deliberately
@@ -219,25 +250,27 @@ export default function EditPartnerModal({ isOpen, onClose, partner, onSaved }) 
             balance via Parameters, not here.
           */}
 
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-slate-700">תפקידים</label>
-            <div className="grid grid-cols-2 gap-2">
-              {ALL_PARTNER_ROLES.map((role) => (
-                <label
-                  key={role}
-                  className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 cursor-pointer hover:bg-slate-50"
-                >
-                  <input
-                    type="checkbox"
-                    checked={roles.includes(role)}
-                    onChange={() => toggleRole(role)}
-                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  {roleLabelHe(role)}
-                </label>
-              ))}
+          {partner.inRoster && (
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-slate-700">תפקידים</label>
+              <div className="grid grid-cols-2 gap-2">
+                {ALL_PARTNER_ROLES.map((role) => (
+                  <label
+                    key={role}
+                    className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 cursor-pointer hover:bg-slate-50"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={roles.includes(role)}
+                      onChange={() => toggleRole(role)}
+                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    {roleLabelHe(role)}
+                  </label>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium text-slate-700">תצוגת יומן ברירת מחדל</label>

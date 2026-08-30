@@ -195,6 +195,16 @@ export default function YachtCalendar({ bookings, onSelectRange, onEventClick, i
         selectable
         selectMirror
         select={(info) => onSelectRange(info.start, info.end)}
+        // A plain tap/click (no drag) doesn't fire `select` at all — on
+        // touch devices FullCalendar's default selectable interaction
+        // needs a ~1s long-press-then-drag to define a range, which is
+        // unreliable and unintuitive on a phone (especially in the
+        // already-narrow weekly view), so mobile taps effectively did
+        // nothing. dateClick fires on a simple tap/click, opening a
+        // 1-hour booking at the tapped slot as a fast mobile-friendly
+        // path — drag-select for a custom range still works alongside
+        // it (the two are mutually exclusive per gesture, never both).
+        dateClick={(info) => onSelectRange(info.date, new Date(info.date.getTime() + 3_600_000))}
         eventClick={(info) => {
           if (!info.event.extendedProps.bookingType) return; // decorative background washes aren't clickable bookings
           onEventClick?.(info.event);

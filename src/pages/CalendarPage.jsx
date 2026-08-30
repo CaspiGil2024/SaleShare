@@ -12,6 +12,14 @@ export default function CalendarPage() {
   const [editingBooking, setEditingBooking] = useState(null);
 
   const fetchBookings = useCallback(async () => {
+    // Opportunistic sweep, same lazy-maintenance pattern as
+    // ensure_current_period() elsewhere in the app (no cron dependency
+    // required) — cancels any Cyprus sailing whose start_time has
+    // passed with no other partner ever having joined. See
+    // 0044_shared_sail_join_leave_and_cyprus_auto_cancel.sql.
+    const { error: autoCancelError } = await supabase.rpc('fn_auto_cancel_solo_cyprus_sailings');
+    if (autoCancelError) console.error('Failed to sweep solo Cyprus sailings', autoCancelError);
+
     const { data, error } = await supabase
       .from('bookings')
       .select('id, start_time, end_time, booking_type, guests_count, notes, user_id, booker:users(full_name, email)')

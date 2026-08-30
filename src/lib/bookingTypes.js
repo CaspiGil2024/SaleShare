@@ -2,9 +2,15 @@ import { getBookingTypeColors, bookingTypeLabelHe } from './bookingColors';
 
 const RAW_OPTIONS = [
   { value: 'Private', helper: 'עלות מלאה לפי סוג המשבצת - 1 מטבע לשעה' },
-  { value: 'Shared', helper: 'עלות מלאה למזמין - 1 מטבע לשעה (אורחים אינם משלמים)' },
+  {
+    value: 'Shared',
+    helper: 'עלות מלאה למזמין כל עוד לא הצטרפו שותפים נוספים - 1 מטבע לשעה (אורחים אינם משלמים)',
+  },
   { value: 'Dockside', helper: 'רתיקה בנמל - 1 מטבע לשעה' },
-  { value: 'Cyprus', helper: 'שייט ארוך לקפריסין' },
+  {
+    value: 'Cyprus',
+    helper: 'שייט ארוך לקפריסין - חובה לפחות שותף נוסף אחד, אחרת ההפלגה תבוטל אוטומטית במועד היציאה',
+  },
   { value: 'Maintenance', helper: 'חוסמת את לוח ההזמנות, ללא חיוב מטבעות' },
 ];
 
