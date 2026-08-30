@@ -67,11 +67,14 @@ function RowActionsMenu({
 
   const isSelf = partner.email?.toLowerCase() === currentUser?.email?.toLowerCase();
   const canEditGeneral = isManager(currentUser);
-  // Freeze/soft-delete/hard-delete all write to partner_roster by
-  // email — meaningless (and would silently no-op) for an orphan
-  // account that has no roster row at all (see fetchPartners below).
+  // Freeze/soft-delete write to partner_roster by email — meaningless
+  // (and would silently no-op) for an orphan account that has no
+  // roster row at all (see fetchPartners below). Hard-delete DOES
+  // apply to orphans too, just via a different RPC for that case
+  // (fn_admin_hard_delete_orphan_user, 0049) — handleHardDelete
+  // branches on partner.inRoster to pick the right one.
   const canFreezeOrSoftDelete = isAdminOrTreasurer(currentUser) && partner.inRoster;
-  const canHardDelete = isAdminRole(currentUser) && partner.inRoster;
+  const canHardDelete = isAdminRole(currentUser);
   const menuItems = buildMenuItems({ isSelf, canEditGeneral, canFreezeOrSoftDelete, canHardDelete });
 
   const MENU_WIDTH = 192; // w-48
@@ -326,12 +329,17 @@ export default function PartnersPage() {
     // this page otherwise, and with no sync mechanism to ever correct
     // full_name if it's still whatever handle_new_auth_user's fallback
     // set it to (the email's local part) at sign-up. Surfaced here so
-    // there's at least one way to fix that, even though none of the
-    // roster-only actions (freeze/soft-delete/roles/status) apply.
+    // there's at least one way to fix that, even though most of the
+    // roster-only actions (freeze/soft-delete/roles/status) don't
+    // apply — hard-delete does, via fn_admin_hard_delete_orphan_user
+    // (0049), which is why `id` is carried here (partner_roster rows
+    // have no id column at all, keyed by email instead, so this field
+    // only exists on orphan rows — handleHardDelete branches on it).
     const rosterEmails = new Set(data.map((p) => p.email.toLowerCase()));
     const orphanPartners = (users ?? [])
       .filter((u) => !rosterEmails.has(u.email.toLowerCase()))
       .map((u) => ({
+        id: u.id,
         email: u.email,
         full_name: u.full_name,
         phone: u.phone ?? null,
@@ -398,6 +406,24 @@ export default function PartnersPage() {
 
   async function handleHardDelete(partner) {
     setActionError(null);
+
+    // Roster-tracked partners go through the existing, already-audited
+    // path (delete the partner_roster row -> 0015's trigger cascades
+    // to public.users and everything under it). Orphan accounts have
+    // no roster row to delete, so they go through the dedicated RPC
+    // instead (0049_hard_delete_orphan_accounts.sql) — same admin-only
+    // restriction, same cascade, just a different entry point.
+    if (!partner.inRoster) {
+      const { error } = await supabase.rpc('fn_admin_hard_delete_orphan_user', { p_user_id: partner.id });
+      if (error) {
+        console.error('Failed to permanently delete orphan account', error);
+        setActionError(error.message ?? 'אירעה שגיאה במחיקת השותף. אנא נסו שוב.');
+        return;
+      }
+      await fetchPartners();
+      return;
+    }
+
     const { data, error } = await supabase.from('partner_roster').delete().eq('email', partner.email).select();
 
     if (error) {
