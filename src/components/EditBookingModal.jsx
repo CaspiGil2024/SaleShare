@@ -216,6 +216,15 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
   // the button doesn't invite an attempt that's always going to fail.
   const isPastSailing = new Date(booking.start_time) <= new Date();
 
+  // Shared/Cyprus only: joining, leaving, and editing (date/time/notes/
+  // guest count) are all allowed up to 7 days after the sailing's
+  // start_time, then strictly blocked — see 0046_seven_day_shared_
+  // sailing_modification_window.sql, the actual enforcement. This is
+  // just the matching UI guard.
+  const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+  const isModificationWindowClosed =
+    isSharedBookingType && Date.now() > new Date(booking.start_time).getTime() + SEVEN_DAYS_MS;
+
   async function handleSave(e) {
     e.preventDefault();
     setErrorMessage(null);
@@ -236,6 +245,10 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
       setErrorMessage(
         `סך המשתתפים (כולל אורחים) הוא ${totalParticipants}, ומעל המקסימום המותר של ${MAX_TOTAL_PARTICIPANTS}. הסירו אורחים.`
       );
+      return;
+    }
+    if (isModificationWindowClosed) {
+      setErrorMessage('עברו יותר משבוע ממועד תחילת ההפלגה — חלון השינויים נסגר ולא ניתן לערוך אותה יותר.');
       return;
     }
 
@@ -402,7 +415,14 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
           </ul>
         )}
 
-        {!isOrganizer && !isCurrentUserParticipant && !isPastSailing && (
+        {isModificationWindowClosed && (
+          <p className="text-xs text-rose-600 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2">
+            עברו יותר משבוע ממועד תחילת ההפלגה — חלון השינויים נסגר. לא ניתן עוד להצטרף, לעזוב, או לערוך הפלגה
+            זו.
+          </p>
+        )}
+
+        {!isOrganizer && !isCurrentUserParticipant && !isModificationWindowClosed && (
           <div className="flex items-center gap-2 pt-1">
             <select
               value={joinGuestCount}
@@ -427,7 +447,7 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
           </div>
         )}
 
-        {!isOrganizer && isCurrentUserParticipant && !isPastSailing && (
+        {!isOrganizer && isCurrentUserParticipant && !isModificationWindowClosed && (
           <button
             type="button"
             onClick={handleLeave}
@@ -439,11 +459,11 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
           </button>
         )}
 
-        {!isOrganizer && !isPastSailing && (
+        {!isOrganizer && !isModificationWindowClosed && (
           <p className="text-xs text-slate-400">
             {isCurrentUserParticipant
               ? `חלקכם המשוער בעלות: כ-${formatCoinAmount((coinBreakdown?.total ?? 0) / Math.max(currentShareCount, 1))} מטבעות (מחולק שווה בשווה בין ${currentShareCount} משתתפים, אורחים לא משלמים).`
-              : `אם תצטרפו כעת, העלות תתחלק שווה בשווה בין ${currentShareCount + 1} משתתפים (אורחים לא משלמים).`}
+              : `אם תצטרפו כעת, העלות תתחלק שווה בשווה בין ${currentShareCount + 1} משתתפים (אורחים לא משלמים)${isPastSailing ? ' — גם הפלגות שכבר עברו ניתן להצטרף אליהן' : ''}.`}
           </p>
         )}
 
@@ -703,7 +723,13 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
             <div className="flex items-center gap-3 pt-2">
               <button
                 type="submit"
-                disabled={submitting || exceedsMaxDuration || exceedsCapacity || insufficientCyprusDuration}
+                disabled={
+                  submitting ||
+                  exceedsMaxDuration ||
+                  exceedsCapacity ||
+                  insufficientCyprusDuration ||
+                  isModificationWindowClosed
+                }
                 className="flex-1 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed text-white text-sm font-semibold py-2.5 transition-colors"
               >
                 {submitting ? 'שומר...' : 'שמור שינויים'}
