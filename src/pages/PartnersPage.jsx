@@ -10,12 +10,14 @@ import {
   Snowflake,
   Archive,
   Trash2,
+  UserPlus,
 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../auth/AuthProvider';
 import { roleLabelHe } from '../lib/partnerRoles';
-import { isManager, isAdminOrTreasurer, isAdminRole } from '../lib/permissions';
+import { isManager, isAdminOrTreasurer, isAdminRole, canSeePartnerManagementMenu } from '../lib/permissions';
 import EditPartnerModal from '../components/EditPartnerModal';
+import AddPartnerModal from '../components/AddPartnerModal';
 import BookingHistoryModal from '../components/BookingHistoryModal';
 import ChangePasswordModal from '../components/ChangePasswordModal';
 
@@ -265,6 +267,11 @@ export default function PartnersPage() {
   const [editingPartner, setEditingPartner] = useState(null);
   const [historyPartner, setHistoryPartner] = useState(null);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+  const [isAddPartnerOpen, setIsAddPartnerOpen] = useState(false);
+
+  // Matches partner_roster's INSERT RLS exactly: can_edit_partners()
+  // (isManager's 4 roles) OR is_admin() — see 0007/0015.
+  const canAddPartner = canSeePartnerManagementMenu(currentUser);
 
   // Michael's Method (0021+): real per-type balances live in
   // user_wallets, keyed by user_id + period_id — partner_roster's old
@@ -405,9 +412,21 @@ export default function PartnersPage() {
 
   return (
     <div className="flex flex-col gap-6 p-6" dir="rtl">
-      <header>
-        <h2 className="text-2xl font-bold text-slate-800">שותפים</h2>
-        <p className="text-sm text-slate-500">רשימת כל השותפים במערכת</p>
+      <header className="flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800">שותפים</h2>
+          <p className="text-sm text-slate-500">רשימת כל השותפים במערכת</p>
+        </div>
+        {canAddPartner && (
+          <button
+            type="button"
+            onClick={() => setIsAddPartnerOpen(true)}
+            className="flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 transition-colors"
+          >
+            <UserPlus size={16} />
+            הוספת שותף
+          </button>
+        )}
       </header>
 
       {actionError && (
@@ -533,6 +552,8 @@ export default function PartnersPage() {
           </div>
         )}
       </div>
+
+      <AddPartnerModal isOpen={isAddPartnerOpen} onClose={() => setIsAddPartnerOpen(false)} onSaved={fetchPartners} />
 
       <EditPartnerModal
         isOpen={editingPartner !== null}
