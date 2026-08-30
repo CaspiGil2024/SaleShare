@@ -33,7 +33,7 @@ export default function WhatsNewModal({ isOpen, onClose }) {
     >
       <div
         dir="rtl"
-        className="w-full max-w-lg max-h-[80vh] rounded-2xl bg-white shadow-xl flex flex-col text-right"
+        className="w-full max-w-lg max-h-[80dvh] rounded-2xl bg-white shadow-xl flex flex-col text-right"
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
           <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">

@@ -108,7 +108,7 @@ export default function AddPartnerModal({ isOpen, onClose, onSaved }) {
         if (e.target === e.currentTarget) handleClose();
       }}
     >
-      <div dir="rtl" className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-xl">
+      <div dir="rtl" className="w-full max-w-lg max-h-[90dvh] overflow-y-auto rounded-2xl bg-white shadow-xl">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
           <h3 className="text-lg font-bold text-slate-800">הוספת שותף</h3>
           <button

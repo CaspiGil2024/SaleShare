@@ -125,7 +125,7 @@ export default function BookingHistoryModal({ isOpen, onClose, partner }) {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div dir="rtl" className="w-full max-w-3xl max-h-[85vh] overflow-y-auto rounded-2xl bg-white shadow-xl">
+      <div dir="rtl" className="w-full max-w-3xl max-h-[85dvh] overflow-y-auto rounded-2xl bg-white shadow-xl">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
           <div>
             <h3 className="text-lg font-bold text-slate-800">היסטוריית הזמנות</h3>
@@ -164,7 +164,7 @@ export default function BookingHistoryModal({ isOpen, onClose, partner }) {
           ) : rows.length === 0 ? (
             <p className="p-10 text-center text-sm text-slate-400">לא נמצאו הזמנות עבור שותף זה.</p>
           ) : (
-            <div className="overflow-auto max-h-[60vh] rounded-2xl border border-slate-200">
+            <div className="overflow-auto max-h-[60dvh] rounded-2xl border border-slate-200">
               <table className="w-full text-sm">
                 <thead className="sticky-thead">
                   <tr className="border-b border-slate-100 text-start text-slate-500 bg-slate-50">

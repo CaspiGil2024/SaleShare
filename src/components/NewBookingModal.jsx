@@ -302,7 +302,7 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div dir="rtl" className="w-full max-w-lg max-h-[95vh] overflow-y-auto rounded-2xl bg-white shadow-xl">
+      <div dir="rtl" className="w-full max-w-lg max-h-[95dvh] overflow-y-auto rounded-2xl bg-white shadow-xl">
         <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
           <div>
             <h3 className="text-base font-bold text-slate-800">הוספת הפלגה</h3>

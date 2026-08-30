@@ -486,7 +486,7 @@ export default function PartnersPage() {
         ) : partners.length === 0 ? (
           <p className="p-10 text-center text-sm text-slate-400">לא נמצאו שותפים.</p>
         ) : (
-          <div className="overflow-auto max-h-[65vh]">
+          <div className="overflow-auto max-h-[65dvh]">
             {/*
               Column order follows normal source order under dir="rtl":
               the FIRST column below lands on the visual right, the

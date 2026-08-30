@@ -181,7 +181,7 @@ export default function CoinsPage() {
         ) : transactions.length === 0 ? (
           <p className="p-10 text-center text-sm text-slate-400">אין עדיין תנועות מטבעות.</p>
         ) : (
-          <div className="overflow-auto max-h-[65vh]">
+          <div className="overflow-auto max-h-[65dvh]">
             <table className="w-full text-sm">
               <thead className="sticky-thead">
                 <tr className="border-b border-slate-100 text-start text-slate-500">

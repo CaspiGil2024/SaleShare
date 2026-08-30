@@ -400,7 +400,7 @@ function PartnerBalancesTable({ onAdjusted }) {
       ) : partners.length === 0 ? (
         <p className="p-10 text-center text-sm text-slate-400">אין שותפים רשומים.</p>
       ) : (
-        <div className={`overflow-auto max-h-[65vh] transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
+        <div className={`overflow-auto max-h-[65dvh] transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
           <table className="w-full text-sm">
             <thead className="sticky-thead">
               <tr className="border-b border-slate-100 text-start text-slate-500">
@@ -514,7 +514,7 @@ function AdjustmentAuditLog({ refreshToken }) {
       ) : rows.length === 0 ? (
         <p className="p-10 text-center text-sm text-slate-400">אין עדיין שינויים ידניים רשומים.</p>
       ) : (
-        <div className="overflow-auto max-h-[65vh]">
+        <div className="overflow-auto max-h-[65dvh]">
           <table className="w-full text-sm">
             <thead className="sticky-thead">
               <tr className="border-b border-slate-100 text-start text-slate-500">

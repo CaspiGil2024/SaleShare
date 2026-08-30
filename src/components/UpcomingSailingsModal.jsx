@@ -48,7 +48,7 @@ export default function UpcomingSailingsModal({ isOpen, onClose }) {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div dir="rtl" className="w-full max-w-lg max-h-[80vh] rounded-2xl bg-white shadow-xl flex flex-col">
+      <div dir="rtl" className="w-full max-w-lg max-h-[80dvh] rounded-2xl bg-white shadow-xl flex flex-col">
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
           <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
             <CalendarClock size={18} className="text-blue-600" />
