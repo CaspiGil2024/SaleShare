@@ -125,6 +125,22 @@ export default function YachtCalendar({ bookings, onSelectRange, onEventClick, i
   const lastViewTypeRef = useRef(initialView);
   const [holidayMap, setHolidayMap] = useState(new Map());
 
+  // (pointer: coarse) is the standards-based "primary input is touch"
+  // check — unlike a screen-width breakpoint, it isn't fooled by a
+  // narrow desktop window and correctly matches a touch device even
+  // in landscape/tablet width. On a mouse, drag-select (`selectable`)
+  // and a plain tap (`dateClick`) are unambiguous — a real drag only
+  // ever happens via mousedown+move. On touch, both gestures start
+  // from the exact same touchstart, and FullCalendar has to guess
+  // which one you meant; that guess is what made tapping a free slot
+  // to book unreliable. Turning off drag-select specifically on touch
+  // devices removes the ambiguity outright — dateClick alone handles
+  // every tap, on both the Day and Week (timeGrid) views.
+  const isCoarsePointer =
+    typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      ? window.matchMedia('(pointer: coarse)').matches
+      : false;
+
   const holidayEvents = useMemo(() => holidayMapToBackgroundEvents(holidayMap), [holidayMap]);
 
   const events = useMemo(
@@ -171,7 +187,7 @@ export default function YachtCalendar({ bookings, onSelectRange, onEventClick, i
   );
 
   return (
-    <div className="flex flex-col h-[calc(100vh-140px)] overflow-hidden bg-white rounded-2xl shadow-sm border border-slate-200 p-2 sm:p-4">
+    <div className="flex flex-col h-[calc(100dvh-140px)] overflow-hidden bg-white rounded-2xl shadow-sm border border-slate-200 p-2 sm:p-4">
       <FullCalendar
         ref={calendarRef}
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
@@ -192,8 +208,8 @@ export default function YachtCalendar({ bookings, onSelectRange, onEventClick, i
         slotLabelInterval="01:00"
         slotMinTime="00:00:00"
         slotMaxTime="24:00:00"
-        selectable
-        selectMirror
+        selectable={!isCoarsePointer}
+        selectMirror={!isCoarsePointer}
         select={(info) => onSelectRange(info.start, info.end)}
         // A plain tap/click (no drag) doesn't fire `select` at all — on
         // touch devices FullCalendar's default selectable interaction

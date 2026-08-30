@@ -88,7 +88,7 @@ export default function CalendarPage() {
         never correcting itself.
       */}
       {profileLoading ? (
-        <div className="flex items-center justify-center h-[calc(100vh-140px)] bg-white rounded-2xl shadow-sm border border-slate-200 text-sm text-slate-400">
+        <div className="flex items-center justify-center h-[calc(100dvh-140px)] bg-white rounded-2xl shadow-sm border border-slate-200 text-sm text-slate-400">
           טוען...
         </div>
       ) : (
