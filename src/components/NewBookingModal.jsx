@@ -27,6 +27,16 @@ const CYPRUS_DURATION_DAY_OPTIONS = Array.from(
 );
 const GUEST_OPTIONS = Array.from({ length: 8 }, (_, i) => i); // 0..7
 
+// Bridges coinCalculator.js's camelCase breakdown keys to user_wallets'
+// snake_case columns, so the header balance fetch and the cost
+// breakdown below can share one iteration order.
+const WALLET_COLUMN_BY_TYPE = {
+  weekendDay: 'coins_weekend_day',
+  weekendNight: 'coins_weekend_night',
+  midweekDay: 'coins_midweek_day',
+  midweekNight: 'coins_midweek_night',
+};
+
 function formatHourLabel(hour) {
   return `${String(hour).padStart(2, '0')}:00`;
 }
@@ -71,6 +81,44 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
+
+  // Current balances, PRIOR to this booking — shown in the header and
+  // used to compute "remaining after" per type in the cost breakdown
+  // below. Same ensure_current_period + user_wallets fetch pattern as
+  // CoinsPage.jsx/SailingLogPage.jsx's balance displays.
+  const [wallet, setWallet] = useState(null);
+  const [walletLoading, setWalletLoading] = useState(true);
+
+  useEffect(() => {
+    if (!isOpen || !currentUser?.id) return;
+    let isCancelled = false;
+    setWalletLoading(true);
+    (async () => {
+      const { error: ensureError } = await supabase.rpc('ensure_current_period');
+      if (ensureError) console.error('Failed to ensure current period', ensureError);
+
+      const { data: period } = await supabase.from('periods').select('id').eq('is_current', true).limit(1).maybeSingle();
+      if (!period) {
+        if (!isCancelled) setWalletLoading(false);
+        return;
+      }
+
+      const { data: walletRow, error } = await supabase
+        .from('user_wallets')
+        .select('coins_weekend_day, coins_weekend_night, coins_midweek_day, coins_midweek_night')
+        .eq('user_id', currentUser.id)
+        .eq('period_id', period.id)
+        .maybeSingle();
+
+      if (isCancelled) return;
+      if (error) console.error('Failed to load wallet balance', error);
+      else setWallet(walletRow);
+      setWalletLoading(false);
+    })();
+    return () => {
+      isCancelled = true;
+    };
+  }, [isOpen, currentUser?.id]);
 
   // Re-seed the form whenever a fresh grid selection comes in.
   useEffect(() => {
@@ -307,6 +355,22 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
           <div>
             <h3 className="text-base font-bold text-slate-800">הוספת הפלגה</h3>
             <p className="text-xs text-slate-400">{currentUser?.full_name ?? currentUser?.email ?? ''}</p>
+            {/* Balances PRIOR to this booking — see coinBreakdown below
+                for the estimated cost/impact this booking would have. */}
+            {walletLoading ? (
+              <p className="text-[11px] text-slate-400 mt-0.5">טוען יתרות...</p>
+            ) : wallet ? (
+              <div className="flex flex-wrap items-center gap-1 mt-0.5">
+                {Object.entries(COIN_TYPE_LABELS_HE).map(([key, label]) => (
+                  <span
+                    key={key}
+                    className="px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-medium whitespace-nowrap"
+                  >
+                    {label}: {formatCoinAmount(wallet[WALLET_COLUMN_BY_TYPE[key]] ?? 0)}
+                  </span>
+                ))}
+              </div>
+            ) : null}
           </div>
           <button
             type="button"
@@ -495,15 +559,35 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
               <span>עלות משוערת</span>
             </div>
             {coinBreakdown ? (
-              <div className="flex flex-wrap items-center gap-2">
-                {Object.entries(COIN_TYPE_LABELS_HE).map(([key, label]) =>
-                  coinBreakdown[key] > 0 ? (
-                    <span key={key} className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-medium">
-                      {label}: {formatCoinAmount(coinBreakdown[key])}
-                    </span>
-                  ) : null
-                )}
-                <span className="px-2.5 py-1 rounded-full bg-blue-600 text-white text-xs font-semibold">
+              <div className="flex flex-col gap-2">
+                {/* All 4 types, always — including ones this booking
+                    doesn't touch (cost 0), so the full impact across
+                    every coin type is visible at a glance, not just
+                    whichever happen to be charged. */}
+                <div className="grid grid-cols-2 gap-1.5">
+                  {Object.entries(COIN_TYPE_LABELS_HE).map(([key, label]) => {
+                    const cost = coinBreakdown[key] ?? 0;
+                    const current = wallet ? wallet[WALLET_COLUMN_BY_TYPE[key]] ?? 0 : null;
+                    const remaining = current !== null ? current - cost : null;
+                    return (
+                      <div
+                        key={key}
+                        className={`rounded-lg px-2 py-1 text-xs ${
+                          cost > 0 ? 'bg-amber-50 text-amber-800' : 'bg-slate-50 text-slate-500'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-medium">{label}</span>
+                          <span className="font-semibold">-{formatCoinAmount(cost)}</span>
+                        </div>
+                        {remaining !== null && (
+                          <div className="text-[10px] opacity-75">יתרה לאחר: {formatCoinAmount(remaining)}</div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                <span className="self-start px-2.5 py-1 rounded-full bg-blue-600 text-white text-xs font-semibold">
                   סה"כ {formatCoinAmount(coinBreakdown.total)} מטבעות
                 </span>
               </div>
