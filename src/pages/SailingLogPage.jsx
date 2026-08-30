@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../auth/AuthProvider';
 import { bookingTypeLabelHe } from '../lib/bookingColors';
 import { exportSailingLogToXlsx } from '../lib/xlsxExport';
+import { formatCoinAmount as formatCoin } from '../lib/coinCalculator';
 
 const ACTION_LABELS_HE = {
   departure: 'הפלגה יצאה',
@@ -26,8 +27,7 @@ function addDays(date, days) {
 
 function formatCoinDisplay(n) {
   if (n === null || n === undefined) return '—';
-  const rounded = Math.round(n * 100) / 100;
-  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2);
+  return formatCoin(n);
 }
 
 const ZERO_BREAKDOWN = { weekendDay: 0, weekendNight: 0, midweekDay: 0, midweekNight: 0 };
@@ -323,16 +323,16 @@ export default function SailingLogPage() {
                     </td>
                     <td className="px-4 py-3 text-slate-500">{r.reasonLabel ?? '—'}</td>
                     <td className="px-4 py-3 text-amber-700 font-medium whitespace-nowrap">
-                      {r.coins.weekendDay || '—'}
+                      {r.coins.weekendDay ? formatCoin(r.coins.weekendDay) : '—'}
                     </td>
                     <td className="px-4 py-3 text-indigo-700 font-medium whitespace-nowrap">
-                      {r.coins.weekendNight || '—'}
+                      {r.coins.weekendNight ? formatCoin(r.coins.weekendNight) : '—'}
                     </td>
                     <td className="px-4 py-3 text-emerald-700 font-medium whitespace-nowrap">
-                      {r.coins.midweekDay || '—'}
+                      {r.coins.midweekDay ? formatCoin(r.coins.midweekDay) : '—'}
                     </td>
                     <td className="px-4 py-3 text-slate-600 font-medium whitespace-nowrap">
-                      {r.coins.midweekNight || '—'}
+                      {r.coins.midweekNight ? formatCoin(r.coins.midweekNight) : '—'}
                     </td>
                   </tr>
                 ))}

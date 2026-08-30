@@ -20,6 +20,7 @@ import EditPartnerModal from '../components/EditPartnerModal';
 import AddPartnerModal from '../components/AddPartnerModal';
 import BookingHistoryModal from '../components/BookingHistoryModal';
 import ChangePasswordModal from '../components/ChangePasswordModal';
+import { formatCoinAmount } from '../lib/coinCalculator';
 
 // Per-item role gate (2026-08-26 rule). Deliberately narrower/different
 // from the general isManager() set used to edit a partner's ordinary
@@ -231,12 +232,6 @@ function RowActionsMenu({
         )}
     </>
   );
-}
-
-function formatCoinAmount(n) {
-  if (n === null || n === undefined) return '0';
-  const rounded = Math.round(n * 100) / 100;
-  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2);
 }
 
 // Michael's Method's 4 coin types (0021+) as a compact 2x2 grid — one

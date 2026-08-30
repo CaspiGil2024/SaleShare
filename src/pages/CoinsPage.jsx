@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../auth/AuthProvider';
 import { isManager } from '../lib/permissions';
 import { bookingTypeLabelHe } from '../lib/bookingColors';
+import { formatCoinAmount as formatCoin } from '../lib/coinCalculator';
 
 // Reference rate card — Michael's Method (§10/30/40,
 // 0021-0024_michael_method_*.sql): every hour costs exactly 1 coin of
@@ -22,8 +23,7 @@ const RATE_CARD_ITEMS = [
 
 function formatCoinDisplay(n) {
   if (n === null || n === undefined) return '—';
-  const rounded = Math.round(n * 100) / 100;
-  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2);
+  return formatCoin(n);
 }
 
 const COIN_TYPE_SHORT_LABELS_HE = {

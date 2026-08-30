@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../auth/AuthProvider';
 import { isAdminOrTreasurer } from '../lib/permissions';
 import { exportCoinAdjustmentAuditToXlsx } from '../lib/xlsxExport';
+import { formatCoinAmount as formatCoin } from '../lib/coinCalculator';
 
 const COIN_TYPE_OPTIONS = [
   { value: 'weekend_day', label: 'סופ"ש יום' },
@@ -19,10 +20,12 @@ const COIN_TYPE_COLUMN = {
   midweek_night: 'coins_midweek_night',
 };
 
+// Dash for genuinely missing data, otherwise always two decimals — the
+// shared formatCoinAmount (coinCalculator.js) is the single source of
+// truth for the number formatting itself.
 function formatCoinAmount(n) {
   if (n === null || n === undefined) return '—';
-  const rounded = Math.round(n * 100) / 100;
-  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2);
+  return formatCoin(n);
 }
 
 function SystemSettingsForm({ currentUser }) {

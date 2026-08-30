@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { X, Coins } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
+import { formatCoinAmount } from '../lib/coinCalculator';
 
 const COIN_TYPES = [
   { key: 'coins_weekend_day', label: 'סופ"ש יום', className: 'bg-amber-50 text-amber-700' },
@@ -8,12 +9,6 @@ const COIN_TYPES = [
   { key: 'coins_midweek_day', label: 'אמצ"ש יום', className: 'bg-emerald-50 text-emerald-700' },
   { key: 'coins_midweek_night', label: 'אמצ"ש לילה', className: 'bg-slate-100 text-slate-600' },
 ];
-
-function formatCoinAmount(n) {
-  if (n === null || n === undefined) return '0';
-  const rounded = Math.round(n * 100) / 100;
-  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2);
-}
 
 export default function CoinBreakdownModal({ isOpen, onClose, currentUser }) {
   const [wallet, setWallet] = useState(null);

@@ -7,18 +7,13 @@ import {
   exportDetailedActivityReportToXlsx,
   exportPartnerBalancesToXlsx,
 } from '../lib/xlsxExport';
+import { formatCoinAmount } from '../lib/coinCalculator';
 
 const TABS = [
   { key: 'past', label: 'דוח פעילות היסטורית', icon: History },
   { key: 'future', label: 'דוח פעילות עתידית', icon: CalendarClock },
   { key: 'balances', label: 'יתרות שותפים', icon: Coins },
 ];
-
-function formatCoinAmount(n) {
-  if (n === null || n === undefined) return '0';
-  const rounded = Math.round(n * 100) / 100;
-  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2);
-}
 
 // Every partner's real current-period balance across all 4 coin
 // types (0021+). Open to every partner, not just managers — see
@@ -392,7 +387,7 @@ function ActivityReportTab({ defaultFrom, defaultTo, reportLabel }) {
                       <td className="px-4 py-3 font-medium text-slate-800">{r.name}</td>
                       <td className="px-4 py-3 text-slate-600">{r.sailCount}</td>
                       <td className="px-4 py-3 text-slate-600">{r.hours.toFixed(1)}</td>
-                      <td className="px-4 py-3 text-slate-600">{r.coins}</td>
+                      <td className="px-4 py-3 text-slate-600">{formatCoinAmount(r.coins)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -409,7 +404,7 @@ function ActivityReportTab({ defaultFrom, defaultTo, reportLabel }) {
               <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
                 <h4 className="font-bold text-slate-800">{r.name}</h4>
                 <p className="text-xs text-slate-400">
-                  {r.sailCount} הפלגות · {r.hours.toFixed(1)} שעות · {r.coins} מטבעות
+                  {r.sailCount} הפלגות · {r.hours.toFixed(1)} שעות · {formatCoinAmount(r.coins)} מטבעות
                 </p>
               </div>
               <div className="overflow-auto max-h-[40dvh]">
@@ -452,16 +447,16 @@ function ActivityReportTab({ defaultFrom, defaultTo, reportLabel }) {
                       </td>
                       <td className="px-4 py-2 text-slate-600">{e.hours.toFixed(1)}</td>
                       <td className="px-4 py-2 text-amber-700 font-medium whitespace-nowrap">
-                        {e.coinBreakdown.weekendDay || '—'}
+                        {e.coinBreakdown.weekendDay ? formatCoinAmount(e.coinBreakdown.weekendDay) : '—'}
                       </td>
                       <td className="px-4 py-2 text-indigo-700 font-medium whitespace-nowrap">
-                        {e.coinBreakdown.weekendNight || '—'}
+                        {e.coinBreakdown.weekendNight ? formatCoinAmount(e.coinBreakdown.weekendNight) : '—'}
                       </td>
                       <td className="px-4 py-2 text-emerald-700 font-medium whitespace-nowrap">
-                        {e.coinBreakdown.midweekDay || '—'}
+                        {e.coinBreakdown.midweekDay ? formatCoinAmount(e.coinBreakdown.midweekDay) : '—'}
                       </td>
                       <td className="px-4 py-2 text-slate-600 font-medium whitespace-nowrap">
-                        {e.coinBreakdown.midweekNight || '—'}
+                        {e.coinBreakdown.midweekNight ? formatCoinAmount(e.coinBreakdown.midweekNight) : '—'}
                       </td>
                     </tr>
                   ))}

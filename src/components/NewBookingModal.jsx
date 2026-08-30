@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { X, Calendar as CalendarIcon, Clock, Coins as CoinsIcon, Anchor } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
-import { classifyHours, COIN_TYPE_LABELS_HE } from '../lib/coinCalculator';
+import { classifyHours, COIN_TYPE_LABELS_HE, formatCoinAmount } from '../lib/coinCalculator';
 import { BOOKING_TYPE_OPTIONS, chargesCoins } from '../lib/bookingTypes';
 import { fetchIsraeliHolidayMap, syncIsraeliHolidays } from '../lib/israeliHolidays';
 import { friendlyBookingErrorMessage } from '../lib/bookingErrors';
@@ -64,11 +64,6 @@ function buildDateTime(baseDate, hour) {
   const dt = new Date(baseDate);
   dt.setHours(hour, 0, 0, 0);
   return dt;
-}
-
-function formatCoinAmount(n) {
-  const rounded = Math.round(n * 100) / 100;
-  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2);
 }
 
 export default function NewBookingModal({ isOpen, onClose, initialStart, initialEnd, currentUser, onBookingCreated }) {

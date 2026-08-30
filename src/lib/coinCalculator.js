@@ -79,3 +79,14 @@ export const COIN_TYPE_LABELS_HE = {
   midweekDay: 'אמצ"ש יום',
   midweekNight: 'אמצ"ש לילה',
 };
+
+// Single shared formatter for every coin amount shown anywhere in the
+// app (balances, costs, remaining balances, audit log entries, ...) —
+// previously duplicated with slightly different behavior (whole
+// numbers shown bare, e.g. "24" instead of "24.00") across 8 different
+// files. Always two decimal places, no exceptions, by explicit product
+// decision.
+export function formatCoinAmount(n) {
+  if (n === null || n === undefined || Number.isNaN(n)) return '0.00';
+  return (Math.round(n * 100) / 100).toFixed(2);
+}

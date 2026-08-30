@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { X, Calendar as CalendarIcon, Clock, Coins as CoinsIcon, User, Users, LogIn, LogOut, UserPlus } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
-import { classifyHours, COIN_TYPE_LABELS_HE } from '../lib/coinCalculator';
+import { classifyHours, COIN_TYPE_LABELS_HE, formatCoinAmount } from '../lib/coinCalculator';
 import { BOOKING_TYPE_OPTIONS, chargesCoins } from '../lib/bookingTypes';
 import { bookingTypeLabelHe } from '../lib/bookingColors';
 import { fetchIsraeliHolidayMap, syncIsraeliHolidays } from '../lib/israeliHolidays';
@@ -44,11 +44,6 @@ function buildDateTime(baseDate, hour) {
   const dt = new Date(baseDate);
   dt.setHours(hour, 0, 0, 0);
   return dt;
-}
-
-function formatCoinAmount(n) {
-  const rounded = Math.round(n * 100) / 100;
-  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2);
 }
 
 export default function EditBookingModal({ isOpen, onClose, booking, currentUser, onBookingUpdated }) {
@@ -868,12 +863,12 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
                         key={key}
                         className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-medium"
                       >
-                        {label}: {coinBreakdown[key]}
+                        {label}: {formatCoinAmount(coinBreakdown[key])}
                       </span>
                     ) : null
                   )}
                   <span className="px-2.5 py-1 rounded-full bg-blue-600 text-white text-xs font-semibold">
-                    סה"כ {coinBreakdown.total} מטבעות
+                    סה"כ {formatCoinAmount(coinBreakdown.total)} מטבעות
                   </span>
                 </div>
               ) : (
