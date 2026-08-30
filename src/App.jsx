@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Menu } from 'lucide-react';
 import { AuthProvider, useAuth } from './auth/AuthProvider';
 import Login from './pages/Login';
+import ForcePasswordChange from './components/ForcePasswordChange';
 import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
 import CalendarPage from './pages/CalendarPage';
@@ -68,9 +69,9 @@ function AuthenticatedApp() {
 }
 
 function AppShell() {
-  const { user, loading } = useAuth();
+  const { user, loading, currentUser, profileLoading } = useAuth();
 
-  if (loading) {
+  if (loading || (user && profileLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 text-sm text-slate-400">
         Loading...
@@ -78,7 +79,9 @@ function AppShell() {
     );
   }
 
-  return user ? <AuthenticatedApp /> : <Login />;
+  if (!user) return <Login />;
+  if (currentUser?.must_change_password) return <ForcePasswordChange />;
+  return <AuthenticatedApp />;
 }
 
 export default function App() {

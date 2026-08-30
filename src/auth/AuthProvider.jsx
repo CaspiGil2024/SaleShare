@@ -56,7 +56,9 @@ export function AuthProvider({ children }) {
     setProfileLoading(true);
     supabase
       .from('users')
-      .select('id, full_name, email, role, default_calendar_view, emails_enabled, receive_shared_sail_notifications')
+      .select(
+        'id, full_name, email, role, default_calendar_view, emails_enabled, receive_shared_sail_notifications, must_change_password'
+      )
       .eq('id', authUser.id)
       .single()
       .then(({ data, error }) => {
@@ -123,6 +125,7 @@ export function AuthProvider({ children }) {
         default_calendar_view: profile?.default_calendar_view ?? 'week',
         emails_enabled: profile?.emails_enabled ?? false,
         receive_shared_sail_notifications: profile?.receive_shared_sail_notifications ?? false,
+        must_change_password: profile?.must_change_password ?? false,
         roles,
       }
     : null;
@@ -141,20 +144,39 @@ export function AuthProvider({ children }) {
     setProfile((prev) => (prev ? { ...prev, default_calendar_view: view } : prev));
   }
 
+  // Used by the forced first-login password screen: sets a real,
+  // partner-chosen password via Supabase Auth, then clears the
+  // must_change_password gate so AppShell lets them into the app.
+  // The two steps aren't atomic — if the flag update fails after the
+  // password succeeded, the user just gets asked to change it again
+  // next login, which is safe (no more than one extra prompt), unlike
+  // failing open would be.
+  async function changePassword(newPassword) {
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) return { error };
+
+    const { error: flagError } = await supabase
+      .from('users')
+      .update({ must_change_password: false })
+      .eq('id', authUser.id);
+    if (flagError) {
+      console.error('Failed to clear must_change_password flag', flagError);
+      return { error: flagError };
+    }
+
+    setProfile((prev) => (prev ? { ...prev, must_change_password: false } : prev));
+    return { error: null };
+  }
+
   const value = {
     session,
     updateDefaultCalendarView,
+    changePassword,
     user: authUser,
     currentUser,
     loading,
     profileLoading,
     signInWithPassword: (email, password) => supabase.auth.signInWithPassword({ email, password }),
-    signUpWithPassword: (email, password) => supabase.auth.signUp({ email, password }),
-    signInWithGoogle: () =>
-      supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: { redirectTo: window.location.origin },
-      }),
     resetPassword: (email) =>
       supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin }),
     signOut: () => supabase.auth.signOut(),

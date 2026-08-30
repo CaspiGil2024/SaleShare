@@ -1,41 +1,32 @@
 import { useState } from 'react';
-import { Mail, Lock, Sailboat } from 'lucide-react';
+import { Lock, Sailboat } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider';
 
-export default function Login() {
-  const { signInWithPassword, resetPassword } = useAuth();
+export default function ForcePasswordChange() {
+  const { changePassword, signOut } = useAuth();
 
-  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
-  const [infoMessage, setInfoMessage] = useState(null);
 
   async function handleSubmit(e) {
     e.preventDefault();
     setErrorMessage(null);
-    setInfoMessage(null);
-    setSubmitting(true);
-    try {
-      const { error } = await signInWithPassword(email, password);
-      if (error) throw error;
-    } catch (err) {
-      setErrorMessage(err.message ?? 'Something went wrong. Please try again.');
-    } finally {
-      setSubmitting(false);
-    }
-  }
 
-  async function handleForgotPassword() {
-    setErrorMessage(null);
-    setInfoMessage(null);
-    if (!email) {
-      setErrorMessage('Enter your email address first.');
+    if (password.length < 6) {
+      setErrorMessage('הסיסמה חייבת להכיל לפחות 6 תווים.');
       return;
     }
-    const { error } = await resetPassword(email);
-    if (error) setErrorMessage(error.message);
-    else setInfoMessage('Password reset email sent.');
+    if (password !== confirmPassword) {
+      setErrorMessage('הסיסמאות אינן תואמות.');
+      return;
+    }
+
+    setSubmitting(true);
+    const { error } = await changePassword(password);
+    setSubmitting(false);
+    if (error) setErrorMessage(error.message ?? 'משהו השתבש. נסו שוב.');
   }
 
   return (
@@ -46,21 +37,23 @@ export default function Login() {
             <Sailboat size={26} />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-slate-800">Welcome to אובור (OBOR)</h1>
-            <p className="text-sm text-slate-500 mt-1">Sign in to continue</p>
+            <h1 className="text-xl font-bold text-slate-800">קביעת סיסמה חדשה</h1>
+            <p className="text-sm text-slate-500 mt-1">
+              זוהי כניסתכם הראשונה — לפני שממשיכים, יש לבחור סיסמה קבועה במקום מספר הטלפון הזמני.
+            </p>
           </div>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="relative">
-            <Mail size={16} className="absolute inset-y-0 right-3 my-auto text-slate-400" />
+            <Lock size={16} className="absolute inset-y-0 right-3 my-auto text-slate-400" />
             <input
-              type="email"
+              type="password"
               required
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Email"
+              autoComplete="new-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="סיסמה חדשה"
               className="w-full rounded-lg bg-blue-50 border border-blue-100 pr-9 pl-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -70,10 +63,10 @@ export default function Login() {
             <input
               type="password"
               required
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Password"
+              autoComplete="new-password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="אימות סיסמה חדשה"
               className="w-full rounded-lg bg-blue-50 border border-blue-100 pr-9 pl-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -83,26 +76,19 @@ export default function Login() {
               {errorMessage}
             </p>
           )}
-          {infoMessage && (
-            <p className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
-              {infoMessage}
-            </p>
-          )}
 
           <button
             type="submit"
             disabled={submitting}
             className="w-full rounded-lg bg-blue-900 hover:bg-blue-950 disabled:bg-blue-300 disabled:cursor-not-allowed text-white text-sm font-semibold py-2.5 transition-colors"
           >
-            {submitting ? '...' : 'Sign in'}
+            {submitting ? '...' : 'שמירת סיסמה והמשך'}
           </button>
         </form>
 
-        <div className="flex items-center justify-center text-sm">
-          <button type="button" onClick={handleForgotPassword} className="text-blue-600 hover:underline">
-            Forgot password?
-          </button>
-        </div>
+        <button type="button" onClick={signOut} className="text-sm text-slate-500 hover:text-slate-700 self-center">
+          יציאה
+        </button>
       </div>
     </div>
   );
