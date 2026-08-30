@@ -204,10 +204,9 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
   const exceedsNightHourLimit =
     !!dayNightBreakdown && dayNightBreakdown.weekendNight + dayNightBreakdown.midweekNight > MAX_NIGHT_HOURS;
 
-  // Guests never cost coins and are no longer attributed to a specific
-  // partner (there's only ever one participant — the organizer — since
-  // partners can no longer be added to a booking at all), so headcount
-  // is the same flat "1 + guestsCount" for every type.
+  // Headcount toward the 9-person cap — organizer + guests. Creation is
+  // always solo (partners join an existing sail afterward, see
+  // EditBookingModal.jsx), so there's only ever one participant here.
   const totalParticipants = 1 + guestsCount;
   const exceedsCapacity = totalParticipants > MAX_TOTAL_PARTICIPANTS;
 
@@ -521,8 +520,12 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
             </div>
           </div>
 
-          {/* Guests — never cost coins, for any booking type (see
-              0040_guests_free_and_shared_sail_solo_pricing.sql) */}
+          {/* At creation there's only ever the organizer, so guests
+              here don't change the estimate below (their share is
+              always 100% regardless of guest count — see
+              coinBreakdown's comment above). They start mattering for
+              cost once other partners join an existing Shared/Cyprus
+              sail — see EditBookingModal.jsx's proportional split. */}
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium text-slate-700">מספר אורחים</label>
             <select

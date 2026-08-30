@@ -232,8 +232,9 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
   // but no longer literally "require" other partners.
   const isSharedType = bookingType === 'Shared' || isCyprusType;
   const otherParticipants = participants.filter((p) => p.user_id !== booking?.user_id);
-  // Guests never cost coins. Headcount = organizer + everyone joined +
-  // everyone's guests.
+  // Headcount toward the 9-person cap = organizer + everyone joined +
+  // everyone's guests (unrelated to how cost is split — see totalShares
+  // below).
   const totalParticipants = isSharedType
     ? 1 + otherParticipants.length + guestsCount + otherParticipants.reduce((sum, p) => sum + p.guest_count, 0)
     : 1 + guestsCount;
@@ -245,15 +246,21 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
     return classifyHours(startDateTime, endDateTime, new Set(holidayMap.keys()));
   }, [bookingType, startDateTime, endDateTime, holidayMap]);
 
-  // Display-only estimate of the organizer's own share once other
-  // partners are on the sail — the real amount is always computed
-  // server-side (fn_recompute_shared_booking_participants), this just
-  // sets expectations before saving/joining/leaving.
-  const currentShareCount = isSharedType ? 1 + otherParticipants.length : 1;
+  // Display-only estimate of how the cost currently splits — the real
+  // amount is always computed server-side (fn_recompute_shared_
+  // booking_participants, 0051_restore_guest_weighted_cost_split.sql),
+  // this just sets expectations before saving/joining/leaving. Each
+  // participant's share is (1 + their own guest_count) out of this
+  // total — guestsCount here is the ORGANIZER's own live-edited field,
+  // matching what fn_update_shared_booking will actually submit.
+  const totalShares = isSharedType
+    ? 1 + guestsCount + otherParticipants.reduce((sum, p) => sum + 1 + p.guest_count, 0)
+    : 1;
 
   if (!isOpen || !booking) return null;
 
   const isCurrentUserParticipant = participants.some((p) => p.user_id === currentUser?.id);
+  const myParticipantRow = participants.find((p) => p.user_id === currentUser?.id);
 
   // Cancelling refunds coins in full (see trg_fn_refund_participants_
   // on_cancel / the private-booking refund trigger) — blocking it once
@@ -611,8 +618,21 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
         {!isOrganizer && !isModificationWindowClosed && (
           <p className="text-xs text-slate-400">
             {isCurrentUserParticipant
-              ? `חלקכם המשוער בעלות: כ-${formatCoinAmount((coinBreakdown?.total ?? 0) / Math.max(currentShareCount, 1))} מטבעות (מחולק שווה בשווה בין ${currentShareCount} משתתפים, אורחים לא משלמים).`
-              : `אם תצטרפו כעת, העלות תתחלק שווה בשווה בין ${currentShareCount + 1} משתתפים (אורחים לא משלמים)${isPastSailing ? ' — גם הפלגות שכבר עברו ניתן להצטרף אליהן' : ''}.`}
+              ? (() => {
+                  const myShares = 1 + (myParticipantRow?.guest_count ?? 0);
+                  return `חלקכם המשוער בעלות: כ-${formatCoinAmount(
+                    ((coinBreakdown?.total ?? 0) * myShares) / Math.max(totalShares, 1)
+                  )} מטבעות (חלק ${myShares} מתוך ${totalShares}, לפי 1 + מספר האורחים שהבאתם).`;
+                })()
+              : (() => {
+                  const prospectiveShares = 1 + joinGuestCount;
+                  const prospectiveTotal = totalShares + prospectiveShares;
+                  return `אם תצטרפו עם ${joinGuestCount} אורחים, חלקכם יהיה כ-${formatCoinAmount(
+                    ((coinBreakdown?.total ?? 0) * prospectiveShares) / prospectiveTotal
+                  )} מטבעות (חלק ${prospectiveShares} מתוך ${prospectiveTotal})${
+                    isPastSailing ? ' — גם הפלגות שכבר עברו ניתן להצטרף אליהן' : ''
+                  }.`;
+                })()}
           </p>
         )}
 
@@ -797,7 +817,10 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
               </div>
             </div>
 
-            {/* Guests — never cost coins, for any booking type */}
+            {/* For Shared/Cyprus, guests increase your proportional
+                share of the cost (1 + guest count, out of the sail's
+                total shares — see totalShares above); for other types
+                they're headcount only. */}
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium text-slate-700">מספר האורחים שלכם</label>
               <select
@@ -813,7 +836,8 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
               </select>
               {isSharedType && (
                 <p className={`text-xs ${exceedsCapacity ? 'text-rose-600 font-medium' : 'text-slate-400'}`}>
-                  סה"כ משתתפים (כולל אתכם): {totalParticipants} / {MAX_TOTAL_PARTICIPANTS}
+                  סה"כ משתתפים (כולל אתכם): {totalParticipants} / {MAX_TOTAL_PARTICIPANTS} · אורחים מגדילים את
+                  חלקכם היחסי בעלות
                 </p>
               )}
             </div>
@@ -834,7 +858,7 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
             <div className="rounded-xl border border-slate-200 px-4 py-3">
               <div className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-2">
                 <CoinsIcon size={16} className="text-amber-500" />
-                <span>עלות משוערת{isSharedType && currentShareCount > 1 ? ' (לכלל המשתתפים)' : ''}</span>
+                <span>עלות משוערת{isSharedType && otherParticipants.length > 0 ? ' (לכלל המשתתפים)' : ''}</span>
               </div>
               {coinBreakdown ? (
                 <div className="flex flex-wrap items-center gap-2">
@@ -855,10 +879,10 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
               ) : (
                 <p className="text-xs text-slate-500">תחזוקה אינה מחייבת מטבעות.</p>
               )}
-              {isSharedType && currentShareCount > 1 && coinBreakdown && (
+              {isSharedType && otherParticipants.length > 0 && coinBreakdown && (
                 <p className="text-xs text-slate-500 mt-2">
-                  חלקכם כמארגנים: כ-{formatCoinAmount(coinBreakdown.total / currentShareCount)} מטבעות (מחולק שווה
-                  בשווה בין {currentShareCount} משתתפים).
+                  חלקכם כמארגנים: כ-{formatCoinAmount((coinBreakdown.total * (1 + guestsCount)) / totalShares)}{' '}
+                  מטבעות (חלק {1 + guestsCount} מתוך {totalShares} — לפי 1 + מספר האורחים של כל שותף).
                 </p>
               )}
             </div>

@@ -5,18 +5,23 @@
 // client-side validation.
 //
 // Michael's Method (§10/30/40): 4 coin types — weekend/weekday ×
-// day/night — each hour costs exactly 1 coin of its own type. Guests
-// never pay or consume coins (0040_guests_free_and_shared_sail_solo_
-// pricing.sql), and the booking form no longer lets partners be added
-// at creation/edit (see NewBookingModal.jsx/EditBookingModal.jsx) — so
-// every chargeable booking, Shared/Cyprus included, is a single payer
-// (the organizer) for the FULL classifyHours breakdown of its
-// duration. That's why there's no separate "shared sail split"
-// calculation here anymore: fn_create_shared_booking/fn_update_shared_
-// booking's own proportional-share formula already degrades to "100%
-// to the one participant" whenever there's only the organizer, which
-// is every case reachable from the UI today — see that migration's
-// header for the reasoning if partners-joining-later ever comes back.
+// day/night — each hour costs exactly 1 coin of its own type. For
+// Private/Dockside/Maintenance, classifyHours IS the full cost, always
+// paid by the organizer alone (guests_count is headcount only there,
+// never affects cost).
+//
+// Shared/Cyprus sailings split proportionally instead — restored in
+// 0051_restore_guest_weighted_cost_split.sql after a brief detour
+// (0040) that made guests free: each participant's share is
+// (1 + their own guest_count) divided by the sum of that across
+// everyone on the sail, computed server-side in fn_recompute_shared_
+// booking_participants (the client-side estimate for that split lives
+// in EditBookingModal.jsx/NewBookingModal.jsx, not here, since it
+// needs the live participant list). With only the organizer aboard
+// (the only case reachable at creation — partners join an existing
+// sail afterward, see EditBookingModal.jsx), the formula degrades to
+// share = 1 regardless of guest count: 100% to the organizer, same as
+// Private.
 //
 // Day/night boundary (20:00-08:00) and weekend/holiday classification
 // match every other rule in this project — Asia/Jerusalem local time,
