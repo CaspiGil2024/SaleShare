@@ -360,13 +360,16 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
             {walletLoading ? (
               <p className="text-[11px] text-slate-400 mt-0.5">טוען יתרות...</p>
             ) : wallet ? (
-              <div className="flex flex-wrap items-center gap-1 mt-0.5">
+              <div className="flex flex-wrap items-center gap-1.5 mt-1">
                 {Object.entries(COIN_TYPE_LABELS_HE).map(([key, label]) => (
                   <span
                     key={key}
-                    className="px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-medium whitespace-nowrap"
+                    className="flex items-center gap-1 px-2 py-1 rounded-full bg-slate-100 text-slate-600 whitespace-nowrap"
                   >
-                    {label}: {formatCoinAmount(wallet[WALLET_COLUMN_BY_TYPE[key]] ?? 0)}
+                    <span className="text-[11px] font-medium">{label}</span>
+                    <span className="text-base font-bold text-slate-800">
+                      {formatCoinAmount(wallet[WALLET_COLUMN_BY_TYPE[key]] ?? 0)}
+                    </span>
                   </span>
                 ))}
               </div>
@@ -572,16 +575,16 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
                     return (
                       <div
                         key={key}
-                        className={`rounded-lg px-2 py-1 text-xs ${
+                        className={`rounded-lg px-2.5 py-1.5 ${
                           cost > 0 ? 'bg-amber-50 text-amber-800' : 'bg-slate-50 text-slate-500'
                         }`}
                       >
                         <div className="flex items-center justify-between gap-2">
-                          <span className="font-medium">{label}</span>
-                          <span className="font-semibold">-{formatCoinAmount(cost)}</span>
+                          <span className="text-xs font-medium">{label}</span>
+                          <span className="text-lg font-bold">-{formatCoinAmount(cost)}</span>
                         </div>
                         {remaining !== null && (
-                          <div className="text-[10px] opacity-75">יתרה לאחר: {formatCoinAmount(remaining)}</div>
+                          <div className="text-sm font-bold opacity-90">יתרה לאחר: {formatCoinAmount(remaining)}</div>
                         )}
                       </div>
                     );
