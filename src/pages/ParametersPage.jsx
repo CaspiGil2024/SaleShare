@@ -188,6 +188,12 @@ function EditBalanceModal({ partner, onClose, onSaved }) {
     setValues(Object.fromEntries(COIN_TYPE_OPTIONS.map((opt) => [opt.value, String(partner.balances[opt.value] ?? 0)])));
     setNote('');
     setErrorMessage(null);
+    // Belt-and-suspenders alongside the finally block in handleSubmit
+    // below: this modal doesn't unmount between partners (same
+    // component instance, `partner` prop just changes), so any stray
+    // stuck submitting=true from a previous session would otherwise
+    // survive into the next one.
+    setSubmitting(false);
   }, [partner]);
 
   if (!partner) return null;
@@ -230,6 +236,12 @@ function EditBalanceModal({ partner, onClose, onSaved }) {
     } catch (err) {
       console.error('Failed to adjust coin balance', err);
       setErrorMessage(err.message ?? 'אירעה שגיאה בעדכון היתרה.');
+    } finally {
+      // Was previously only reset in the catch block — on success this
+      // modal doesn't unmount between partners (same component
+      // instance, just a new `partner` prop), so submitting stayed
+      // stuck true forever after the FIRST successful save, disabling
+      // the Save button for every partner opened after that one.
       setSubmitting(false);
     }
   }

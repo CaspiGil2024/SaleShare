@@ -36,27 +36,22 @@
 /* =====================================================================
    FullCalendar — "Michael's Method" visual coin indicators
    These target the background events defined in YachtCalendar.jsx.
-   Two-tier weekend/holiday distinction:
-     fc-bg-weekend      — Friday / erev-chag (lighter, partial rest day)
-     fc-bg-weekend-full — Saturday / chag (deeper, full rest day)
-   fc-bg-night tints the 20:00-06:00 rows on every day. Where multiple
-   layers apply (e.g. a chag night) they stack.
+   fc-bg-weekend-holiday is ONE unified wash — Friday, Saturday, erev-
+   chag, and chag all render identically (soft yellow, 30% opacity), by
+   explicit product decision superseding an earlier two-tier version
+   (lighter Friday/erev-chag vs. deeper Saturday/chag) that used two
+   different colors/opacities. fc-bg-night tints the 20:00-06:00 rows
+   on every day; where both layers apply (e.g. a chag night) they stack.
 
-   All opacities are kept well under 1 on purpose: FullCalendar draws
-   hour gridlines as table-cell borders *underneath* these background
-   event layers. An opaque wash here can paint over those borders,
-   making the hour lines look "missing" on whichever days the wash
-   covers — this happened once already (fully opaque, Friday/Saturday)
-   so fc-bg-weekend-full's deeper color is reached via a richer hue at
-   a still-translucent opacity, not by pushing toward 1.
+   Opacity is kept well under 1 on purpose: FullCalendar draws hour
+   gridlines as table-cell borders *underneath* these background event
+   layers. An opaque wash here can paint over those borders, making the
+   hour lines look "missing" on whichever days the wash covers — this
+   happened once already (fully opaque, Friday/Saturday).
    ===================================================================== */
-.fc-bg-weekend {
-  background-color: #fef08a !important;
-  opacity: 0.45 !important;
-}
-.fc-bg-weekend-full {
-  background-color: #f59e0b !important;
-  opacity: 0.55 !important;
+.fc-bg-weekend-holiday {
+  background-color: #facc15 !important;
+  opacity: 0.3 !important;
 }
 .fc-bg-night {
   background-color: rgba(15, 23, 42, 0.16) !important;

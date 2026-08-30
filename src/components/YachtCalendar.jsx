@@ -9,11 +9,12 @@ import { fetchIsraeliHolidayMap, toDateKey } from '../lib/israeliHolidays';
 
 // Recurring, non-interactive background layers so partners can see at
 // a glance which of the 4 coin types a slot will draw from:
-//  - Friday/erev-chag get a light wash (fc-bg-weekend) — a partial rest
-//    day, still ramping up to Shabbat/chag.
-//  - Saturday/chag get a deeper, more saturated wash (fc-bg-weekend-full)
-//    — the actual full rest day. Same two-tier distinction applies to
-//    holidays below (see holidayMapToBackgroundEvents).
+//  - Friday AND Saturday share one unified wash (fc-bg-weekend-holiday
+//    — soft yellow, 30% opacity) by explicit product decision; an
+//    earlier two-tier version (lighter Friday, deeper Saturday) was
+//    replaced. Same unified class applies to holidays below (see
+//    holidayMapToBackgroundEvents) — erev-chag and chag now render
+//    identically too, not just to each other but to Friday/Saturday.
 //  - 20:00-08:00 rows get a dark wash for night hours (matches the
 //    real night rate in 0014_coin_quota_system.sql — was 20:00-06:00
 //    before that migration redefined "night").
@@ -22,14 +23,9 @@ import { fetchIsraeliHolidayMap, toDateKey } from '../lib/israeliHolidays';
 // custom cell-rendering hook is needed; layers stack automatically.
 const WEEKEND_BACKGROUND_EVENTS = [
   {
-    daysOfWeek: [5], // Friday (יום ו') — erev Shabbat, lighter tier
+    daysOfWeek: [5, 6], // Friday + Saturday (ערב שבת/שבת)
     display: 'background',
-    classNames: ['fc-bg-weekend'],
-  },
-  {
-    daysOfWeek: [6], // Saturday (שבת) — full rest day, deeper tier
-    display: 'background',
-    classNames: ['fc-bg-weekend-full'],
+    classNames: ['fc-bg-weekend-holiday'],
   },
 ];
 
@@ -74,11 +70,9 @@ function formatEventClock(date) {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
-// One all-day background wash per holiday/eve date. Same two-tier
-// distinction as WEEKEND_BACKGROUND_EVENTS above: an actual chag
-// (holiday.type === 'holiday', Saturday-equivalent) gets the deeper
-// fc-bg-weekend-full tier; erev-chag (holiday.type === 'eve', Friday-
-// equivalent) gets the lighter fc-bg-weekend tier.
+// One all-day background wash per holiday/eve date — same unified
+// fc-bg-weekend-holiday class as WEEKEND_BACKGROUND_EVENTS above,
+// regardless of holiday.type (chag and erev-chag render identically).
 //
 // Plain 'YYYY-MM-DD' strings + allDay:true, deliberately NOT
 // Date#toISOString(): that converts to UTC and shifts the boundary by
@@ -98,7 +92,7 @@ function holidayMapToBackgroundEvents(holidayMap) {
       end: toDateKey(nextDay),
       allDay: true,
       display: 'background',
-      classNames: [holiday.type === 'holiday' ? 'fc-bg-weekend-full' : 'fc-bg-weekend'],
+      classNames: ['fc-bg-weekend-holiday'],
     });
   }
   return events;
