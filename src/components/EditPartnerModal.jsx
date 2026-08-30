@@ -234,8 +234,9 @@ export default function EditPartnerModal({ isOpen, onClose, partner, onSaved }) 
             admin/treasurer-only row actions in PartnersPage.jsx
             (Soft Delete / Freeze), enforced server-side by
             0015_partner_freeze_and_delete_gates.sql. Leaving a status
-            dropdown in this broader-access form would let
-            ceo/lab_tester/maintenance bypass that narrower rule.
+            dropdown in this broader-access form would let ceo/
+            maintenance (isManager() but not isAdminOrTreasurer())
+            bypass that narrower rule.
 
             Coin balance is gone from this form too, for the same kind
             of reason: under Michael's Method (0021+) real per-type

@@ -79,8 +79,8 @@ export function AuthProvider({ children }) {
 
   // profile.role only ever holds 'treasurer' or 'partner' (see
   // fn_apply_partner_roster) — it can't represent 'ceo'/'admin'/
-  // 'maintenance'/'lab_tester', or more than one role per person. The
-  // full picture lives in user_roles.
+  // 'maintenance'/'sailing_officer', or more than one role per person.
+  // The full picture lives in user_roles.
   useEffect(() => {
     const authUser = session?.user;
     if (!authUser) {

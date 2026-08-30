@@ -23,9 +23,11 @@ import ChangePasswordModal from '../components/ChangePasswordModal';
 
 // Per-item role gate (2026-08-26 rule). Deliberately narrower/different
 // from the general isManager() set used to edit a partner's ordinary
-// fields — "Manager" in this specific rule means the admin role alone,
-// not the broader treasurer/ceo/lab_tester/maintenance group. The real
-// enforcement is server-side (0015_partner_freeze_and_delete_gates.sql
+// fields — Freeze/Soft-Delete require admin/treasurer/sailing_officer
+// (isAdminOrTreasurer; 0047 gave sailing_officer full admin parity),
+// Hard-Delete requires admin/sailing_officer only (isAdminRole) — ceo
+// and maintenance pass the broader isManager() set but not this one.
+// The real enforcement is server-side (0015_partner_freeze_and_delete_gates.sql
 // — RLS + a trigger that raises a real exception on the wrong role, so
 // a UI mismatch here would surface as a loud error, not a silent
 // no-op). isSelf items ignore role entirely — self-service only.

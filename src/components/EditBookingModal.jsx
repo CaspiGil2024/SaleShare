@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { X, Calendar as CalendarIcon, Clock, Coins as CoinsIcon, User, Users, LogIn, LogOut } from 'lucide-react';
+import { X, Calendar as CalendarIcon, Clock, Coins as CoinsIcon, User, Users, LogIn, LogOut, UserPlus } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { classifyHours, COIN_TYPE_LABELS_HE } from '../lib/coinCalculator';
 import { BOOKING_TYPE_OPTIONS, chargesCoins } from '../lib/bookingTypes';
 import { bookingTypeLabelHe } from '../lib/bookingColors';
 import { fetchIsraeliHolidayMap, syncIsraeliHolidays } from '../lib/israeliHolidays';
 import { friendlyBookingErrorMessage } from '../lib/bookingErrors';
-import { isManager } from '../lib/permissions';
+import { isManager, isAdminRole } from '../lib/permissions';
 
 const MAX_TOTAL_PARTICIPANTS = 9;
 // Matches check_max_24_hours' Cyprus branch (0013_cyprus_duration.sql):
@@ -76,7 +76,22 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
   const [joinLeaveSubmitting, setJoinLeaveSubmitting] = useState(false);
   const [joinLeaveError, setJoinLeaveError] = useState(null);
 
+  // Organizer/admin explicit add — separate from the self-service join
+  // above (fn_admin_add_shared_participant, not fn_join_shared_booking):
+  // lets the organizer or an admin/sailing_officer add a SPECIFIC
+  // partner on someone else's behalf, e.g. when that partner asked in
+  // person rather than joining themselves. See 0047_sailing_officer_
+  // role_and_admin_participant_management.sql.
+  const [addPartnerCandidates, setAddPartnerCandidates] = useState([]);
+  const [selectedAddPartnerId, setSelectedAddPartnerId] = useState('');
+  const [addPartnerGuestCount, setAddPartnerGuestCount] = useState(0);
+
   const isSharedBookingType = booking?.booking_type === 'Shared' || booking?.booking_type === 'Cyprus';
+  // Safe with booking possibly still null (computed before this
+  // component's early `if (!isOpen || !booking) return null`, so it
+  // can be used by the hooks below without violating hook-order rules).
+  const isOrganizer = booking?.user_id === currentUser?.id;
+  const canManageParticipants = isSharedBookingType && (isOrganizer || isAdminRole(currentUser));
 
   async function refetchParticipants() {
     if (!booking || !isSharedBookingType) return;
@@ -120,6 +135,8 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
     setJoinLeaveError(null);
     setJoinGuestCount(0);
     setParticipants([]);
+    setSelectedAddPartnerId('');
+    setAddPartnerGuestCount(0);
 
     const isShared = booking.booking_type === 'Shared' || booking.booking_type === 'Cyprus';
     if (!isShared) {
@@ -140,6 +157,37 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, booking?.id, booking?.booking_type]);
+
+  // Eligible partners the organizer/admin could explicitly add — active,
+  // not frozen (matches trg_fn_block_frozen_or_inactive_participant),
+  // excluding the organizer and anyone already on the sail.
+  useEffect(() => {
+    if (!isOpen || !canManageParticipants) {
+      setAddPartnerCandidates([]);
+      return;
+    }
+    let isCancelled = false;
+    supabase
+      .from('users')
+      .select('id, full_name, email')
+      .eq('is_active', true)
+      .eq('is_frozen', false)
+      .then(({ data, error }) => {
+        if (isCancelled) return;
+        if (error) {
+          console.error('Failed to load eligible partners', error);
+          return;
+        }
+        const participantIds = new Set(participants.map((p) => p.user_id));
+        setAddPartnerCandidates(
+          (data ?? []).filter((u) => u.id !== booking?.user_id && !participantIds.has(u.id))
+        );
+      });
+    return () => {
+      isCancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, canManageParticipants, booking?.id, participants]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -205,7 +253,6 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
 
   if (!isOpen || !booking) return null;
 
-  const isOrganizer = booking.user_id === currentUser?.id;
   const isCurrentUserParticipant = participants.some((p) => p.user_id === currentUser?.id);
 
   // Cancelling refunds coins in full (see trg_fn_refund_participants_
@@ -380,6 +427,49 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
     }
   }
 
+  async function handleAdminAdd() {
+    if (!selectedAddPartnerId) return;
+    setJoinLeaveError(null);
+    setJoinLeaveSubmitting(true);
+    try {
+      const { error } = await supabase.rpc('fn_admin_add_shared_participant', {
+        p_booking_id: booking.id,
+        p_user_id: selectedAddPartnerId,
+        p_guest_count: addPartnerGuestCount,
+      });
+      if (error) throw error;
+      setSelectedAddPartnerId('');
+      setAddPartnerGuestCount(0);
+      await refetchParticipants();
+      await onBookingUpdated?.();
+    } catch (err) {
+      console.error('Failed to add participant', err);
+      setJoinLeaveError(friendlyBookingErrorMessage(err));
+    } finally {
+      setJoinLeaveSubmitting(false);
+    }
+  }
+
+  async function handleAdminRemove(userId) {
+    if (!window.confirm('להסיר שותף זה מההפלגה?')) return;
+    setJoinLeaveError(null);
+    setJoinLeaveSubmitting(true);
+    try {
+      const { error } = await supabase.rpc('fn_admin_remove_shared_participant', {
+        p_booking_id: booking.id,
+        p_user_id: userId,
+      });
+      if (error) throw error;
+      await refetchParticipants();
+      await onBookingUpdated?.();
+    } catch (err) {
+      console.error('Failed to remove participant', err);
+      setJoinLeaveError(friendlyBookingErrorMessage(err));
+    } finally {
+      setJoinLeaveSubmitting(false);
+    }
+  }
+
   // Shown in both the read-only and editable views for any Shared/
   // Cyprus booking — who's on it, plus a self-service join/leave
   // action for whoever isn't the organizer.
@@ -405,14 +495,73 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
           <p className="text-xs text-slate-400">רק המארגן/ת משתתף/ת כרגע.</p>
         ) : (
           <ul className="flex flex-wrap gap-1.5">
-            {participants.map((p) => (
-              <li key={p.user_id} className="px-2 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-medium">
-                {p.full_name}
-                {p.user_id === booking.user_id ? ' (מארגן/ת)' : ''}
-                {p.guest_count > 0 ? ` +${p.guest_count} אורחים` : ''}
-              </li>
-            ))}
+            {participants.map((p) => {
+              const canRemove =
+                canManageParticipants && !isModificationWindowClosed && p.user_id !== booking.user_id;
+              return (
+                <li
+                  key={p.user_id}
+                  className="flex items-center gap-1 px-2 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-medium"
+                >
+                  <span>
+                    {p.full_name}
+                    {p.user_id === booking.user_id ? ' (מארגן/ת)' : ''}
+                    {p.guest_count > 0 ? ` +${p.guest_count} אורחים` : ''}
+                  </span>
+                  {canRemove && (
+                    <button
+                      type="button"
+                      onClick={() => handleAdminRemove(p.user_id)}
+                      disabled={joinLeaveSubmitting}
+                      aria-label={`הסרת ${p.full_name}`}
+                      className="w-4 h-4 flex items-center justify-center rounded-full text-slate-400 hover:bg-rose-100 hover:text-rose-600 disabled:opacity-40"
+                    >
+                      <X size={11} />
+                    </button>
+                  )}
+                </li>
+              );
+            })}
           </ul>
+        )}
+
+        {canManageParticipants && !isModificationWindowClosed && (
+          <div className="flex items-center gap-2 pt-1 border-t border-slate-100 mt-1">
+            <select
+              value={selectedAddPartnerId}
+              onChange={(e) => setSelectedAddPartnerId(e.target.value)}
+              className="flex-1 rounded-lg border border-slate-300 px-2 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">
+                {addPartnerCandidates.length === 0 ? 'אין שותפים זמינים להוספה' : 'בחרו שותף להוספה...'}
+              </option>
+              {addPartnerCandidates.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.full_name ?? u.email}
+                </option>
+              ))}
+            </select>
+            <select
+              value={addPartnerGuestCount}
+              onChange={(e) => setAddPartnerGuestCount(Number(e.target.value))}
+              className="rounded-lg border border-slate-300 px-2 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {GUEST_OPTIONS.map((count) => (
+                <option key={count} value={count}>
+                  {formatGuestsLabel(count)}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={handleAdminAdd}
+              disabled={joinLeaveSubmitting || !selectedAddPartnerId}
+              className="flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed text-white text-xs font-semibold px-3 py-1.5 transition-colors whitespace-nowrap"
+            >
+              <UserPlus size={13} />
+              {joinLeaveSubmitting ? 'מוסיפים...' : 'הוספה'}
+            </button>
+          </div>
         )}
 
         {isModificationWindowClosed && (
