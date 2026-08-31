@@ -247,18 +247,18 @@ export default function SailingLogPage() {
           <div className="overflow-auto max-h-[65dvh]">
             <table className="w-full text-sm">
               <thead className="sticky-thead">
-                <tr className="border-b border-slate-100 text-start text-slate-500">
-                  <th className="px-4 py-3 font-medium text-start">תאריך ושעה</th>
-                  <th className="px-4 py-3 font-medium text-start">פעולה</th>
-                  <th className="px-4 py-3 font-medium text-start">שותף</th>
-                  <th className="px-4 py-3 font-medium text-start">סוג</th>
-                  <th className="px-4 py-3 font-medium text-start">התחלת הפלגה</th>
-                  <th className="px-4 py-3 font-medium text-start">סיום הפלגה</th>
-                  <th className="px-4 py-3 font-medium text-start">סיבה</th>
-                  <th className="px-4 py-3 font-medium text-start whitespace-nowrap">אמצ"ש יום</th>
-                  <th className="px-4 py-3 font-medium text-start whitespace-nowrap">אמצ"ש לילה</th>
-                  <th className="px-4 py-3 font-medium text-start whitespace-nowrap">סופ"ש יום</th>
-                  <th className="px-4 py-3 font-medium text-start whitespace-nowrap">סופ"ש לילה</th>
+                <tr className="border-b border-slate-200 text-start text-slate-700">
+                  <th className="px-4 py-3 font-bold text-start">תאריך ושעה</th>
+                  <th className="px-4 py-3 font-bold text-start">פעולה</th>
+                  <th className="px-4 py-3 font-bold text-start">שותף</th>
+                  <th className="px-4 py-3 font-bold text-start">סוג</th>
+                  <th className="px-4 py-3 font-bold text-start">התחלת הפלגה</th>
+                  <th className="px-4 py-3 font-bold text-start">סיום הפלגה</th>
+                  <th className="px-4 py-3 font-bold text-start">סיבה</th>
+                  <th className="px-4 py-3 font-bold text-start whitespace-nowrap">אמצ"ש יום</th>
+                  <th className="px-4 py-3 font-bold text-start whitespace-nowrap">אמצ"ש לילה</th>
+                  <th className="px-4 py-3 font-bold text-start whitespace-nowrap">סופ"ש יום</th>
+                  <th className="px-4 py-3 font-bold text-start whitespace-nowrap">סופ"ש לילה</th>
                 </tr>
               </thead>
               <tbody>
