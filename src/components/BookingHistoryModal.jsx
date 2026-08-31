@@ -3,6 +3,7 @@ import { X, Download } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { bookingTypeLabelHe } from '../lib/bookingColors';
 import { exportPartnerHistoryToXlsx } from '../lib/xlsxExport';
+import { formatCoinAmount } from '../lib/coinCalculator';
 
 function statusLabelHe(status) {
   return status === 'Cancelled' ? 'בוטלה' : 'פעילה';
@@ -201,7 +202,7 @@ export default function BookingHistoryModal({ isOpen, onClose, partner }) {
                         {r.end_time ? new Date(r.end_time).toLocaleString('he-IL') : '—'}
                       </td>
                       <td className="px-4 py-3 text-amber-700 font-semibold whitespace-nowrap">
-                        {r.coinsForThisPartner}
+                        {formatCoinAmount(r.coinsForThisPartner)}
                       </td>
                     </tr>
                   ))}
