@@ -1,659 +1,441 @@
 import { useEffect, useState } from 'react';
-import { DatabaseBackup, Download, Plus, Wrench, CheckCircle2, ImagePlus, Megaphone, Pencil, X } from 'lucide-react';
+import { DatabaseBackup, Download, Table2, History, Pencil, X } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../auth/AuthProvider';
-import { isManager } from '../lib/permissions';
+import { isManager, isAdminOrTreasurer } from '../lib/permissions';
 import { bookingTypeLabelHe } from '../lib/bookingColors';
-import { exportDatabaseToXlsx, exportMaintenanceIssuesToXlsx } from '../lib/xlsxExport';
+import { exportDatabaseToXlsx, exportCoinAdjustmentAuditToXlsx } from '../lib/xlsxExport';
+import { formatCoinAmount as formatCoin } from '../lib/coinCalculator';
 
-const IMAGES_BUCKET = 'maintenance-images';
+const COIN_TYPE_OPTIONS = [
+  { value: 'midweek_day', label: 'אמצ"ש יום' },
+  { value: 'midweek_night', label: 'אמצ"ש לילה' },
+  { value: 'weekend_day', label: 'סופ"ש יום' },
+  { value: 'weekend_night', label: 'סופ"ש לילה' },
+];
+const COIN_TYPE_LABELS_HE = Object.fromEntries(COIN_TYPE_OPTIONS.map((o) => [o.value, o.label]));
+const COIN_TYPE_COLUMN = {
+  midweek_day: 'coins_midweek_day',
+  midweek_night: 'coins_midweek_night',
+  weekend_day: 'coins_weekend_day',
+  weekend_night: 'coins_weekend_night',
+};
+
+// Dash for genuinely missing data, otherwise always two decimals — the
+// shared formatCoinAmount (coinCalculator.js) is the single source of
+// truth for the number formatting itself.
+function formatCoinAmount(n) {
+  if (n === null || n === undefined) return '—';
+  return formatCoin(n);
+}
 
 // ---------------------------------------------------------------------
-// General System Notices (0036) — content-only (no title/summary),
-// closed rather than deleted. Separate from the AnnouncementsPanel
-// feed shown elsewhere on the dashboard — see the migration's header
-// comment for why these are two distinct systems.
+// Manual coin-balance editing + its audit log — moved here from
+// ParametersPage.jsx (which keeps only the general S/overdraft/rollover
+// settings form). Both sections below stay admin/treasurer-only, same
+// as when the whole page they used to live on was gated that way — see
+// canManage in the default export.
 // ---------------------------------------------------------------------
-function NoticeCard({ notice, canManage, onChanged }) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [content, setContent] = useState(notice.content);
+
+// Opens pre-filled with all 4 of one partner's coin-type balances at
+// once. Deliberately batches every field behind a single Save button
+// instead of committing per-field: each field used to open its own
+// single-value modal that wrote + reloaded the whole partner table
+// immediately, so adjusting all 4 types for one person meant 4 separate
+// full-table reloads back to back — that's the "locks up / takes
+// forever" UI freeze this replaces. The actual write still always goes
+// through fn_admin_adjust_coin_balance (never a raw UPDATE on
+// user_wallets), once per type that actually changed, so every change
+// stays individually audited — Save just batches the calls into one
+// user action and one reload afterward instead of one each.
+function EditBalanceModal({ partner, onClose, onSaved }) {
+  const [values, setValues] = useState({});
+  const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
 
-  async function handleSaveEdit(e) {
-    e.preventDefault();
-    if (!content.trim()) return;
-    setSubmitting(true);
+  useEffect(() => {
+    if (!partner) return;
+    setValues(Object.fromEntries(COIN_TYPE_OPTIONS.map((opt) => [opt.value, String(partner.balances[opt.value] ?? 0)])));
+    setNote('');
     setErrorMessage(null);
-    const { data, error } = await supabase
-      .from('system_notices')
-      .update({ content: content.trim() })
-      .eq('id', notice.id)
-      .select();
+    // Belt-and-suspenders alongside the finally block in handleSubmit
+    // below: this modal doesn't unmount between partners (same
+    // component instance, `partner` prop just changes), so any stray
+    // stuck submitting=true from a previous session would otherwise
+    // survive into the next one.
     setSubmitting(false);
-    if (error) {
-      console.error('Failed to update notice', error);
-      setErrorMessage(error.message ?? 'אירעה שגיאה בעדכון ההודעה.');
-      return;
-    }
-    if (!data || data.length === 0) {
-      setErrorMessage('העדכון לא בוצע — ייתכן שאין לכם הרשאה.');
-      return;
-    }
-    setIsEditing(false);
-    await onChanged();
-  }
+  }, [partner]);
 
-  async function handleClose() {
-    if (!window.confirm('לסגור את ההודעה? היא תפסיק להופיע ללוח הבקרה של השותפים.')) return;
+  if (!partner) return null;
+
+  async function handleSubmit(e) {
+    e.preventDefault();
     setErrorMessage(null);
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser();
 
-    const { data, error } = await supabase
-      .from('system_notices')
-      .update({
-        is_active: false,
-        closed_by: authUser?.id ?? null,
-        closed_by_name: authUser?.email ?? null,
-        closed_at: new Date().toISOString(),
-      })
-      .eq('id', notice.id)
-      .select();
-    if (error) {
-      console.error('Failed to close notice', error);
-      setErrorMessage(error.message ?? 'אירעה שגיאה בסגירת ההודעה.');
+    const parsed = {};
+    for (const opt of COIN_TYPE_OPTIONS) {
+      const raw = values[opt.value];
+      if (raw === '' || raw === undefined || Number.isNaN(Number(raw))) {
+        setErrorMessage(`יש להזין יתרה תקינה עבור ${opt.label}.`);
+        return;
+      }
+      parsed[opt.value] = Number(raw);
+    }
+
+    // Only types whose value actually changed get written/audited —
+    // re-submitting an untouched field as a no-op "change" would just
+    // add noise to the audit log for nothing.
+    const changedTypes = COIN_TYPE_OPTIONS.filter((opt) => parsed[opt.value] !== (partner.balances[opt.value] ?? 0));
+    if (changedTypes.length === 0) {
+      onClose();
       return;
     }
-    if (!data || data.length === 0) {
-      setErrorMessage('הסגירה לא בוצעה — ייתכן שאין לכם הרשאה.');
-      return;
+
+    setSubmitting(true);
+    try {
+      for (const opt of changedTypes) {
+        const { error } = await supabase.rpc('fn_admin_adjust_coin_balance', {
+          p_user_id: partner.partnerId,
+          p_coin_type: opt.value,
+          p_new_balance: parsed[opt.value],
+          p_note: note.trim() ? note.trim() : null,
+        });
+        if (error) throw error;
+      }
+      await onSaved?.();
+    } catch (err) {
+      console.error('Failed to adjust coin balance', err);
+      setErrorMessage(err.message ?? 'אירעה שגיאה בעדכון היתרה.');
+    } finally {
+      // Was previously only reset in the catch block — on success this
+      // modal doesn't unmount between partners (same component
+      // instance, just a new `partner` prop), so submitting stayed
+      // stuck true forever after the FIRST successful save, disabling
+      // the Save button for every partner opened after that one.
+      setSubmitting(false);
     }
-    await onChanged();
   }
 
   return (
-    <div className="border border-slate-200 rounded-xl p-4 flex flex-col gap-2">
-      {isEditing ? (
-        <form onSubmit={handleSaveEdit} className="flex flex-col gap-2">
-          <textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            rows={2}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          {errorMessage && <p className="text-xs text-rose-600">{errorMessage}</p>}
-          <div className="flex items-center gap-2">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div dir="rtl" className="w-full max-w-md rounded-2xl bg-white shadow-xl">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+          <div>
+            <h3 className="text-base font-bold text-slate-800">שינוי יתרות</h3>
+            <p className="text-xs text-slate-500">{partner.partnerName}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            aria-label="סגור"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="px-5 py-4 flex flex-col gap-4">
+          <div className="grid grid-cols-2 gap-3">
+            {COIN_TYPE_OPTIONS.map((opt, i) => (
+              <div key={opt.value} className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-slate-700">{opt.label}</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  autoFocus={i === 0}
+                  value={values[opt.value] ?? ''}
+                  onChange={(e) => setValues((prev) => ({ ...prev, [opt.value]: e.target.value }))}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            ))}
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-slate-700">הערה (אופציונלי, חלה על כל שדה ששונה)</label>
+            <input
+              type="text"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="סיבת השינוי..."
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <p className="text-xs text-slate-400">
+            שינוי זה עוקף את מגבלת האוברדרפט (תיקון מנהלי מפורש) ומתועד באופן מלא ביומן הביקורת, כולל שם
+            המבצע, יתרה קודמת/חדשה, וחותמת זמן — לכל שדה ששונה בנפרד.
+          </p>
+
+          {errorMessage && (
+            <p className="text-sm text-rose-600 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2">{errorMessage}</p>
+          )}
+
+          <div className="flex items-center gap-3 pt-1">
             <button
               type="submit"
               disabled={submitting}
-              className="rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white text-sm font-semibold px-3.5 py-1.5 transition-colors"
+              className="flex-1 rounded-lg bg-amber-600 hover:bg-amber-700 disabled:bg-amber-300 disabled:cursor-not-allowed text-white text-sm font-semibold py-2.5 transition-colors"
             >
-              {submitting ? 'שומר...' : 'שמירה'}
+              {submitting ? 'מעדכן...' : 'שמירה'}
             </button>
             <button
               type="button"
-              onClick={() => {
-                setIsEditing(false);
-                setContent(notice.content);
-              }}
-              className="rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 text-sm font-semibold px-3.5 py-1.5 transition-colors"
+              onClick={onClose}
+              disabled={submitting}
+              className="flex-1 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-semibold py-2.5 transition-colors"
             >
               ביטול
             </button>
           </div>
         </form>
-      ) : (
-        <div className="flex items-start justify-between gap-3">
-          <p className="text-sm text-slate-700 whitespace-pre-wrap">{notice.content}</p>
-          <span
-            className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
-              notice.is_active ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-500'
-            }`}
-          >
-            {notice.is_active ? 'פעילה' : 'סגורה'}
-          </span>
-        </div>
-      )}
-
-      <p className="text-xs text-slate-400">
-        {notice.created_by_name ?? 'שותף'} · {new Date(notice.created_at).toLocaleDateString('he-IL')}
-        {!notice.is_active && notice.closed_at && (
-          <> · נסגרה ע"י {notice.closed_by_name ?? 'שותף'} ב-{new Date(notice.closed_at).toLocaleDateString('he-IL')}</>
-        )}
-      </p>
-
-      {canManage && !isEditing && (
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setIsEditing(true)}
-            className="flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700"
-          >
-            <Pencil size={14} />
-            עריכה
-          </button>
-          {notice.is_active && (
-            <button
-              type="button"
-              onClick={handleClose}
-              className="flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-700"
-            >
-              <X size={14} />
-              סגירת הודעה
-            </button>
-          )}
-        </div>
-      )}
-      {errorMessage && !isEditing && <p className="text-xs text-rose-600">{errorMessage}</p>}
+      </div>
     </div>
   );
 }
 
-function NewNoticeForm({ onCreated }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [content, setContent] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState(null);
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-    if (!content.trim()) {
-      setErrorMessage('יש להזין תוכן להודעה.');
-      return;
-    }
-    setSubmitting(true);
-    setErrorMessage(null);
-
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser();
-
-    const { error } = await supabase.from('system_notices').insert({
-      content: content.trim(),
-      created_by: authUser?.id ?? null,
-      created_by_name: authUser?.email ?? null,
-    });
-
-    setSubmitting(false);
-    if (error) {
-      console.error('Failed to create notice', error);
-      setErrorMessage(error.message ?? 'אירעה שגיאה בפרסום ההודעה.');
-      return;
-    }
-    setContent('');
-    setIsOpen(false);
-    await onCreated();
-  }
-
-  if (!isOpen) {
-    return (
-      <button
-        type="button"
-        onClick={() => setIsOpen(true)}
-        className="flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 transition-colors self-start"
-      >
-        <Plus size={16} />
-        הודעה חדשה
-      </button>
-    );
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="bg-slate-50 rounded-xl border border-slate-200 p-4 flex flex-col gap-3">
-      <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-medium text-slate-700">תוכן ההודעה</label>
-        <textarea
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          rows={3}
-          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-      </div>
-      {errorMessage && (
-        <p className="text-sm text-rose-600 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2">{errorMessage}</p>
-      )}
-      <div className="flex items-center gap-2">
-        <button
-          type="submit"
-          disabled={submitting}
-          className="rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed text-white text-sm font-semibold px-4 py-2 transition-colors"
-        >
-          {submitting ? 'מפרסם...' : 'פרסום הודעה'}
-        </button>
-        <button
-          type="button"
-          onClick={() => setIsOpen(false)}
-          disabled={submitting}
-          className="rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 text-sm font-semibold px-4 py-2 transition-colors"
-        >
-          ביטול
-        </button>
-      </div>
-    </form>
-  );
-}
-
-function SystemNoticesSection({ currentUser }) {
-  const canManage = isManager(currentUser);
-  const [notices, setNotices] = useState([]);
+// The dedicated table this feature is actually about: every partner,
+// all 4 coin-type balances at once, each one directly editable.
+// Clicking any balance cell opens EditBalanceModal pre-filled with
+// that partner's full set of 4 balances, saved together behind one
+// Save button — there's no separate dropdown-based form anymore, this
+// table IS the adjustment UI.
+function PartnerBalancesTable({ onAdjusted }) {
+  const [partners, setPartners] = useState([]);
+  const [walletByUserId, setWalletByUserId] = useState({});
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
+  const [editingPartner, setEditingPartner] = useState(null); // { partnerId, partnerName, balances }
 
-  async function fetchNotices() {
-    setIsLoading(true);
+  // isLoading only ever gates the FIRST load (replaces the table with a
+  // spinner, since there's nothing to show yet); every reload after
+  // that — e.g. right after EditBalanceModal saves — uses isRefreshing
+  // instead, which keeps the existing rows on screen (just dimmed) so
+  // saving one balance doesn't blank/flash the whole table each time.
+  async function load({ isInitial = false } = {}) {
+    if (isInitial) setIsLoading(true);
+    else setIsRefreshing(true);
     setErrorMessage(null);
-    const { data, error } = await supabase
-      .from('system_notices')
-      .select('*')
-      .order('is_active', { ascending: false })
-      .order('created_at', { ascending: false });
+    try {
+      const { error: ensureError } = await supabase.rpc('ensure_current_period');
+      if (ensureError) console.error('Failed to ensure current period', ensureError);
 
-    if (error) {
-      console.error('Failed to load system notices', error);
-      setErrorMessage('אירעה שגיאה בטעינת ההודעות.');
-    } else {
-      setNotices(data);
+      const { data: users, error: usersError } = await supabase
+        .from('users')
+        .select('id, full_name, email')
+        .order('full_name');
+      if (usersError) throw usersError;
+
+      const { data: period } = await supabase.from('periods').select('id').eq('is_current', true).limit(1).maybeSingle();
+
+      let wallets = [];
+      if (period) {
+        const { data, error: walletsError } = await supabase
+          .from('user_wallets')
+          .select('user_id, coins_weekend_day, coins_weekend_night, coins_midweek_day, coins_midweek_night')
+          .eq('period_id', period.id);
+        if (walletsError) throw walletsError;
+        wallets = data ?? [];
+      }
+
+      setPartners(users ?? []);
+      setWalletByUserId(Object.fromEntries(wallets.map((w) => [w.user_id, w])));
+    } catch (err) {
+      console.error('Failed to load partner balances', err);
+      setErrorMessage('אירעה שגיאה בטעינת יתרות השותפים.');
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
     }
-    setIsLoading(false);
   }
 
   useEffect(() => {
-    fetchNotices();
+    load({ isInitial: true });
   }, []);
 
-  return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col gap-4">
-      <div>
-        <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
-          <Megaphone size={18} className="text-blue-600" />
-          הודעות מערכת כלליות
-        </h3>
-        <p className="text-sm text-slate-500 mt-1">הודעות פעילות מוצגות ללוח הבקרה של כל השותפים</p>
-      </div>
+  async function handleSaved() {
+    setEditingPartner(null);
+    await load();
+    await onAdjusted?.();
+  }
 
-      {canManage && <NewNoticeForm onCreated={fetchNotices} />}
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
+        <Table2 size={18} className="text-blue-600" />
+        <div>
+          <h3 className="text-base font-bold text-slate-800">יתרות שותפים - עריכה ידנית</h3>
+          <p className="text-xs text-slate-400">לחצו על עיפרון ליד כל יתרה כדי לערוך את כל 4 היתרות של אותו שותף יחד</p>
+        </div>
+      </div>
 
       {isLoading ? (
         <p className="p-10 text-center text-sm text-slate-400">טוען...</p>
       ) : errorMessage ? (
         <p className="p-10 text-center text-sm text-rose-600">{errorMessage}</p>
-      ) : notices.length === 0 ? (
-        <p className="p-10 text-center text-sm text-slate-400">אין הודעות מערכת.</p>
+      ) : partners.length === 0 ? (
+        <p className="p-10 text-center text-sm text-slate-400">אין שותפים רשומים.</p>
       ) : (
-        <div className="flex flex-col gap-3">
-          {notices.map((notice) => (
-            <NoticeCard key={notice.id} notice={notice} canManage={canManage} onChanged={fetchNotices} />
-          ))}
+        <div className={`overflow-auto max-h-[65dvh] transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
+          <table className="w-full text-sm">
+            <thead className="sticky-thead">
+              <tr className="border-b border-slate-100 text-start text-slate-500">
+                <th className="px-4 py-3 font-medium text-start whitespace-nowrap">שותף</th>
+                {COIN_TYPE_OPTIONS.map((opt) => (
+                  <th key={opt.value} className="px-4 py-3 font-medium text-start whitespace-nowrap min-w-[110px]">
+                    {opt.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {partners.map((p) => {
+                const wallet = walletByUserId[p.id];
+                const partnerName = p.full_name ?? p.email;
+                const balances = Object.fromEntries(
+                  COIN_TYPE_OPTIONS.map((opt) => [opt.value, wallet ? wallet[COIN_TYPE_COLUMN[opt.value]] : 0])
+                );
+                return (
+                  <tr key={p.id} className="border-b border-slate-50 last:border-0">
+                    <td className="px-4 py-3 font-medium text-slate-800 whitespace-nowrap">{partnerName}</td>
+                    {COIN_TYPE_OPTIONS.map((opt) => (
+                      <td key={opt.value} className="px-4 py-3 whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={() => setEditingPartner({ partnerId: p.id, partnerName, balances })}
+                          disabled={isRefreshing}
+                          className="flex items-center gap-1.5 rounded-lg px-2 py-1 hover:bg-amber-50 text-amber-700 font-semibold transition-colors whitespace-nowrap disabled:cursor-not-allowed"
+                          title="לחצו לעריכת כל היתרות של שותף זה"
+                        >
+                          {formatCoinAmount(balances[opt.value])}
+                          <Pencil size={12} className="text-amber-400" />
+                        </button>
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
+
+      <EditBalanceModal partner={editingPartner} onClose={() => setEditingPartner(null)} onSaved={handleSaved} />
     </div>
   );
 }
 
-function imagePublicUrl(storagePath) {
-  return supabase.storage.from(IMAGES_BUCKET).getPublicUrl(storagePath).data.publicUrl;
-}
-
-// ---------------------------------------------------------------------
-// New issue form — summary + description + one or more images.
-// Images upload to storage first; the issue row (and its image rows)
-// are only inserted once every upload succeeds, so a partial failure
-// doesn't leave an issue with some images silently missing.
-// ---------------------------------------------------------------------
-function NewIssueForm({ onCreated }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [summary, setSummary] = useState('');
-  const [description, setDescription] = useState('');
-  const [files, setFiles] = useState([]);
-  const [submitting, setSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState(null);
-
-  function handleFilesChange(e) {
-    setFiles(Array.from(e.target.files ?? []));
-  }
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-    setErrorMessage(null);
-    if (!summary.trim() || !description.trim()) {
-      setErrorMessage('יש למלא תקציר ותיאור הבעיה.');
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      const {
-        data: { user: authUser },
-      } = await supabase.auth.getUser();
-
-      const { data: issue, error: issueError } = await supabase
-        .from('maintenance_issues')
-        .insert({ summary: summary.trim(), description: description.trim(), created_by: authUser?.id ?? null })
-        .select()
-        .single();
-      if (issueError) throw issueError;
-
-      const uploadedPaths = [];
-      for (const file of files) {
-        const storagePath = `${issue.id}/${Date.now()}-${file.name}`;
-        const { error: uploadError } = await supabase.storage.from(IMAGES_BUCKET).upload(storagePath, file);
-        if (uploadError) throw uploadError;
-        uploadedPaths.push(storagePath);
-      }
-
-      if (uploadedPaths.length > 0) {
-        const { error: imagesError } = await supabase
-          .from('maintenance_issue_images')
-          .insert(uploadedPaths.map((storage_path) => ({ issue_id: issue.id, storage_path })));
-        if (imagesError) throw imagesError;
-      }
-
-      setSummary('');
-      setDescription('');
-      setFiles([]);
-      setIsOpen(false);
-      await onCreated();
-    } catch (err) {
-      console.error('Failed to create maintenance issue', err);
-      setErrorMessage(err.message ?? 'אירעה שגיאה בדיווח התקלה.');
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  if (!isOpen) {
-    return (
-      <button
-        type="button"
-        onClick={() => setIsOpen(true)}
-        className="flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 transition-colors self-start"
-      >
-        <Plus size={16} />
-        דיווח תקלה חדשה
-      </button>
-    );
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="bg-slate-50 rounded-xl border border-slate-200 p-4 flex flex-col gap-3">
-      <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-medium text-slate-700">תקציר</label>
-        <input
-          type="text"
-          value={summary}
-          onChange={(e) => setSummary(e.target.value)}
-          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-medium text-slate-700">תיאור הבעיה</label>
-        <textarea
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          rows={3}
-          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <label className="inline-flex w-fit items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 cursor-pointer">
-          <ImagePlus size={16} />
-          {files.length > 0 ? `${files.length} תמונות נבחרו` : 'הוספת תמונות'}
-          <input type="file" accept="image/*" multiple className="hidden" onChange={handleFilesChange} />
-        </label>
-      </div>
-
-      {errorMessage && (
-        <p className="text-sm text-rose-600 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2">{errorMessage}</p>
-      )}
-
-      <div className="flex items-center gap-2 pt-1">
-        <button
-          type="submit"
-          disabled={submitting}
-          className="rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed text-white text-sm font-semibold px-4 py-2 transition-colors"
-        >
-          {submitting ? 'שומר...' : 'דיווח תקלה'}
-        </button>
-        <button
-          type="button"
-          onClick={() => setIsOpen(false)}
-          disabled={submitting}
-          className="rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 text-sm font-semibold px-4 py-2 transition-colors"
-        >
-          ביטול
-        </button>
-      </div>
-    </form>
-  );
-}
-
-// ---------------------------------------------------------------------
-// One issue row — image thumbnails, and (for managers, on an open
-// issue) a "mark resolved" control that reveals a solution memo.
-// ---------------------------------------------------------------------
-function IssueCard({ issue, canManage, onResolved }) {
-  const [isResolving, setIsResolving] = useState(false);
-  const [resolutionNotes, setResolutionNotes] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState(null);
-
-  async function handleResolve(e) {
-    e.preventDefault();
-    if (!resolutionNotes.trim()) {
-      setErrorMessage('יש לתאר את הפתרון.');
-      return;
-    }
-    setErrorMessage(null);
-    setSubmitting(true);
-    try {
-      const {
-        data: { user: authUser },
-      } = await supabase.auth.getUser();
-
-      const { data, error } = await supabase
-        .from('maintenance_issues')
-        .update({
-          status: 'resolved',
-          resolution_notes: resolutionNotes.trim(),
-          resolved_by: authUser?.id ?? null,
-          resolved_at: new Date().toISOString(),
-        })
-        .eq('id', issue.id)
-        .select();
-
-      if (error) throw error;
-      if (!data || data.length === 0) {
-        throw new Error('העדכון לא בוצע בפועל — ייתכן שאין לכם הרשאה.');
-      }
-      await onResolved();
-    } catch (err) {
-      console.error('Failed to resolve maintenance issue', err);
-      setErrorMessage(err.message ?? 'אירעה שגיאה בסימון התקלה כנפתרה.');
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <div className="border border-slate-200 rounded-xl p-4 flex flex-col gap-2.5">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h4 className="font-semibold text-slate-800">{issue.summary}</h4>
-          <p className="text-sm text-slate-600 mt-1 whitespace-pre-wrap">{issue.description}</p>
-        </div>
-        <span
-          className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
-            issue.status === 'resolved' ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'
-          }`}
-        >
-          {issue.status === 'resolved' ? 'נפתרה' : 'פתוחה'}
-        </span>
-      </div>
-
-      {issue.images?.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {issue.images.map((img) => (
-            <a key={img.id} href={imagePublicUrl(img.storage_path)} target="_blank" rel="noopener noreferrer">
-              <img
-                src={imagePublicUrl(img.storage_path)}
-                alt=""
-                className="w-20 h-20 object-cover rounded-lg border border-slate-200"
-              />
-            </a>
-          ))}
-        </div>
-      )}
-
-      <p className="text-xs text-slate-400">
-        דווח ע"י {issue.createdByName ?? 'שותף'} · {new Date(issue.created_at).toLocaleDateString('he-IL')}
-      </p>
-
-      {issue.status === 'resolved' && (
-        <div className="rounded-lg bg-green-50 border border-green-100 px-3 py-2 text-sm text-green-800">
-          <p className="font-medium">פתרון:</p>
-          <p className="whitespace-pre-wrap">{issue.resolution_notes}</p>
-          <p className="text-xs text-green-600 mt-1">
-            ע"י {issue.resolvedByName ?? 'שותף'} · {new Date(issue.resolved_at).toLocaleDateString('he-IL')}
-          </p>
-        </div>
-      )}
-
-      {canManage && issue.status === 'open' && (
-        <div>
-          {!isResolving ? (
-            <button
-              type="button"
-              onClick={() => setIsResolving(true)}
-              className="flex items-center gap-1.5 text-sm font-medium text-green-700 hover:text-green-800"
-            >
-              <CheckCircle2 size={16} />
-              סמן כנפתרה
-            </button>
-          ) : (
-            <form onSubmit={handleResolve} className="flex flex-col gap-2 bg-slate-50 rounded-lg p-3">
-              <label className="text-sm font-medium text-slate-700">פתרון הבעיה</label>
-              <textarea
-                value={resolutionNotes}
-                onChange={(e) => setResolutionNotes(e.target.value)}
-                rows={2}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              {errorMessage && <p className="text-xs text-rose-600">{errorMessage}</p>}
-              <div className="flex items-center gap-2">
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="rounded-lg bg-green-600 hover:bg-green-700 disabled:bg-green-300 text-white text-sm font-semibold px-3.5 py-1.5 transition-colors"
-                >
-                  {submitting ? 'שומר...' : 'אישור פתרון'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsResolving(false)}
-                  disabled={submitting}
-                  className="rounded-lg border border-slate-300 text-slate-700 hover:bg-white text-sm font-semibold px-3.5 py-1.5 transition-colors"
-                >
-                  ביטול
-                </button>
-              </div>
-            </form>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function MaintenanceIssuesSection({ currentUser }) {
-  const canManage = isManager(currentUser);
-  const [issues, setIssues] = useState([]);
+function AdjustmentAuditLog({ refreshToken }) {
+  const [rows, setRows] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState(null);
 
-  async function fetchIssues() {
-    setIsLoading(true);
-    setErrorMessage(null);
-    try {
-      const { data: issueRows, error: issuesError } = await supabase
-        .from('maintenance_issues')
+  useEffect(() => {
+    let isCancelled = false;
+    async function load() {
+      setIsLoading(true);
+      setErrorMessage(null);
+      const { data, error } = await supabase
+        .from('coin_transactions')
         .select(
-          'id, summary, description, status, resolution_notes, created_at, resolved_at, creator:users!maintenance_issues_created_by_fkey(full_name, email), resolver:users!maintenance_issues_resolved_by_fkey(full_name, email)'
+          'id, coin_type, balance_before, balance_after, note, created_at, partner:users!coin_transactions_user_id_fkey(full_name, email), actor:users!coin_transactions_actor_user_id_fkey(full_name, email)'
         )
-        .order('status', { ascending: true }) // 'open' sorts before 'resolved'
-        .order('created_at', { ascending: false });
-      if (issuesError) throw issuesError;
+        .eq('reason', 'admin_adjustment')
+        .order('created_at', { ascending: false })
+        .limit(100);
 
-      const { data: imageRows, error: imagesError } = await supabase
-        .from('maintenance_issue_images')
-        .select('id, issue_id, storage_path');
-      if (imagesError) throw imagesError;
-
-      const imagesByIssue = new Map();
-      for (const img of imageRows) {
-        if (!imagesByIssue.has(img.issue_id)) imagesByIssue.set(img.issue_id, []);
-        imagesByIssue.get(img.issue_id).push(img);
+      if (isCancelled) return;
+      if (error) {
+        console.error('Failed to load coin adjustment audit log', error);
+        setErrorMessage('אירעה שגיאה בטעינת יומן הביקורת.');
+      } else {
+        setRows(data ?? []);
       }
-
-      setIssues(
-        issueRows.map((r) => ({
-          ...r,
-          createdByName: r.creator?.full_name ?? r.creator?.email,
-          resolvedByName: r.resolver?.full_name ?? r.resolver?.email,
-          images: imagesByIssue.get(r.id) ?? [],
-        }))
-      );
-    } catch (err) {
-      console.error('Failed to load maintenance issues', err);
-      setErrorMessage('אירעה שגיאה בטעינת רשימת התקלות.');
-    } finally {
       setIsLoading(false);
     }
-  }
-
-  useEffect(() => {
-    fetchIssues();
-  }, []);
+    load();
+    return () => {
+      isCancelled = true;
+    };
+  }, [refreshToken]);
 
   function handleExport() {
-    exportMaintenanceIssuesToXlsx({ rows: issues });
+    exportCoinAdjustmentAuditToXlsx({
+      rows: rows.map((r) => ({ ...r, coinTypeLabel: COIN_TYPE_LABELS_HE[r.coin_type] })),
+    });
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col gap-4">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
-            <Wrench size={18} className="text-blue-600" />
-            הודעות ותקלות תחזוקה
-          </h3>
-          <p className="text-sm text-slate-500 mt-1">רשימת כל התקלות שדווחו, פתוחות וסגורות</p>
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <History size={18} className="text-slate-500" />
+          <h3 className="text-base font-bold text-slate-800">יומן ביקורת - שינויים ידניים ביתרות</h3>
         </div>
         <button
           type="button"
           onClick={handleExport}
-          disabled={isLoading || issues.length === 0}
+          disabled={isLoading || rows.length === 0}
           className="flex items-center gap-1.5 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-semibold px-3.5 py-2 transition-colors"
         >
           <Download size={15} />
-          יצוא לאקסל
+          יצוא ל-EXCEL
         </button>
       </div>
-
-      {canManage && <NewIssueForm onCreated={fetchIssues} />}
 
       {isLoading ? (
         <p className="p-10 text-center text-sm text-slate-400">טוען...</p>
       ) : errorMessage ? (
         <p className="p-10 text-center text-sm text-rose-600">{errorMessage}</p>
-      ) : issues.length === 0 ? (
-        <p className="p-10 text-center text-sm text-slate-400">לא דווחו תקלות.</p>
+      ) : rows.length === 0 ? (
+        <p className="p-10 text-center text-sm text-slate-400">אין עדיין שינויים ידניים רשומים.</p>
       ) : (
-        <div className="flex flex-col gap-3">
-          {issues.map((issue) => (
-            <IssueCard key={issue.id} issue={issue} canManage={canManage} onResolved={fetchIssues} />
-          ))}
+        <div className="overflow-auto max-h-[65dvh]">
+          <table className="w-full text-sm">
+            <thead className="sticky-thead">
+              <tr className="border-b border-slate-100 text-start text-slate-500">
+                <th className="px-4 py-3 font-medium text-start">תאריך ושעה</th>
+                <th className="px-4 py-3 font-medium text-start">בוצע ע"י</th>
+                <th className="px-4 py-3 font-medium text-start">שותף</th>
+                <th className="px-4 py-3 font-medium text-start">סוג מטבע</th>
+                <th className="px-4 py-3 font-medium text-start">יתרה קודמת</th>
+                <th className="px-4 py-3 font-medium text-start">יתרה חדשה</th>
+                <th className="px-4 py-3 font-medium text-start">הערה</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id} className="border-b border-slate-50 last:border-0">
+                  <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
+                    {new Date(r.created_at).toLocaleString('he-IL', {
+                      day: 'numeric',
+                      month: 'numeric',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </td>
+                  <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
+                    {r.actor?.full_name ?? r.actor?.email ?? '—'}
+                  </td>
+                  <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
+                    {r.partner?.full_name ?? r.partner?.email ?? '—'}
+                  </td>
+                  <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{COIN_TYPE_LABELS_HE[r.coin_type]}</td>
+                  <td className="px-4 py-3 text-slate-600">{formatCoinAmount(r.balance_before)}</td>
+                  <td className="px-4 py-3 font-semibold text-slate-800">{formatCoinAmount(r.balance_after)}</td>
+                  <td className="px-4 py-3 text-slate-500">{r.note ?? '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
@@ -661,8 +443,7 @@ function MaintenanceIssuesSection({ currentUser }) {
 }
 
 // ---------------------------------------------------------------------
-// Existing DB backup/export tool — unchanged, still manager-only, just
-// no longer gating the WHOLE page (issues above are open to everyone).
+// Existing DB backup/export tool — unchanged, still manager-only.
 // ---------------------------------------------------------------------
 async function loadExportData() {
   const { data: partners, error: partnersError } = await supabase
@@ -771,6 +552,8 @@ function DatabaseBackupSection() {
 
 export default function MaintenanceDataPage() {
   const { currentUser } = useAuth();
+  const [auditRefreshToken, setAuditRefreshToken] = useState(0);
+  const canManageBalances = isAdminOrTreasurer(currentUser);
 
   return (
     <div className="flex flex-col gap-6 p-6" dir="rtl">
@@ -779,12 +562,15 @@ export default function MaintenanceDataPage() {
           <DatabaseBackup size={22} className="text-blue-600" />
           תחזוקה ונתונים
         </h2>
-        <p className="text-sm text-slate-500">תקלות תחזוקה וכלי גיבוי וייצוא נתונים</p>
+        <p className="text-sm text-slate-500">יתרות שותפים, יומן ביקורת, וכלי גיבוי וייצוא נתונים</p>
       </header>
 
-      <SystemNoticesSection currentUser={currentUser} />
-
-      <MaintenanceIssuesSection currentUser={currentUser} />
+      {canManageBalances && (
+        <>
+          <PartnerBalancesTable onAdjusted={() => setAuditRefreshToken((n) => n + 1)} />
+          <AdjustmentAuditLog refreshToken={auditRefreshToken} />
+        </>
+      )}
 
       {isManager(currentUser) && <DatabaseBackupSection />}
     </div>

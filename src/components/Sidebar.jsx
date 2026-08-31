@@ -11,6 +11,7 @@ import {
   DatabaseBackup,
   Settings,
   BookOpen,
+  Bell,
   LogOut,
   X,
   HelpCircle,
@@ -29,7 +30,10 @@ const NAV_ITEMS = [
   { key: 'reports', label: 'דוחות', icon: FileBarChart },
   // Universal access, same as reports — every partner should see and
   // use this, not just managers.
-  { key: 'sailing-log', label: 'יומן הפלגות וסגירת סירה', icon: BookOpen },
+  { key: 'sailing-log', label: 'יומן הפלגות', icon: BookOpen },
+  // System messages + maintenance-fault reports — split out of
+  // "תחזוקה ונתונים" into their own top-level section.
+  { key: 'messages', label: 'הודעות', icon: Bell },
   { key: 'maintenance-data', label: 'תחזוקה ונתונים', icon: DatabaseBackup },
   // Parameters is admin/treasurer-only (0024) — filtered into the
   // rendered list below rather than removed from this array outright,

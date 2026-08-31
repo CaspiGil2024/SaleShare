@@ -168,17 +168,17 @@ export default function SailingLogPage() {
 
   return (
     <div className="flex flex-col gap-6 p-6" dir="rtl">
+      <CoinBalanceBadge currentUser={currentUser} />
+
       <header>
-        <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-          <BookOpen size={22} className="text-blue-600" />
+        <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+          <BookOpen size={26} className="text-blue-600" />
           יומן הפלגות וסגירת סירה
         </h2>
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-slate-500 mt-1">
           רישום אוטומטי של כל יציאה להפלגה וסגירת הסירה (ביטול הפלגה או תחזוקה)
         </p>
       </header>
-
-      <CoinBalanceBadge currentUser={currentUser} />
 
       <div className="flex flex-wrap items-end gap-3">
         <div className="flex flex-col gap-1.5">

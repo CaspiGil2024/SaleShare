@@ -12,6 +12,7 @@ import ChecklistsPage from './pages/ChecklistsPage';
 import CoinsPage from './pages/CoinsPage';
 import ReportsPage from './pages/ReportsPage';
 import MaintenanceDataPage from './pages/MaintenanceDataPage';
+import MessagesPage from './pages/MessagesPage';
 import ParametersPage from './pages/ParametersPage';
 import SailingLogPage from './pages/SailingLogPage';
 
@@ -59,6 +60,7 @@ function AuthenticatedApp() {
           {active === 'checklists' && <ChecklistsPage />}
           {active === 'coins' && <CoinsPage />}
           {active === 'reports' && <ReportsPage />}
+          {active === 'messages' && <MessagesPage />}
           {active === 'maintenance-data' && <MaintenanceDataPage />}
           {active === 'parameters' && <ParametersPage />}
           {active === 'sailing-log' && <SailingLogPage />}
