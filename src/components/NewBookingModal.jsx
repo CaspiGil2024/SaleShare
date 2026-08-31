@@ -451,6 +451,11 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
                   const nextType = e.target.value;
                   setBookingType(nextType);
                   if (nextType !== 'Private') setIsAnchor(false);
+                  // Private sailings don't track an exact guest count (see
+                  // the guest-capacity notice below) — reset so a stale
+                  // count from a previously-selected Shared/Cyprus type
+                  // doesn't silently ride along into the submission.
+                  if (nextType === 'Private') setGuestsCount(0);
                   // Switching to/from Cyprus needs a matching duration
                   // unit (days vs hours) — otherwise the day-select would
                   // show a duration that isn't one of its own options.
@@ -536,31 +541,42 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
             </div>
           </div>
 
-          {/* At creation there's only ever the organizer, so guests
-              here don't change the estimate below (their share is
-              always 100% regardless of guest count — see
-              coinBreakdown's comment above). They start mattering for
-              cost once other partners join an existing Shared/Cyprus
-              sail — see EditBookingModal.jsx's proportional split. */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-700">מספר אורחים</label>
-            <select
-              value={guestsCount}
-              onChange={(e) => setGuestsCount(Number(e.target.value))}
-              className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {GUEST_OPTIONS.map((count) => (
-                <option key={count} value={count}>
-                  {formatGuestsLabel(count)}
-                </option>
-              ))}
-            </select>
-            {isSharedType && (
-              <p className={`text-xs ${exceedsCapacity ? 'text-rose-600 font-medium' : 'text-slate-400'}`}>
-                סה"כ משתתפים: {totalParticipants} / {MAX_TOTAL_PARTICIPANTS}
-              </p>
-            )}
-          </div>
+          {bookingType === 'Private' ? (
+            // Private sailings don't record an exact guest count — the
+            // organizer pays the full coin cost regardless of headcount,
+            // so there's nothing for a selector to feed into. Guests are
+            // still welcome; this is a capacity notice, not a field.
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+              אורחים מוזמנים בשמחה! כל עוד סך האנשים על הסירה (שותף + אורחים)
+              אינו עולה על 8 — עד למגבלת הקיבולת המקסימלית של הסירה, 9 אנשים בסך הכל.
+            </div>
+          ) : (
+            // At creation there's only ever the organizer, so guests
+            // here don't change the estimate below (their share is
+            // always 100% regardless of guest count — see
+            // coinBreakdown's comment above). They start mattering for
+            // cost once other partners join an existing Shared/Cyprus
+            // sail — see EditBookingModal.jsx's proportional split.
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-slate-700">מספר אורחים</label>
+              <select
+                value={guestsCount}
+                onChange={(e) => setGuestsCount(Number(e.target.value))}
+                className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {GUEST_OPTIONS.map((count) => (
+                  <option key={count} value={count}>
+                    {formatGuestsLabel(count)}
+                  </option>
+                ))}
+              </select>
+              {isSharedType && (
+                <p className={`text-xs ${exceedsCapacity ? 'text-rose-600 font-medium' : 'text-slate-400'}`}>
+                  סה"כ משתתפים: {totalParticipants} / {MAX_TOTAL_PARTICIPANTS}
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Real-time coin cost — placed right after the fields that
               actually determine it (type/duration/guests), ABOVE the

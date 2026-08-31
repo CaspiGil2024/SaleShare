@@ -758,6 +758,11 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
                 onChange={(e) => {
                   const nextType = e.target.value;
                   setBookingType(nextType);
+                  // Private sailings don't track an exact guest count (see
+                  // the guest-capacity notice below) — reset so a stale
+                  // count from a previously-selected type doesn't
+                  // silently ride along into the submission.
+                  if (nextType === 'Private') setGuestsCount(0);
                   if (nextType === 'Cyprus' && durationHours < CYPRUS_MIN_DURATION_DAYS * 24) {
                     setDurationHours(CYPRUS_MIN_DURATION_DAYS * 24);
                   } else if (nextType !== 'Cyprus' && durationHours > 24) {
@@ -820,30 +825,41 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
               </div>
             </div>
 
-            {/* For Shared/Cyprus, guests increase your proportional
-                share of the cost (1 + guest count, out of the sail's
-                total shares — see totalShares above); for other types
-                they're headcount only. */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-slate-700">מספר האורחים שלכם</label>
-              <select
-                value={guestsCount}
-                onChange={(e) => setGuestsCount(Number(e.target.value))}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {GUEST_OPTIONS.map((count) => (
-                  <option key={count} value={count}>
-                    {formatGuestsLabel(count)}
-                  </option>
-                ))}
-              </select>
-              {isSharedType && (
-                <p className={`text-xs ${exceedsCapacity ? 'text-rose-600 font-medium' : 'text-slate-400'}`}>
-                  סה"כ משתתפים (כולל אתכם): {totalParticipants} / {MAX_TOTAL_PARTICIPANTS} · אורחים מגדילים את
-                  חלקכם היחסי בעלות
-                </p>
-              )}
-            </div>
+            {bookingType === 'Private' ? (
+              // Private sailings don't record an exact guest count — the
+              // organizer pays the full coin cost regardless of headcount,
+              // so there's nothing for a selector to feed into. Guests are
+              // still welcome; this is a capacity notice, not a field.
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                אורחים מוזמנים בשמחה! כל עוד סך האנשים על הסירה (שותף + אורחים)
+                אינו עולה על 8 — עד למגבלת הקיבולת המקסימלית של הסירה, 9 אנשים בסך הכל.
+              </div>
+            ) : (
+              // For Shared/Cyprus, guests increase your proportional
+              // share of the cost (1 + guest count, out of the sail's
+              // total shares — see totalShares above); for other types
+              // they're headcount only.
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-slate-700">מספר האורחים שלכם</label>
+                <select
+                  value={guestsCount}
+                  onChange={(e) => setGuestsCount(Number(e.target.value))}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {GUEST_OPTIONS.map((count) => (
+                    <option key={count} value={count}>
+                      {formatGuestsLabel(count)}
+                    </option>
+                  ))}
+                </select>
+                {isSharedType && (
+                  <p className={`text-xs ${exceedsCapacity ? 'text-rose-600 font-medium' : 'text-slate-400'}`}>
+                    סה"כ משתתפים (כולל אתכם): {totalParticipants} / {MAX_TOTAL_PARTICIPANTS} · אורחים מגדילים את
+                    חלקכם היחסי בעלות
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Placed right after the fields that determine it
                 (type/duration/guests), ABOVE participants/notes, so
