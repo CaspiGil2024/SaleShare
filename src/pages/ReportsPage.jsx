@@ -109,20 +109,20 @@ function PartnerBalancesTab() {
               <thead className="sticky-thead">
                 <tr className="border-b border-slate-100 text-start text-slate-500">
                   <th className="px-4 py-3 font-medium text-start">שותף</th>
-                  <th className="px-4 py-3 font-medium text-start">סופ"ש יום</th>
-                  <th className="px-4 py-3 font-medium text-start">סופ"ש לילה</th>
                   <th className="px-4 py-3 font-medium text-start">אמצ"ש יום</th>
                   <th className="px-4 py-3 font-medium text-start">אמצ"ש לילה</th>
+                  <th className="px-4 py-3 font-medium text-start">סופ"ש יום</th>
+                  <th className="px-4 py-3 font-medium text-start">סופ"ש לילה</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.userId} className="border-b border-slate-50 last:border-0">
                     <td className="px-4 py-3 font-medium text-slate-800 whitespace-nowrap">{r.name}</td>
-                    <td className="px-4 py-3 text-amber-700 font-semibold">{formatCoinAmount(r.weekendDay)}</td>
-                    <td className="px-4 py-3 text-indigo-700 font-semibold">{formatCoinAmount(r.weekendNight)}</td>
                     <td className="px-4 py-3 text-emerald-700 font-semibold">{formatCoinAmount(r.midweekDay)}</td>
                     <td className="px-4 py-3 text-slate-600 font-semibold">{formatCoinAmount(r.midweekNight)}</td>
+                    <td className="px-4 py-3 text-amber-700 font-semibold">{formatCoinAmount(r.weekendDay)}</td>
+                    <td className="px-4 py-3 text-indigo-700 font-semibold">{formatCoinAmount(r.weekendNight)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -416,10 +416,10 @@ function ActivityReportTab({ defaultFrom, defaultTo, reportLabel }) {
                     <th className="px-4 py-2 font-medium text-start">התחלה</th>
                     <th className="px-4 py-2 font-medium text-start">סיום</th>
                     <th className="px-4 py-2 font-medium text-start">שעות</th>
-                    <th className="px-4 py-2 font-medium text-start whitespace-nowrap">סופ"ש יום</th>
-                    <th className="px-4 py-2 font-medium text-start whitespace-nowrap">סופ"ש לילה</th>
                     <th className="px-4 py-2 font-medium text-start whitespace-nowrap">אמצ"ש יום</th>
                     <th className="px-4 py-2 font-medium text-start whitespace-nowrap">אמצ"ש לילה</th>
+                    <th className="px-4 py-2 font-medium text-start whitespace-nowrap">סופ"ש יום</th>
+                    <th className="px-4 py-2 font-medium text-start whitespace-nowrap">סופ"ש לילה</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -446,17 +446,17 @@ function ActivityReportTab({ defaultFrom, defaultTo, reportLabel }) {
                         })}
                       </td>
                       <td className="px-4 py-2 text-slate-600">{e.hours.toFixed(1)}</td>
-                      <td className="px-4 py-2 text-amber-700 font-medium whitespace-nowrap">
-                        {e.coinBreakdown.weekendDay ? formatCoinAmount(e.coinBreakdown.weekendDay) : '—'}
-                      </td>
-                      <td className="px-4 py-2 text-indigo-700 font-medium whitespace-nowrap">
-                        {e.coinBreakdown.weekendNight ? formatCoinAmount(e.coinBreakdown.weekendNight) : '—'}
-                      </td>
                       <td className="px-4 py-2 text-emerald-700 font-medium whitespace-nowrap">
                         {e.coinBreakdown.midweekDay ? formatCoinAmount(e.coinBreakdown.midweekDay) : '—'}
                       </td>
                       <td className="px-4 py-2 text-slate-600 font-medium whitespace-nowrap">
                         {e.coinBreakdown.midweekNight ? formatCoinAmount(e.coinBreakdown.midweekNight) : '—'}
+                      </td>
+                      <td className="px-4 py-2 text-amber-700 font-medium whitespace-nowrap">
+                        {e.coinBreakdown.weekendDay ? formatCoinAmount(e.coinBreakdown.weekendDay) : '—'}
+                      </td>
+                      <td className="px-4 py-2 text-indigo-700 font-medium whitespace-nowrap">
+                        {e.coinBreakdown.weekendNight ? formatCoinAmount(e.coinBreakdown.weekendNight) : '—'}
                       </td>
                     </tr>
                   ))}

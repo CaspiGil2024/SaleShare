@@ -255,10 +255,10 @@ export default function SailingLogPage() {
                   <th className="px-4 py-3 font-medium text-start">התחלת הפלגה</th>
                   <th className="px-4 py-3 font-medium text-start">סיום הפלגה</th>
                   <th className="px-4 py-3 font-medium text-start">סיבה</th>
-                  <th className="px-4 py-3 font-medium text-start whitespace-nowrap">סופ"ש יום</th>
-                  <th className="px-4 py-3 font-medium text-start whitespace-nowrap">סופ"ש לילה</th>
                   <th className="px-4 py-3 font-medium text-start whitespace-nowrap">אמצ"ש יום</th>
                   <th className="px-4 py-3 font-medium text-start whitespace-nowrap">אמצ"ש לילה</th>
+                  <th className="px-4 py-3 font-medium text-start whitespace-nowrap">סופ"ש יום</th>
+                  <th className="px-4 py-3 font-medium text-start whitespace-nowrap">סופ"ש לילה</th>
                 </tr>
               </thead>
               <tbody>
@@ -305,17 +305,17 @@ export default function SailingLogPage() {
                         : '—'}
                     </td>
                     <td className="px-4 py-3 text-slate-500">{r.reasonLabel ?? '—'}</td>
-                    <td className="px-4 py-3 text-amber-700 font-medium whitespace-nowrap">
-                      {r.coins.weekendDay ? formatCoin(r.coins.weekendDay) : '—'}
-                    </td>
-                    <td className="px-4 py-3 text-indigo-700 font-medium whitespace-nowrap">
-                      {r.coins.weekendNight ? formatCoin(r.coins.weekendNight) : '—'}
-                    </td>
                     <td className="px-4 py-3 text-emerald-700 font-medium whitespace-nowrap">
                       {r.coins.midweekDay ? formatCoin(r.coins.midweekDay) : '—'}
                     </td>
                     <td className="px-4 py-3 text-slate-600 font-medium whitespace-nowrap">
                       {r.coins.midweekNight ? formatCoin(r.coins.midweekNight) : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-amber-700 font-medium whitespace-nowrap">
+                      {r.coins.weekendDay ? formatCoin(r.coins.weekendDay) : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-indigo-700 font-medium whitespace-nowrap">
+                      {r.coins.weekendNight ? formatCoin(r.coins.weekendNight) : '—'}
                     </td>
                   </tr>
                 ))}

@@ -4,10 +4,10 @@ import { supabase } from '../lib/supabaseClient';
 import { formatCoinAmount } from '../lib/coinCalculator';
 
 const COIN_TYPES = [
-  { key: 'coins_weekend_day', label: 'סופ"ש יום', className: 'bg-amber-50 text-amber-700' },
-  { key: 'coins_weekend_night', label: 'סופ"ש לילה', className: 'bg-indigo-50 text-indigo-700' },
   { key: 'coins_midweek_day', label: 'אמצ"ש יום', className: 'bg-emerald-50 text-emerald-700' },
   { key: 'coins_midweek_night', label: 'אמצ"ש לילה', className: 'bg-slate-100 text-slate-600' },
+  { key: 'coins_weekend_day', label: 'סופ"ש יום', className: 'bg-amber-50 text-amber-700' },
+  { key: 'coins_weekend_night', label: 'סופ"ש לילה', className: 'bg-indigo-50 text-indigo-700' },
 ];
 
 export default function CoinBreakdownModal({ isOpen, onClose, currentUser }) {

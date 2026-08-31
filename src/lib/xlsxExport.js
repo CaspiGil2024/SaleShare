@@ -58,10 +58,10 @@ export function exportDetailedActivityReportToXlsx({ rows, fromDate, toDate, rep
       'תאריך התחלה': e.start_time ? new Date(e.start_time).toLocaleString('he-IL') : '',
       'תאריך סיום': e.end_time ? new Date(e.end_time).toLocaleString('he-IL') : '',
       'שעות': Number(e.hours.toFixed(1)),
-      'סופ"ש יום': e.coinBreakdown?.weekendDay ?? 0,
-      'סופ"ש לילה': e.coinBreakdown?.weekendNight ?? 0,
       'אמצ"ש יום': e.coinBreakdown?.midweekDay ?? 0,
       'אמצ"ש לילה': e.coinBreakdown?.midweekNight ?? 0,
+      'סופ"ש יום': e.coinBreakdown?.weekendDay ?? 0,
+      'סופ"ש לילה': e.coinBreakdown?.weekendNight ?? 0,
       'סה"כ מטבעות': e.coins,
     }))
   );
@@ -97,10 +97,10 @@ export function exportPartnerBalancesToXlsx({ rows }) {
 
   const sheetRows = rows.map((r) => ({
     'שותף': r.name,
-    'סופ"ש יום': r.weekendDay,
-    'סופ"ש לילה': r.weekendNight,
     'אמצ"ש יום': r.midweekDay,
     'אמצ"ש לילה': r.midweekNight,
+    'סופ"ש יום': r.weekendDay,
+    'סופ"ש לילה': r.weekendNight,
   }));
   const sheet = XLSX.utils.json_to_sheet(sheetRows);
   XLSX.utils.book_append_sheet(wb, sheet, 'יתרות שותפים');
@@ -164,10 +164,10 @@ export function exportSailingLogToXlsx({ rows, fromDate, toDate }) {
     'התחלת הפלגה': r.start_time ? new Date(r.start_time).toLocaleString('he-IL') : '',
     'סיום הפלגה': r.end_time ? new Date(r.end_time).toLocaleString('he-IL') : '',
     'סיבה': r.reasonLabel ?? '',
-    'סופ"ש יום': r.coins?.weekendDay ?? 0,
-    'סופ"ש לילה': r.coins?.weekendNight ?? 0,
     'אמצ"ש יום': r.coins?.midweekDay ?? 0,
     'אמצ"ש לילה': r.coins?.midweekNight ?? 0,
+    'סופ"ש יום': r.coins?.weekendDay ?? 0,
+    'סופ"ש לילה': r.coins?.weekendNight ?? 0,
   }));
   const sheet = XLSX.utils.json_to_sheet(sheetRows);
   XLSX.utils.book_append_sheet(wb, sheet, 'יומן הפלגות וסגירת סירה');

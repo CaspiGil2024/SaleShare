@@ -7,17 +7,17 @@ import { exportCoinAdjustmentAuditToXlsx } from '../lib/xlsxExport';
 import { formatCoinAmount as formatCoin } from '../lib/coinCalculator';
 
 const COIN_TYPE_OPTIONS = [
-  { value: 'weekend_day', label: 'סופ"ש יום' },
-  { value: 'weekend_night', label: 'סופ"ש לילה' },
   { value: 'midweek_day', label: 'אמצ"ש יום' },
   { value: 'midweek_night', label: 'אמצ"ש לילה' },
+  { value: 'weekend_day', label: 'סופ"ש יום' },
+  { value: 'weekend_night', label: 'סופ"ש לילה' },
 ];
 const COIN_TYPE_LABELS_HE = Object.fromEntries(COIN_TYPE_OPTIONS.map((o) => [o.value, o.label]));
 const COIN_TYPE_COLUMN = {
-  weekend_day: 'coins_weekend_day',
-  weekend_night: 'coins_weekend_night',
   midweek_day: 'coins_midweek_day',
   midweek_night: 'coins_midweek_night',
+  weekend_day: 'coins_weekend_day',
+  weekend_night: 'coins_weekend_night',
 };
 
 // Dash for genuinely missing data, otherwise always two decimals — the

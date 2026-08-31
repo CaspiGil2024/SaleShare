@@ -73,11 +73,18 @@ export function calculateBookingCoins(start, end, holidayDates = new Set()) {
   return classifyHours(start, end, holidayDates);
 }
 
+// Standardized display order across the ENTIRE app (every badge, card,
+// table, and summary) — explicit product decision. Object.entries()
+// preserves this insertion order for every string-keyed call site that
+// derives its order from this object, so reordering just the four keys
+// here is enough to fix them all; a handful of places also render the
+// 4 types as separate hardcoded JSX elements (not derived from this
+// object) and had to be reordered by hand to match.
 export const COIN_TYPE_LABELS_HE = {
-  weekendDay: 'סופ"ש יום',
-  weekendNight: 'סופ"ש לילה',
   midweekDay: 'אמצ"ש יום',
   midweekNight: 'אמצ"ש לילה',
+  weekendDay: 'סופ"ש יום',
+  weekendNight: 'סופ"ש לילה',
 };
 
 // Single shared formatter for every coin amount shown anywhere in the

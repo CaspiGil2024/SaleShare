@@ -66,6 +66,16 @@ function buildDateTime(baseDate, hour) {
   return dt;
 }
 
+// Local-time 'YYYY-MM-DD' for a native <input type="date"> value —
+// deliberately not toISOString() (that converts to UTC and can shift
+// the date by Israel's UTC offset).
+function toDateInputValue(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 export default function NewBookingModal({ isOpen, onClose, initialStart, initialEnd, currentUser, onBookingCreated }) {
   const [selectedDate, setSelectedDate] = useState(initialStart ?? new Date());
   const [startHour, setStartHour] = useState(initialStart ? initialStart.getHours() : 9);
@@ -385,6 +395,17 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
             <span className="flex items-center gap-1.5 text-blue-900 font-semibold">
               <CalendarIcon size={14} />
               {formattedDateHe}
+              <input
+                type="date"
+                value={toDateInputValue(selectedDate)}
+                onChange={(e) => {
+                  if (!e.target.value) return;
+                  const [y, m, d] = e.target.value.split('-').map(Number);
+                  setSelectedDate(new Date(y, m - 1, d));
+                }}
+                aria-label="שנה תאריך"
+                className="mr-1 text-xs font-medium text-blue-700 bg-white border border-blue-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
             </span>
             {isCyprusType && (
               <span className="flex items-center gap-1.5 text-blue-800">
