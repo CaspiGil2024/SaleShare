@@ -21,6 +21,13 @@ export default function CalendarPage() {
     const { error: autoCancelError } = await supabase.rpc('fn_auto_cancel_solo_cyprus_sailings');
     if (autoCancelError) console.error('Failed to sweep solo Cyprus sailings', autoCancelError);
 
+    // Same lazy-maintenance pattern: a past (last 14 days) Shared
+    // sailing nobody else ever joined gets relabeled Private instead of
+    // staying mislabeled forever — see 0054_auto_convert_solo_shared_
+    // sailings_to_private.sql for why this is safe (coin cost unchanged).
+    const { error: autoConvertError } = await supabase.rpc('fn_auto_convert_solo_shared_sailings_to_private');
+    if (autoConvertError) console.error('Failed to sweep solo Shared sailings', autoConvertError);
+
     const { data, error } = await supabase
       .from('bookings')
       .select('id, start_time, end_time, booking_type, guests_count, notes, user_id, booker:users(full_name, email)')

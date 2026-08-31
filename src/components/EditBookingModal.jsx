@@ -977,7 +977,17 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
               )}
             </div>
 
-            {isSharedBookingType && <ParticipantsSection />}
+            {/* isSharedBookingType alone (the booking's type as PERSISTED,
+                unaffected by the live dropdown below) used to gate this —
+                so switching the dropdown away from Shared/Cyprus left the
+                whole join/leave/add-partner block sitting there as if
+                nothing had changed. Requiring the LIVE selection too
+                (isSharedType) hides it the instant the user picks a
+                different type, matching the guest-selector/notice toggle
+                just above. Still requires isSharedBookingType so it never
+                appears for a booking that was never Shared/Cyprus to
+                begin with — there's no participant data to show. */}
+            {isSharedBookingType && isSharedType && <ParticipantsSection />}
 
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium text-slate-700">הערות</label>
