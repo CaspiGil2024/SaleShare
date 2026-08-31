@@ -20,8 +20,6 @@ const CYPRUS_DURATION_DAY_OPTIONS = Array.from(
   { length: CYPRUS_MAX_DURATION_DAYS - CYPRUS_MIN_DURATION_DAYS + 1 },
   (_, i) => CYPRUS_MIN_DURATION_DAYS + i
 );
-const GUEST_OPTIONS = Array.from({ length: 8 }, (_, i) => i); // 0..7
-
 function formatHourLabel(hour) {
   return `${String(hour).padStart(2, '0')}:00`;
 }
@@ -38,6 +36,14 @@ function formatGuestsLabel(count) {
   if (count === 0) return 'ללא אורחים';
   if (count === 1) return '1 אורח';
   return `${count} אורחים`;
+}
+
+// 0..maxGuests — replaces a fixed GUEST_OPTIONS range so every guest
+// selector can only offer counts that still fit under the 9-person hard
+// cap given who else is already on the sailing (see the maxOwnGuests/
+// maxNewParticipantGuests call sites).
+function guestOptionsUpTo(maxGuests) {
+  return Array.from({ length: Math.max(0, maxGuests) + 1 }, (_, i) => i);
 }
 
 function buildDateTime(baseDate, hour) {
@@ -235,6 +241,35 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
     : 1 + guestsCount;
   const exceedsCapacity = totalParticipants > MAX_TOTAL_PARTICIPANTS;
 
+  // Dynamic guest-dropdown ceilings — each selector can only offer
+  // guest counts that still fit under the 9-person hard cap given who
+  // ELSE is already on board, so an over-capacity combination can no
+  // longer even be selected (not just rejected after the fact).
+  //
+  // Organizer's own selector: what's left after every OTHER participant
+  // (1 seat each) and their guests, minus the organizer's own seat.
+  const otherSeatsUsed = otherParticipants.reduce((sum, p) => sum + 1 + p.guest_count, 0);
+  const maxOwnGuests = Math.max(0, MAX_TOTAL_PARTICIPANTS - 1 - otherSeatsUsed);
+  // Join/admin-add selectors: identical math either way — adding ONE new
+  // participant (self-join or admin-added) on top of everyone currently
+  // on `participants` (organizer included), minus that new person's own
+  // seat.
+  const seatsAlreadyOnBoard = participants.reduce((sum, p) => sum + 1 + p.guest_count, 0);
+  const maxNewParticipantGuests = Math.max(0, MAX_TOTAL_PARTICIPANTS - 1 - seatsAlreadyOnBoard);
+
+  // Clamp down any already-selected value that a since-changed ceiling
+  // (another partner joined, a guest count changed) has made invalid —
+  // functional updates so this doesn't need the live counts in its
+  // dependency array, and is a no-op (bails out, no re-render) once the
+  // value is already within range.
+  useEffect(() => {
+    setGuestsCount((c) => Math.min(c, maxOwnGuests));
+  }, [maxOwnGuests]);
+  useEffect(() => {
+    setJoinGuestCount((c) => Math.min(c, maxNewParticipantGuests));
+    setAddPartnerGuestCount((c) => Math.min(c, maxNewParticipantGuests));
+  }, [maxNewParticipantGuests]);
+
   const coinBreakdown = useMemo(() => {
     if (!chargesCoins(bookingType)) return null;
     // Full classifyHours cost either way — see coinCalculator.js header.
@@ -394,6 +429,15 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
 
   async function handleJoin() {
     setJoinLeaveError(null);
+    // Belt-and-suspenders: the dropdown is already capped at
+    // maxNewParticipantGuests, so this can only fire if the ceiling
+    // shifted (another partner joined) between render and click.
+    if (joinGuestCount > maxNewParticipantGuests) {
+      setJoinLeaveError(
+        `סך האנשים על הסירה (שותפים ואורחים) לא יכול לעלות על ${MAX_TOTAL_PARTICIPANTS}. הפחיתו את מספר האורחים.`
+      );
+      return;
+    }
     setJoinLeaveSubmitting(true);
     try {
       const { error } = await supabase.rpc('fn_join_shared_booking', {
@@ -432,6 +476,12 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
   async function handleAdminAdd() {
     if (!selectedAddPartnerId) return;
     setJoinLeaveError(null);
+    if (addPartnerGuestCount > maxNewParticipantGuests) {
+      setJoinLeaveError(
+        `סך האנשים על הסירה (שותפים ואורחים) לא יכול לעלות על ${MAX_TOTAL_PARTICIPANTS}. הפחיתו את מספר האורחים.`
+      );
+      return;
+    }
     setJoinLeaveSubmitting(true);
     try {
       const { error } = await supabase.rpc('fn_admin_add_shared_participant', {
@@ -550,7 +600,7 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
                 onChange={(e) => setAddPartnerGuestCount(Number(e.target.value))}
                 className="w-28 shrink-0 rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                {GUEST_OPTIONS.map((count) => (
+                {guestOptionsUpTo(maxNewParticipantGuests).map((count) => (
                   <option key={count} value={count}>
                     {formatGuestsLabel(count)}
                   </option>
@@ -585,7 +635,7 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
                 onChange={(e) => setJoinGuestCount(Number(e.target.value))}
                 className="w-28 shrink-0 rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                {GUEST_OPTIONS.map((count) => (
+                {guestOptionsUpTo(maxNewParticipantGuests).map((count) => (
                   <option key={count} value={count}>
                     {formatGuestsLabel(count)}
                   </option>
@@ -692,6 +742,37 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
               </div>
               <p className="text-sm text-blue-800">{bookingTypeLabelHe(booking.booking_type)}</p>
             </div>
+
+            {/* Same prominent cost box as the editable form below — a
+                read-only viewer (not the organizer/a manager) should
+                still see the live coin breakdown, not just the small
+                "your share" line inside ParticipantsSection. */}
+            <div className="rounded-xl border border-slate-200 px-4 py-3">
+              <div className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-2">
+                <CoinsIcon size={16} className="text-amber-500" />
+                <span>עלות משוערת{isSharedType && otherParticipants.length > 0 ? ' (לכלל המשתתפים)' : ''}</span>
+              </div>
+              {coinBreakdown ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  {Object.entries(COIN_TYPE_LABELS_HE).map(([key, label]) =>
+                    coinBreakdown[key] > 0 ? (
+                      <span
+                        key={key}
+                        className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-medium"
+                      >
+                        {label}: {formatCoinAmount(coinBreakdown[key])}
+                      </span>
+                    ) : null
+                  )}
+                  <span className="px-2.5 py-1 rounded-full bg-blue-600 text-white text-xs font-semibold">
+                    סה"כ {formatCoinAmount(coinBreakdown.total)} מטבעות
+                  </span>
+                </div>
+              ) : (
+                <p className="text-xs text-slate-500">תחזוקה אינה מחייבת מטבעות.</p>
+              )}
+            </div>
+
             {booking.notes && <p className="text-sm text-slate-600">{booking.notes}</p>}
 
             <ParticipantsSection />
@@ -846,7 +927,7 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
                   onChange={(e) => setGuestsCount(Number(e.target.value))}
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  {GUEST_OPTIONS.map((count) => (
+                  {guestOptionsUpTo(maxOwnGuests).map((count) => (
                     <option key={count} value={count}>
                       {formatGuestsLabel(count)}
                     </option>

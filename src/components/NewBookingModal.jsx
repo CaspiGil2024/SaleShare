@@ -25,7 +25,12 @@ const CYPRUS_DURATION_DAY_OPTIONS = Array.from(
   { length: CYPRUS_MAX_DURATION_DAYS - CYPRUS_MIN_DURATION_DAYS + 1 },
   (_, i) => CYPRUS_MIN_DURATION_DAYS + i
 );
-const GUEST_OPTIONS = Array.from({ length: 8 }, (_, i) => i); // 0..7
+// 0..(MAX_TOTAL_PARTICIPANTS - 1) — at creation the booking only ever
+// has the organizer aboard (see exceedsCapacity below), so this is the
+// true max reachable without exceeding the hard 9-person cap. Sourced
+// from MAX_TOTAL_PARTICIPANTS instead of a separate literal so the
+// dropdown's range can never drift out of sync with the validation.
+const GUEST_OPTIONS = Array.from({ length: MAX_TOTAL_PARTICIPANTS }, (_, i) => i); // 0..8
 
 // Bridges coinCalculator.js's camelCase breakdown keys to user_wallets'
 // snake_case columns, so the header balance fetch and the cost
