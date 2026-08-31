@@ -4,6 +4,7 @@ import NewBookingModal from '../components/NewBookingModal';
 import EditBookingModal from '../components/EditBookingModal';
 import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../lib/supabaseClient';
+import CoinBalanceBadge from '../components/CoinBalanceBadge';
 
 export default function CalendarPage() {
   const { currentUser, profileLoading, updateDefaultCalendarView } = useAuth();
@@ -80,15 +81,19 @@ export default function CalendarPage() {
         <p className="text-sm text-slate-500">לחצו וגררו על משבצת פנויה כדי לפתוח הזמנה חדשה, או לחצו על הפלגה קיימת לעריכה</p>
       </header>
 
+      <CoinBalanceBadge currentUser={currentUser} />
+
       {/*
         FullCalendar only reads initialView once, at mount — waiting
         for profileLoading here (rather than rendering immediately with
         a fallback) means the calendar mounts already knowing the
         partner's real saved preference instead of locking in "day" and
-        never correcting itself.
+        never correcting itself. Height offset bumped from 140 to 205
+        to make room for the balance badge above (~65px incl. its own
+        margin) without pushing the page into vertical overflow.
       */}
       {profileLoading ? (
-        <div className="flex items-center justify-center h-[calc(100dvh-140px)] bg-white rounded-2xl shadow-sm border border-slate-200 text-sm text-slate-400">
+        <div className="flex items-center justify-center h-[calc(100dvh-205px)] bg-white rounded-2xl shadow-sm border border-slate-200 text-sm text-slate-400">
           טוען...
         </div>
       ) : (

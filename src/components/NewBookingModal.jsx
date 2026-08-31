@@ -344,7 +344,7 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div dir="rtl" className="w-full max-w-lg max-h-[95dvh] overflow-y-auto rounded-2xl bg-white shadow-xl">
+      <div dir="rtl" className="w-full max-w-xl max-h-[95dvh] overflow-y-auto rounded-2xl bg-white shadow-xl">
         <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
           <div>
             <h3 className="text-base font-bold text-slate-800">הוספת הפלגה</h3>
@@ -541,19 +541,11 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
             )}
           </div>
 
-          {/* Notes */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-700">הערות (אופציונלי)</label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="הערות נוספות..."
-              rows={1}
-              className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-800 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          {/* Real-time coin cost */}
+          {/* Real-time coin cost — placed right after the fields that
+              actually determine it (type/duration/guests), ABOVE the
+              optional notes field, so it's visible as soon as those
+              choices are made rather than buried at the bottom below
+              free-text input a user might not scroll past on mobile. */}
           <div className="rounded-lg border border-slate-200 px-3 py-2">
             <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700 mb-1.5">
               <CoinsIcon size={14} className="text-amber-500" />
@@ -595,6 +587,18 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
             ) : (
               <p className="text-xs text-slate-500">תחזוקה אינה מחייבת מטבעות.</p>
             )}
+          </div>
+
+          {/* Notes */}
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-slate-700">הערות (אופציונלי)</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="הערות נוספות..."
+              rows={1}
+              className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-800 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
           </div>
 
           {errorMessage && (

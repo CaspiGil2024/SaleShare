@@ -528,11 +528,12 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
         )}
 
         {canManageParticipants && !isModificationWindowClosed && (
-          <div className="flex items-center gap-2 pt-1 border-t border-slate-100 mt-1">
+          <div className="flex flex-col gap-1.5 pt-2 border-t border-slate-100 mt-1">
+            <span className="text-xs font-medium text-slate-600">הוספת שותף</span>
             <select
               value={selectedAddPartnerId}
               onChange={(e) => setSelectedAddPartnerId(e.target.value)}
-              className="flex-1 rounded-lg border border-slate-300 px-2 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">
                 {addPartnerCandidates.length === 0 ? 'אין שותפים זמינים להוספה' : 'בחרו שותף להוספה...'}
@@ -543,26 +544,28 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
                 </option>
               ))}
             </select>
-            <select
-              value={addPartnerGuestCount}
-              onChange={(e) => setAddPartnerGuestCount(Number(e.target.value))}
-              className="rounded-lg border border-slate-300 px-2 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {GUEST_OPTIONS.map((count) => (
-                <option key={count} value={count}>
-                  {formatGuestsLabel(count)}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={handleAdminAdd}
-              disabled={joinLeaveSubmitting || !selectedAddPartnerId}
-              className="flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed text-white text-xs font-semibold px-3 py-1.5 transition-colors whitespace-nowrap"
-            >
-              <UserPlus size={13} />
-              {joinLeaveSubmitting ? 'מוסיפים...' : 'הוספה'}
-            </button>
+            <div className="flex items-center gap-2">
+              <select
+                value={addPartnerGuestCount}
+                onChange={(e) => setAddPartnerGuestCount(Number(e.target.value))}
+                className="w-28 shrink-0 rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {GUEST_OPTIONS.map((count) => (
+                  <option key={count} value={count}>
+                    {formatGuestsLabel(count)}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={handleAdminAdd}
+                disabled={joinLeaveSubmitting || !selectedAddPartnerId}
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed text-white text-xs font-semibold py-1.5 transition-colors"
+              >
+                <UserPlus size={13} />
+                {joinLeaveSubmitting ? 'מוסיפים...' : 'הוספה'}
+              </button>
+            </div>
           </div>
         )}
 
@@ -574,40 +577,45 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
         )}
 
         {!isOrganizer && !isCurrentUserParticipant && !isModificationWindowClosed && (
-          <div className="flex items-center gap-2 pt-1">
-            <select
-              value={joinGuestCount}
-              onChange={(e) => setJoinGuestCount(Number(e.target.value))}
-              className="rounded-lg border border-slate-300 px-2 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {GUEST_OPTIONS.map((count) => (
-                <option key={count} value={count}>
-                  {formatGuestsLabel(count)}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={handleJoin}
-              disabled={joinLeaveSubmitting}
-              className="flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 disabled:cursor-not-allowed text-white text-xs font-semibold px-3 py-1.5 transition-colors"
-            >
-              <LogIn size={13} />
-              {joinLeaveSubmitting ? 'מצטרפים...' : 'הצטרפות להפלגה'}
-            </button>
+          <div className="flex flex-col gap-1.5 pt-2 border-t border-slate-100 mt-1">
+            <span className="text-xs font-medium text-slate-600">הצטרפות להפלגה</span>
+            <div className="flex items-center gap-2">
+              <select
+                value={joinGuestCount}
+                onChange={(e) => setJoinGuestCount(Number(e.target.value))}
+                className="w-28 shrink-0 rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {GUEST_OPTIONS.map((count) => (
+                  <option key={count} value={count}>
+                    {formatGuestsLabel(count)}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={handleJoin}
+                disabled={joinLeaveSubmitting}
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 disabled:cursor-not-allowed text-white text-xs font-semibold py-1.5 transition-colors"
+              >
+                <LogIn size={13} />
+                {joinLeaveSubmitting ? 'מצטרפים...' : 'הצטרפות'}
+              </button>
+            </div>
           </div>
         )}
 
         {!isOrganizer && isCurrentUserParticipant && !isModificationWindowClosed && (
-          <button
-            type="button"
-            onClick={handleLeave}
-            disabled={joinLeaveSubmitting}
-            className="self-start flex items-center gap-1.5 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-semibold px-3 py-1.5 transition-colors"
-          >
-            <LogOut size={13} />
-            {joinLeaveSubmitting ? 'עוזבים...' : 'עזיבת ההפלגה'}
-          </button>
+          <div className="pt-2 border-t border-slate-100 mt-1">
+            <button
+              type="button"
+              onClick={handleLeave}
+              disabled={joinLeaveSubmitting}
+              className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-semibold py-1.5 transition-colors"
+            >
+              <LogOut size={13} />
+              {joinLeaveSubmitting ? 'עוזבים...' : 'עזיבת ההפלגה'}
+            </button>
+          </div>
         )}
 
         {!isOrganizer && !isModificationWindowClosed && (
@@ -645,7 +653,7 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div dir="rtl" className="w-full max-w-lg max-h-[90dvh] overflow-y-auto rounded-2xl bg-white shadow-xl">
+      <div dir="rtl" className="w-full max-w-xl max-h-[95dvh] overflow-y-auto rounded-2xl bg-white shadow-xl">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
           <h3 className="text-lg font-bold text-slate-800">{canEdit ? 'עריכת הפלגה' : 'פרטי הפלגה'}</h3>
           <button
@@ -837,19 +845,9 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
               )}
             </div>
 
-            {isSharedBookingType && <ParticipantsSection />}
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-slate-700">הערות</label>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="הערות נוספות..."
-                rows={3}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
+            {/* Placed right after the fields that determine it
+                (type/duration/guests), ABOVE participants/notes, so
+                it's visible without scrolling past those on mobile. */}
             <div className="rounded-xl border border-slate-200 px-4 py-3">
               <div className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-2">
                 <CoinsIcon size={16} className="text-amber-500" />
@@ -880,6 +878,19 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
                   מטבעות (חלק {1 + guestsCount} מתוך {totalShares} — לפי 1 + מספר האורחים של כל שותף).
                 </p>
               )}
+            </div>
+
+            {isSharedBookingType && <ParticipantsSection />}
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-slate-700">הערות</label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="הערות נוספות..."
+                rows={3}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
             </div>
 
             {errorMessage && (

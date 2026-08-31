@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { BookOpen, Play, Download, Coins } from 'lucide-react';
+import { BookOpen, Play, Download } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../auth/AuthProvider';
 import { bookingTypeLabelHe } from '../lib/bookingColors';
 import { exportSailingLogToXlsx } from '../lib/xlsxExport';
 import { formatCoinAmount as formatCoin } from '../lib/coinCalculator';
+import CoinBalanceBadge from '../components/CoinBalanceBadge';
 
 const ACTION_LABELS_HE = {
   departure: 'הפלגה יצאה',
@@ -23,11 +24,6 @@ function addDays(date, days) {
   const d = new Date(date);
   d.setDate(d.getDate() + days);
   return d;
-}
-
-function formatCoinDisplay(n) {
-  if (n === null || n === undefined) return '—';
-  return formatCoin(n);
 }
 
 const ZERO_BREAKDOWN = { weekendDay: 0, weekendNight: 0, midweekDay: 0, midweekNight: 0 };
@@ -77,13 +73,17 @@ async function fetchCoinBreakdownByBookingId(bookingIds) {
   return breakdownByBookingId;
 }
 
-async function fetchSailingLog(fromDate, toDate) {
-  const { data, error } = await supabase
+async function fetchSailingLog(fromDate, toDate, partnerId) {
+  let query = supabase
     .from('sailing_log')
     .select('id, booking_id, action, reason, booking_type, start_time, end_time, logged_at, users(full_name, email)')
     .gte('logged_at', fromDate.toISOString())
     .lte('logged_at', toDate.toISOString())
     .order('logged_at', { ascending: false });
+  if (partnerId) {
+    query = query.eq('user_id', partnerId);
+  }
+  const { data, error } = await query;
   if (error) throw error;
 
   const bookingIds = [...new Set(data.map((r) => r.booking_id).filter((id) => id !== null))];
@@ -103,87 +103,46 @@ async function fetchSailingLog(fromDate, toDate) {
   }));
 }
 
-// Compact top-row balance strip so it's visible while scanning the log
-// below, without duplicating CoinsPage's full rates/history screen —
-// same ensure_current_period + user_wallets fetch pattern as there.
-function CoinBalanceSummary({ currentUser }) {
-  const [wallet, setWallet] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    if (!currentUser?.id) return;
-    let isCancelled = false;
-
-    async function load() {
-      setIsLoading(true);
-      const { error: ensureError } = await supabase.rpc('ensure_current_period');
-      if (ensureError) console.error('Failed to ensure current period', ensureError);
-
-      const { data: period } = await supabase.from('periods').select('id').eq('is_current', true).limit(1).maybeSingle();
-      if (period) {
-        const { data: walletRow, error } = await supabase
-          .from('user_wallets')
-          .select('coins_weekend_day, coins_weekend_night, coins_midweek_day, coins_midweek_night')
-          .eq('user_id', currentUser.id)
-          .eq('period_id', period.id)
-          .maybeSingle();
-        if (!isCancelled) {
-          if (error) console.error('Failed to load wallet balance', error);
-          else setWallet(walletRow);
-        }
-      }
-      if (!isCancelled) setIsLoading(false);
-    }
-
-    load();
-    return () => {
-      isCancelled = true;
-    };
-  }, [currentUser?.id]);
-
-  return (
-    <div className="rounded-2xl bg-gradient-to-l from-amber-500 to-orange-400 px-5 py-3 shadow-sm text-white flex flex-wrap items-center gap-3">
-      <span className="w-9 h-9 shrink-0 rounded-lg bg-white/20 flex items-center justify-center">
-        <Coins size={18} />
-      </span>
-      <span className="text-sm text-amber-50 shrink-0">היתרה שלי:</span>
-      {isLoading ? (
-        <span className="text-sm text-amber-50">טוען...</span>
-      ) : (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="px-2.5 py-1 rounded-lg bg-white/15 text-xs font-semibold">
-            אמצ"ש יום: {formatCoinDisplay(wallet?.coins_midweek_day)}
-          </span>
-          <span className="px-2.5 py-1 rounded-lg bg-white/15 text-xs font-semibold">
-            אמצ"ש לילה: {formatCoinDisplay(wallet?.coins_midweek_night)}
-          </span>
-          <span className="px-2.5 py-1 rounded-lg bg-white/15 text-xs font-semibold">
-            סופ"ש יום: {formatCoinDisplay(wallet?.coins_weekend_day)}
-          </span>
-          <span className="px-2.5 py-1 rounded-lg bg-white/15 text-xs font-semibold">
-            סופ"ש לילה: {formatCoinDisplay(wallet?.coins_weekend_night)}
-          </span>
-        </div>
-      )}
-    </div>
-  );
-}
 
 export default function SailingLogPage() {
   const { currentUser } = useAuth();
   const [fromDate, setFromDate] = useState(toInputDate(addDays(new Date(), -7)));
   const [toDate, setToDate] = useState(toInputDate(addDays(new Date(), 7)));
+  // '' = כל השותפים (no filter). Defaults to the logged-in partner once
+  // known, so the log is immediately useful ("my own sailings") without
+  // requiring a manual selection first.
+  const [selectedPartnerId, setSelectedPartnerId] = useState('');
+  const [partners, setPartners] = useState([]);
   const [rows, setRows] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
   const [hasGenerated, setHasGenerated] = useState(false);
 
-  async function handleGenerate() {
+  useEffect(() => {
+    supabase
+      .from('users')
+      .select('id, full_name, email')
+      .order('full_name')
+      .then(({ data, error }) => {
+        if (error) {
+          console.error('Failed to load partner list', error);
+          return;
+        }
+        setPartners(data ?? []);
+      });
+  }, []);
+
+  useEffect(() => {
+    if (currentUser?.id) setSelectedPartnerId(currentUser.id);
+  }, [currentUser?.id]);
+
+  async function handleGenerate(partnerIdOverride) {
     setIsLoading(true);
     setErrorMessage(null);
     setHasGenerated(true);
     try {
-      const data = await fetchSailingLog(new Date(fromDate), new Date(`${toDate}T23:59:59`));
+      const partnerId = partnerIdOverride !== undefined ? partnerIdOverride : selectedPartnerId;
+      const data = await fetchSailingLog(new Date(fromDate), new Date(`${toDate}T23:59:59`), partnerId || null);
       setRows(data);
     } catch (err) {
       console.error('Failed to load sailing log', err);
@@ -193,6 +152,15 @@ export default function SailingLogPage() {
       setIsLoading(false);
     }
   }
+
+  // Auto-load once the default filters (±7 days, current partner) are
+  // known, so the log shows real data immediately instead of the empty
+  // "pick a range and click הצג" placeholder.
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    handleGenerate(currentUser.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id]);
 
   function handleExport() {
     exportSailingLogToXlsx({ rows, fromDate, toDate });
@@ -210,7 +178,7 @@ export default function SailingLogPage() {
         </p>
       </header>
 
-      <CoinBalanceSummary currentUser={currentUser} />
+      <CoinBalanceBadge currentUser={currentUser} />
 
       <div className="flex flex-wrap items-end gap-3">
         <div className="flex flex-col gap-1.5">
@@ -231,14 +199,29 @@ export default function SailingLogPage() {
             className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800"
           />
         </div>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-slate-700">שותף</label>
+          <select
+            value={selectedPartnerId}
+            onChange={(e) => setSelectedPartnerId(e.target.value)}
+            className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 min-w-[160px]"
+          >
+            <option value="">כל השותפים</option>
+            {partners.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.id === currentUser?.id ? `${p.full_name ?? p.email} (אני)` : p.full_name ?? p.email}
+              </option>
+            ))}
+          </select>
+        </div>
         <button
           type="button"
-          onClick={handleGenerate}
+          onClick={() => handleGenerate()}
           disabled={isLoading}
           className="flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed text-white text-sm font-semibold px-4 py-2.5 transition-colors"
         >
           <Play size={15} />
-          {isLoading ? 'מפיק דוח...' : 'הצג יומן'}
+          {isLoading ? 'מפיק דוח...' : 'הצג'}
         </button>
         <button
           type="button"

@@ -181,7 +181,7 @@ export default function YachtCalendar({ bookings, onSelectRange, onEventClick, i
   );
 
   return (
-    <div className="flex flex-col h-[calc(100dvh-140px)] overflow-hidden bg-white rounded-2xl shadow-sm border border-slate-200 p-2 sm:p-4">
+    <div className="flex flex-col h-[calc(100dvh-205px)] overflow-hidden bg-white rounded-2xl shadow-sm border border-slate-200 p-2 sm:p-4">
       <FullCalendar
         ref={calendarRef}
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}

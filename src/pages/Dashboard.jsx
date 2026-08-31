@@ -11,6 +11,7 @@ import UpcomingSailingsModal from '../components/UpcomingSailingsModal';
 import OpenMaintenanceIssuesModal from '../components/OpenMaintenanceIssuesModal';
 import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../lib/supabaseClient';
+import { formatCoinAmount } from '../lib/coinCalculator';
 
 function defaultBookingRange() {
   const start = new Date();
@@ -125,7 +126,15 @@ export default function Dashboard({ onNavigate }) {
       <SailingStatsChart onClick={() => onNavigate?.('calendar')} />
 
       <KpiCards
-        stats={{ totalCoins: walletCoins, upcomingBookings: upcomingCount, openMaintenanceIssues: openIssuesCount }}
+        stats={{
+          // Coin totals can be fractional (proportional shared-sail
+          // splits, e.g. 3/7 of a booking) — format for display here so
+          // KpiCards stays a generic "number or count" card and doesn't
+          // need to know which of its stats are coin amounts.
+          totalCoins: walletCoins !== null ? formatCoinAmount(walletCoins) : null,
+          upcomingBookings: upcomingCount,
+          openMaintenanceIssues: openIssuesCount,
+        }}
         onCardClick={setOpenModal}
       />
 
