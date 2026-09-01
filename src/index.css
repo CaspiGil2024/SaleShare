@@ -9,7 +9,16 @@
     height: 100%;
   }
   body {
-    @apply bg-slate-50 text-slate-800 font-sans;
+    @apply bg-slate-50 text-slate-800 font-sans transition-colors duration-300 dark:bg-slate-900 dark:text-slate-100;
+  }
+  /* Lets native controls (scrollbars, date/time pickers, etc.) pick a
+     matching light/dark rendering instead of staying light-styled
+     inside a dark page. */
+  html {
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
   }
 }
 

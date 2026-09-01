@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Menu } from 'lucide-react';
 import { AuthProvider, useAuth } from './auth/AuthProvider';
+import { ThemeProvider } from './theme/ThemeProvider';
 import Login from './pages/Login';
 import ForcePasswordChange from './components/ForcePasswordChange';
 import Sidebar from './components/Sidebar';
@@ -22,7 +23,7 @@ function AuthenticatedApp() {
   const { currentUser, signOut } = useAuth();
 
   return (
-    <div className="flex min-h-screen bg-slate-50" dir="rtl">
+    <div className="flex min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-300" dir="rtl">
       <Sidebar
         active={active}
         onNavigate={setActive}
@@ -40,16 +41,16 @@ function AuthenticatedApp() {
         flexbox mobile-overflow bug.
       */}
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="md:hidden sticky top-0 z-30 flex items-center justify-between px-4 py-3 bg-white border-b border-slate-200">
+        <header className="md:hidden sticky top-0 z-30 flex items-center justify-between px-4 py-3 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 transition-colors duration-300">
           <button
             type="button"
             onClick={() => setIsMobileNavOpen(true)}
             aria-label="פתיחת תפריט"
-            className="w-9 h-9 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
+            className="w-9 h-9 flex items-center justify-center rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
           >
             <Menu size={20} />
           </button>
-          <span className="text-sm font-bold text-blue-900">OBOR</span>
+          <span className="text-sm font-bold text-blue-900 dark:text-blue-300">OBOR</span>
           <span className="w-9" aria-hidden="true" />
         </header>
         <main className="flex-1 overflow-y-auto min-w-0">
@@ -75,7 +76,7 @@ function AppShell() {
 
   if (loading || (user && profileLoading)) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 text-sm text-slate-400">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 text-sm text-slate-400">
         Loading...
       </div>
     );
@@ -88,8 +89,10 @@ function AppShell() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppShell />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <AppShell />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
