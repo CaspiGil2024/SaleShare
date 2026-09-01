@@ -30,6 +30,7 @@ export default function EditPartnerModal({ isOpen, onClose, partner, onSaved }) 
   const [defaultCalendarView, setDefaultCalendarView] = useState(null);
   const [emailsEnabled, setEmailsEnabled] = useState(false);
   const [receiveSharedSailNotifications, setReceiveSharedSailNotifications] = useState(false);
+  const [receiveCriticalUpdates, setReceiveCriticalUpdates] = useState(false);
   const [calendarViewLoading, setCalendarViewLoading] = useState(false);
 
   // Re-seed the form whenever a different partner is opened for editing.
@@ -46,10 +47,11 @@ export default function EditPartnerModal({ isOpen, onClose, partner, onSaved }) 
     setDefaultCalendarView(null);
     setEmailsEnabled(false);
     setReceiveSharedSailNotifications(false);
+    setReceiveCriticalUpdates(false);
     setCalendarViewLoading(true);
     supabase
       .from('users')
-      .select('id, default_calendar_view, emails_enabled, receive_shared_sail_notifications')
+      .select('id, default_calendar_view, emails_enabled, receive_shared_sail_notifications, receive_critical_updates')
       .ilike('email', partner.email)
       .maybeSingle()
       .then(({ data, error }) => {
@@ -60,6 +62,7 @@ export default function EditPartnerModal({ isOpen, onClose, partner, onSaved }) 
           setDefaultCalendarView(data.default_calendar_view);
           setEmailsEnabled(data.emails_enabled ?? false);
           setReceiveSharedSailNotifications(data.receive_shared_sail_notifications ?? false);
+          setReceiveCriticalUpdates(data.receive_critical_updates ?? false);
         }
         setCalendarViewLoading(false);
       });
@@ -148,6 +151,7 @@ export default function EditPartnerModal({ isOpen, onClose, partner, onSaved }) 
             default_calendar_view: defaultCalendarView,
             emails_enabled: emailsEnabled,
             receive_shared_sail_notifications: emailsEnabled && receiveSharedSailNotifications,
+            receive_critical_updates: emailsEnabled && receiveCriticalUpdates,
           })
           .eq('id', userId)
           .select();
@@ -313,15 +317,26 @@ export default function EditPartnerModal({ isOpen, onClose, partner, onSaved }) 
                 שליחת מיילים
               </label>
               {emailsEnabled && (
-                <label className="flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 ms-6 text-sm text-slate-700 dark:text-slate-200 cursor-pointer hover:bg-white dark:hover:bg-slate-700">
-                  <input
-                    type="checkbox"
-                    checked={receiveSharedSailNotifications}
-                    onChange={(e) => setReceiveSharedSailNotifications(e.target.checked)}
-                    className="rounded border-slate-300 dark:border-slate-600 text-blue-600 dark:text-blue-300 focus:ring-blue-500 dark:focus:ring-blue-400"
-                  />
-                  קבלת עדכונים על הפלגות שותפים
-                </label>
+                <>
+                  <label className="flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 ms-6 text-sm text-slate-700 dark:text-slate-200 cursor-pointer hover:bg-white dark:hover:bg-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={receiveSharedSailNotifications}
+                      onChange={(e) => setReceiveSharedSailNotifications(e.target.checked)}
+                      className="rounded border-slate-300 dark:border-slate-600 text-blue-600 dark:text-blue-300 focus:ring-blue-500 dark:focus:ring-blue-400"
+                    />
+                    קבלת עדכונים על הפלגות שותפים
+                  </label>
+                  <label className="flex items-center gap-2 rounded-lg border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950 px-3 py-2 ms-6 text-sm text-amber-800 dark:text-amber-300 cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-900">
+                    <input
+                      type="checkbox"
+                      checked={receiveCriticalUpdates}
+                      onChange={(e) => setReceiveCriticalUpdates(e.target.checked)}
+                      className="rounded border-amber-300 dark:border-amber-700 text-amber-600 dark:text-amber-400 focus:ring-amber-500 dark:focus:ring-amber-400"
+                    />
+                    קבלת עדכונים קריטיים (השבתת ספינה)
+                  </label>
+                </>
               )}
             </div>
           )}

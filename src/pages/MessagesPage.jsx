@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Bell, Download, Plus, Wrench, CheckCircle2, ImagePlus, Megaphone, Pencil, X } from 'lucide-react';
+import { Bell, Download, Plus, Wrench, CheckCircle2, ImagePlus, Megaphone, Pencil, X, TriangleAlert } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../auth/AuthProvider';
 import { isManager } from '../lib/permissions';
 import { exportMaintenanceIssuesToXlsx } from '../lib/xlsxExport';
 import { formatDateHe } from '../lib/dateFormat';
+import { sendMaintenanceResolvedNotificationEmails, sendVesselGroundingAlertEmails } from '../lib/emailNotifications';
 
 const IMAGES_BUCKET = 'maintenance-images';
 
@@ -311,6 +312,7 @@ function NewIssueForm({ onCreated }) {
   const [summary, setSummary] = useState('');
   const [description, setDescription] = useState('');
   const [files, setFiles] = useState([]);
+  const [isGrounding, setIsGrounding] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
 
@@ -334,10 +336,38 @@ function NewIssueForm({ onCreated }) {
 
       const { data: issue, error: issueError } = await supabase
         .from('maintenance_issues')
-        .insert({ summary: summary.trim(), description: description.trim(), created_by: authUser?.id ?? null })
+        .insert({
+          summary: summary.trim(),
+          description: description.trim(),
+          created_by: authUser?.id ?? null,
+          is_grounding: isGrounding,
+        })
         .select()
         .single();
       if (issueError) throw issueError;
+
+      // Fire-and-forget, same soft-no-op-if-unconfigured behavior as
+      // every other email call in this app — never risks the report
+      // that already succeeded above, and dispatched immediately rather
+      // than waiting on the (unrelated) image upload below.
+      if (isGrounding) {
+        supabase
+          .from('users')
+          .select('email, full_name')
+          .eq('emails_enabled', true)
+          .eq('receive_critical_updates', true)
+          .then(({ data: recipientRows, error: recipientsError }) => {
+            if (recipientsError) {
+              console.error('Failed to load critical-update recipients', recipientsError);
+              return;
+            }
+            sendVesselGroundingAlertEmails({
+              recipients: (recipientRows ?? []).map((u) => ({ email: u.email, name: u.full_name })),
+              summary: issue.summary,
+              description: issue.description,
+            });
+          });
+      }
 
       const uploadedPaths = [];
       for (const file of files) {
@@ -357,6 +387,7 @@ function NewIssueForm({ onCreated }) {
       setSummary('');
       setDescription('');
       setFiles([]);
+      setIsGrounding(false);
       setIsOpen(false);
       await onCreated();
     } catch (err) {
@@ -407,6 +438,17 @@ function NewIssueForm({ onCreated }) {
           <input type="file" accept="image/*" multiple className="hidden" onChange={handleFilesChange} />
         </label>
       </div>
+
+      <label className="flex items-center gap-2 rounded-lg border-2 border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950 px-3 py-2.5 text-sm font-semibold text-rose-800 dark:text-rose-300 cursor-pointer hover:bg-rose-100 dark:hover:bg-rose-900">
+        <input
+          type="checkbox"
+          checked={isGrounding}
+          onChange={(e) => setIsGrounding(e.target.checked)}
+          className="w-4 h-4 rounded border-rose-300 dark:border-rose-700 text-rose-600 dark:text-rose-400 focus:ring-rose-500 dark:focus:ring-rose-400"
+        />
+        <TriangleAlert size={16} className="shrink-0" />
+        השבתת יאכטה — הסירה אינה כשירה לשייט עד לפתרון התקלה
+      </label>
 
       {errorMessage && (
         <p className="text-sm text-rose-600 dark:text-rose-300 bg-rose-50 dark:bg-rose-950 border border-rose-100 dark:border-rose-900 rounded-lg px-3 py-2">{errorMessage}</p>
@@ -471,6 +513,30 @@ function IssueCard({ issue, canManage, onResolved }) {
       if (!data || data.length === 0) {
         throw new Error('העדכון לא בוצע בפועל — ייתכן שאין לכם הרשאה.');
       }
+
+      // Fire-and-forget, same soft-no-op-if-unconfigured behavior as
+      // every other email call — never risks the resolution that
+      // already succeeded above. Only for a grounding issue: everything
+      // else being marked resolved doesn't need a fleet-wide notice.
+      if (issue.is_grounding) {
+        supabase
+          .from('users')
+          .select('email, full_name')
+          .eq('emails_enabled', true)
+          .eq('receive_critical_updates', true)
+          .then(({ data: recipientRows, error: recipientsError }) => {
+            if (recipientsError) {
+              console.error('Failed to load critical-update recipients', recipientsError);
+              return;
+            }
+            sendMaintenanceResolvedNotificationEmails({
+              recipients: (recipientRows ?? []).map((u) => ({ email: u.email, name: u.full_name })),
+              summary: issue.summary,
+              resolutionNotes: resolutionNotes.trim(),
+            });
+          });
+      }
+
       await onResolved();
     } catch (err) {
       console.error('Failed to resolve maintenance issue', err);
@@ -484,7 +550,18 @@ function IssueCard({ issue, canManage, onResolved }) {
     <div className="border border-slate-200 dark:border-slate-700 rounded-xl p-4 flex flex-col gap-2.5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h4 className="font-semibold text-slate-800 dark:text-slate-100">{issue.summary}</h4>
+          <h4 className="font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+            {issue.is_grounding && (
+              <span
+                title="השבתת יאכטה"
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-900 text-rose-700 dark:text-rose-300 text-[11px] font-bold"
+              >
+                <TriangleAlert size={12} />
+                השבתת יאכטה
+              </span>
+            )}
+            {issue.summary}
+          </h4>
           <p className="text-sm text-slate-600 dark:text-slate-300 mt-1 whitespace-pre-wrap">{issue.description}</p>
         </div>
         <span
@@ -583,7 +660,7 @@ function MaintenanceIssuesSection({ currentUser }) {
       const { data: issueRows, error: issuesError } = await supabase
         .from('maintenance_issues')
         .select(
-          'id, summary, description, status, resolution_notes, created_at, resolved_at, creator:users!maintenance_issues_created_by_fkey(full_name, email), resolver:users!maintenance_issues_resolved_by_fkey(full_name, email)'
+          'id, summary, description, status, is_grounding, resolution_notes, created_at, resolved_at, creator:users!maintenance_issues_created_by_fkey(full_name, email), resolver:users!maintenance_issues_resolved_by_fkey(full_name, email)'
         )
         .order('status', { ascending: true }) // 'open' sorts before 'resolved'
         .order('created_at', { ascending: false });

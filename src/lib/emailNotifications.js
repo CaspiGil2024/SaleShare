@@ -1,6 +1,7 @@
 // =====================================================================
 // SailShare — EmailJS integration (booking confirmation, shared-sail
-// creation + cancellation notifications)
+// creation + cancellation notifications, critical maintenance/grounding
+// resolution notices)
 // =====================================================================
 // EmailJS is a BROWSER SDK — it sends mail directly from the client
 // using a public key (by design; that key isn't a secret the way a
@@ -15,7 +16,7 @@
 // successful booking change.
 //
 // Requires real EmailJS account setup this codebase can't do for you
-// (external SaaS, its own login) — see the 5 VITE_EMAILJS_* env vars
+// (external SaaS, its own login) — see the 7 VITE_EMAILJS_* env vars
 // below and the template variable names each function documents.
 // Until those are set, every function here no-ops with a console.warn
 // rather than throwing, so a booking still works with email
@@ -35,6 +36,8 @@ const PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
 const TEMPLATE_BOOKING_CONFIRMATION = import.meta.env.VITE_EMAILJS_TEMPLATE_BOOKING_CONFIRMATION;
 const TEMPLATE_SHARED_SAIL_NOTIFICATION = import.meta.env.VITE_EMAILJS_TEMPLATE_SHARED_SAIL_NOTIFICATION;
 const TEMPLATE_CANCEL_SHARED_SAIL = import.meta.env.VITE_EMAILJS_TEMPLATE_CANCEL_SHARED_SAIL;
+const TEMPLATE_MAINTENANCE_RESOLVED = import.meta.env.VITE_EMAILJS_TEMPLATE_MAINTENANCE_RESOLVED;
+const TEMPLATE_VESSEL_GROUNDING = import.meta.env.VITE_EMAILJS_TEMPLATE_VESSEL_GROUNDING;
 
 let hasWarnedMissingConfig = false;
 
@@ -228,5 +231,79 @@ export async function sendCancelSharedSailNotificationEmails({ recipients, organ
   const failures = results.filter((r) => r.status === 'rejected');
   if (failures.length > 0) {
     console.error(`Failed to send ${failures.length}/${recipients.length} shared-sail cancellation emails`, failures);
+  }
+}
+
+// Sent when a GROUNDING maintenance issue (maintenance_issues.is_grounding)
+// is marked resolved — see MessagesPage.jsx's IssueCard.handleResolve,
+// which fetches the recipient list the same way the shared-sail
+// functions above do (emails_enabled + receive_critical_updates this
+// time, instead of receive_shared_sail_notifications — a partner opts
+// into critical/grounding updates separately from shared-sail chatter).
+//
+// status_message is passed as its own merge tag (fixed Hebrew text, not
+// caller-configurable) so the template can use it directly without
+// having to hardcode the exact wording itself.
+//
+// Template variables (VITE_EMAILJS_TEMPLATE_MAINTENANCE_RESOLVED):
+//   to_email, to_name, status_message, summary, resolution_notes
+export async function sendMaintenanceResolvedNotificationEmails({ recipients, summary, resolutionNotes }) {
+  if (!recipients?.length) return;
+  if (!isConfigured() || !TEMPLATE_MAINTENANCE_RESOLVED) return;
+
+  const results = await Promise.allSettled(
+    recipients.map((r) =>
+      emailjs.send(
+        SERVICE_ID,
+        TEMPLATE_MAINTENANCE_RESOLVED,
+        {
+          to_email: r.email,
+          to_name: r.name ?? r.email,
+          status_message: 'התקלה נפתרה והיאכטה מוכנה לשימוש',
+          summary,
+          resolution_notes: resolutionNotes ?? '',
+        },
+        { publicKey: PUBLIC_KEY }
+      )
+    )
+  );
+
+  const failures = results.filter((r) => r.status === 'rejected');
+  if (failures.length > 0) {
+    console.error(`Failed to send ${failures.length}/${recipients.length} maintenance-resolved emails`, failures);
+  }
+}
+
+// Opposite end of sendMaintenanceResolvedNotificationEmails above — sent
+// the moment a NEW grounding issue is reported (is_grounding checked in
+// MessagesPage.jsx's "דיווח תקלה חדשה" form), not when it's resolved.
+// Same recipient audience (emails_enabled + receive_critical_updates).
+//
+// Template variables (VITE_EMAILJS_TEMPLATE_VESSEL_GROUNDING):
+//   to_email, to_name, status_message, summary, description
+export async function sendVesselGroundingAlertEmails({ recipients, summary, description }) {
+  if (!recipients?.length) return;
+  if (!isConfigured() || !TEMPLATE_VESSEL_GROUNDING) return;
+
+  const results = await Promise.allSettled(
+    recipients.map((r) =>
+      emailjs.send(
+        SERVICE_ID,
+        TEMPLATE_VESSEL_GROUNDING,
+        {
+          to_email: r.email,
+          to_name: r.name ?? r.email,
+          status_message: 'היאכטה הושבתה עקב תקלה ואינה כשירה לשייט',
+          summary,
+          description: description ?? '',
+        },
+        { publicKey: PUBLIC_KEY }
+      )
+    )
+  );
+
+  const failures = results.filter((r) => r.status === 'rejected');
+  if (failures.length > 0) {
+    console.error(`Failed to send ${failures.length}/${recipients.length} vessel-grounding alert emails`, failures);
   }
 }

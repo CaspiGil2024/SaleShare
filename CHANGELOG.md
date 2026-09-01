@@ -10,6 +10,25 @@ developers.
 ## Unreleased
 
 ### Added
+- **Critical maintenance / vessel-grounding notifications — both ends
+  wired, both templates configured.** New `users.receive_critical_updates`
+  preference (migration `0058`, same self/admin field-gate shape as
+  `emails_enabled`/`receive_shared_sail_notifications`) with a checkbox
+  in `EditPartnerModal.jsx`. New `maintenance_issues.is_grounding` flag,
+  set via a prominent checkbox in `MessagesPage.jsx`'s "דיווח תקלה
+  חדשה" form and shown as a badge on the issue card. Two emails, same
+  `emails_enabled` + `receive_critical_updates` audience:
+  - `sendVesselGroundingAlertEmails` (new) — fires immediately from
+    `NewIssueForm`'s submit handler when a new issue is reported with
+    "השבתת יאכטה" checked. Fixed message "היאכטה הושבתה עקב תקלה ואינה
+    כשירה לשייט" + the ticket's summary/description. Env var
+    `VITE_EMAILJS_TEMPLATE_VESSEL_GROUNDING`.
+  - `sendMaintenanceResolvedNotificationEmails` — fires from
+    `IssueCard.handleResolve` when a grounding issue is marked resolved.
+    Fixed message "התקלה נפתרה והיאכטה מוכנה לשימוש" + summary/resolution
+    notes. Env var `VITE_EMAILJS_TEMPLATE_MAINTENANCE_RESOLVED`.
+  
+  Both template IDs are now set in `.env.local`.
 - **Full EmailJS notification system, wired end to end.** The client
   wrapper (`src/lib/emailNotifications.js`) and env var placeholders
   already existed from an earlier pass but the actual call sites had
