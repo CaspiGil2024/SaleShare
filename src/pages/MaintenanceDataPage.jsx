@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { DatabaseBackup, Download, Table2, History, Pencil, X } from 'lucide-react';
+import { DatabaseBackup, Download, Table2, History, Pencil, X, PlusCircle } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../auth/AuthProvider';
 import { isManager, isAdminOrTreasurer } from '../lib/permissions';
@@ -32,10 +32,207 @@ function formatCoinAmount(n) {
 // ---------------------------------------------------------------------
 // Manual coin-balance editing + its audit log — moved here from
 // ParametersPage.jsx (which keeps only the general S/overdraft/rollover
-// settings form). Both sections below stay admin/treasurer-only, same
-// as when the whole page they used to live on was gated that way — see
-// canManage in the default export.
+// settings form). All three sections below stay admin/treasurer-only,
+// same as when the whole page they used to live on was gated that way
+// — see canManageBalances in the default export.
 // ---------------------------------------------------------------------
+
+// Explicit Debit/Credit journal entry — classic accounting-style
+// counterpart to EditBalanceModal below (which SETS a target balance
+// directly). This one takes an amount + direction (חובה/זכות) and a
+// value date, calling fn_admin_manual_coin_entry (0055) — a different
+// RPC from fn_admin_adjust_coin_balance, but both write the SAME
+// 'admin_adjustment' reason, so they share one unified audit trail
+// (AdjustmentAuditLog below) rather than needing a second one.
+function ManualCoinEntryForm({ onSaved }) {
+  const [partners, setPartners] = useState([]);
+  const [partnerId, setPartnerId] = useState('');
+  const [coinType, setCoinType] = useState(COIN_TYPE_OPTIONS[0].value);
+  const [direction, setDirection] = useState('credit');
+  const [amount, setAmount] = useState('');
+  const [valueDate, setValueDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [note, setNote] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
+
+  useEffect(() => {
+    supabase
+      .from('users')
+      .select('id, full_name, email')
+      .order('full_name')
+      .then(({ data, error }) => {
+        if (error) {
+          console.error('Failed to load partners for manual coin entry', error);
+          return;
+        }
+        setPartners(data ?? []);
+      });
+  }, []);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    if (!partnerId) {
+      setErrorMessage('יש לבחור שותף.');
+      return;
+    }
+    const parsedAmount = Number(amount);
+    if (!amount || Number.isNaN(parsedAmount) || parsedAmount <= 0) {
+      setErrorMessage('יש להזין סכום חיובי גדול מאפס.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const { error } = await supabase.rpc('fn_admin_manual_coin_entry', {
+        p_user_id: partnerId,
+        p_coin_type: coinType,
+        p_amount: parsedAmount,
+        p_direction: direction,
+        p_value_date: valueDate,
+        p_note: note.trim() ? note.trim() : null,
+      });
+      if (error) throw error;
+
+      setSuccessMessage('התנועה נרשמה בהצלחה.');
+      setAmount('');
+      setNote('');
+      await onSaved?.();
+    } catch (err) {
+      console.error('Failed to record manual coin entry', err);
+      setErrorMessage(err.message ?? 'אירעה שגיאה ברישום התנועה.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col gap-4"
+    >
+      <div>
+        <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+          <PlusCircle size={18} className="text-blue-600" />
+          תנועת מטבעות ידנית (חובה / זכות)
+        </h3>
+        <p className="text-sm text-slate-500 mt-1">
+          רישום ידני של תנועת חובה או זכות עבור שותף, כולל תאריך ערך — בהתאם לכללי הנהלת חשבונות כפולה
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-slate-700">שותף</label>
+          <select
+            value={partnerId}
+            onChange={(e) => setPartnerId(e.target.value)}
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">בחרו שותף...</option>
+            {partners.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.full_name ?? p.email}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-slate-700">סוג מטבע</label>
+          <select
+            value={coinType}
+            onChange={(e) => setCoinType(e.target.value)}
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            {COIN_TYPE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-slate-700">חובה / זכות</label>
+          <div className="flex rounded-lg border border-slate-300 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setDirection('debit')}
+              className={`flex-1 py-2 text-sm font-semibold transition-colors ${
+                direction === 'debit' ? 'bg-rose-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              חובה
+            </button>
+            <button
+              type="button"
+              onClick={() => setDirection('credit')}
+              className={`flex-1 py-2 text-sm font-semibold transition-colors border-r border-slate-300 ${
+                direction === 'credit' ? 'bg-emerald-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              זכות
+            </button>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-slate-700">סכום</label>
+          <input
+            type="number"
+            step="0.01"
+            min="0.01"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-slate-700">תאריך ערך</label>
+          <input
+            type="date"
+            value={valueDate}
+            onChange={(e) => setValueDate(e.target.value)}
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-slate-700">הערה (אופציונלי)</label>
+          <input
+            type="text"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="סיבת התנועה..."
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+      </div>
+
+      {errorMessage && (
+        <p className="text-sm text-rose-600 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2">{errorMessage}</p>
+      )}
+      {successMessage && (
+        <p className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
+          {successMessage}
+        </p>
+      )}
+
+      <button
+        type="submit"
+        disabled={submitting}
+        className="self-start rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed text-white text-sm font-semibold px-5 py-2.5 transition-colors"
+      >
+        {submitting ? 'רושם...' : 'רישום תנועה'}
+      </button>
+    </form>
+  );
+}
 
 // Opens pre-filled with all 4 of one partner's coin-type balances at
 // once. Deliberately batches every field behind a single Save button
@@ -206,7 +403,7 @@ function EditBalanceModal({ partner, onClose, onSaved }) {
 // that partner's full set of 4 balances, saved together behind one
 // Save button — there's no separate dropdown-based form anymore, this
 // table IS the adjustment UI.
-function PartnerBalancesTable({ onAdjusted }) {
+function PartnerBalancesTable({ onAdjusted, refreshToken = 0 }) {
   const [partners, setPartners] = useState([]);
   const [walletByUserId, setWalletByUserId] = useState({});
   const [isLoading, setIsLoading] = useState(true);
@@ -256,9 +453,14 @@ function PartnerBalancesTable({ onAdjusted }) {
     }
   }
 
+  // Also reloads (dimmed, not a full spinner) whenever refreshToken
+  // changes — e.g. ManualCoinEntryForm above just recorded a new entry
+  // for some partner, so the table shouldn't keep showing stale
+  // balances until this page happens to remount.
   useEffect(() => {
-    load({ isInitial: true });
-  }, []);
+    load({ isInitial: refreshToken === 0 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshToken]);
 
   async function handleSaved() {
     setEditingPartner(null);
@@ -567,7 +769,11 @@ export default function MaintenanceDataPage() {
 
       {canManageBalances && (
         <>
-          <PartnerBalancesTable onAdjusted={() => setAuditRefreshToken((n) => n + 1)} />
+          <ManualCoinEntryForm onSaved={() => setAuditRefreshToken((n) => n + 1)} />
+          <PartnerBalancesTable
+            refreshToken={auditRefreshToken}
+            onAdjusted={() => setAuditRefreshToken((n) => n + 1)}
+          />
           <AdjustmentAuditLog refreshToken={auditRefreshToken} />
         </>
       )}

@@ -198,3 +198,25 @@ export function exportPartnerHistoryToXlsx({ partnerName, rows }) {
   const safeName = (partnerName ?? 'partner').replace(/[\\/:*?"<>|]/g, '_');
   XLSX.writeFile(wb, `SailShare-${safeName}-history-${timestamp}.xlsx`);
 }
+
+// Periodic partner statement (ReportsPage.jsx's "דוח תקופתי לשותף" tab)
+// — one row per coin_transactions entry in the chosen value-date range,
+// already split into debit/credit by the caller (see PartnerStatementTab).
+export function exportPartnerStatementToXlsx({ partnerName, fromDate, toDate, rows }) {
+  const wb = XLSX.utils.book_new();
+
+  const sheetRows = rows.map((r) => ({
+    'תאריך ערך': r.value_date,
+    'סוג מטבע': r.coinTypeLabel,
+    'סיבה': r.reasonLabel,
+    'חובה': r.debit ?? 0,
+    'זכות': r.credit ?? 0,
+    'יתרה מתגלגלת': r.running_balance,
+    'הערה': r.note ?? '',
+  }));
+  const sheet = XLSX.utils.json_to_sheet(sheetRows);
+  XLSX.utils.book_append_sheet(wb, sheet, 'דוח תקופתי');
+
+  const safeName = (partnerName ?? 'partner').replace(/[\\/:*?"<>|]/g, '_');
+  XLSX.writeFile(wb, `SailShare-${safeName}-statement-${fromDate}-to-${toDate}.xlsx`);
+}

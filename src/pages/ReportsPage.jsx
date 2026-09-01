@@ -1,11 +1,14 @@
-import { useEffect, useState } from 'react';
-import { FileBarChart, History, CalendarClock, Coins, Play, Download } from 'lucide-react';
+import { Fragment, useEffect, useState } from 'react';
+import { FileBarChart, History, CalendarClock, Coins, Play, Download, BookOpenText } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
+import { useAuth } from '../auth/AuthProvider';
+import { isManager, isAdminRole } from '../lib/permissions';
 import { bookingTypeLabelHe } from '../lib/bookingColors';
 import {
   exportActivityReportToXlsx,
   exportDetailedActivityReportToXlsx,
   exportPartnerBalancesToXlsx,
+  exportPartnerStatementToXlsx,
 } from '../lib/xlsxExport';
 import { formatCoinAmount } from '../lib/coinCalculator';
 
@@ -13,7 +16,28 @@ const TABS = [
   { key: 'past', label: 'דוח פעילות היסטורית', icon: History },
   { key: 'future', label: 'דוח פעילות עתידית', icon: CalendarClock },
   { key: 'balances', label: 'יתרות שותפים', icon: Coins },
+  { key: 'statement', label: 'דוח תקופתי לשותף', icon: BookOpenText },
 ];
+
+// Snake_case coin_type (as stored in coin_transactions / returned by
+// fn_partner_coin_statement) — separate from coinCalculator.js's
+// camelCase COIN_TYPE_LABELS_HE, which keys by the classifyHours
+// breakdown shape instead. Same standardized midweek-day-first order.
+const STATEMENT_COIN_TYPES = [
+  { value: 'midweek_day', label: 'אמצ"ש יום' },
+  { value: 'midweek_night', label: 'אמצ"ש לילה' },
+  { value: 'weekend_day', label: 'סופ"ש יום' },
+  { value: 'weekend_night', label: 'סופ"ש לילה' },
+];
+
+const STATEMENT_REASON_LABELS_HE = {
+  quarterly_allowance: 'הקצאה רבעונית',
+  booking_charge: 'חיוב הפלגה',
+  booking_refund: 'זיכוי ביטול הפלגה',
+  participant_charge: 'חיוב השתתפות',
+  participant_refund: 'זיכוי ביטול השתתפות',
+  admin_adjustment: 'תנועה ידנית',
+};
 
 // Every partner's real current-period balance across all 4 coin
 // types (0021+). Open to every partner, not just managers — see
@@ -471,6 +495,246 @@ function ActivityReportTab({ defaultFrom, defaultTo, reportLabel }) {
   );
 }
 
+// One partner's coin_transactions in a value-date range, split into
+// Debit/Credit per coin type — real double-entry-style statement.
+// fn_partner_coin_statement (0055) already returns a correct running
+// balance PER type (seeded from the true opening balance before the
+// range, not from zero); this only needs to carry each type's last-
+// known balance forward across rows that belong to a DIFFERENT type,
+// so all 4 running-balance columns stay populated at every row instead
+// of only the one type that row's transaction actually touched.
+async function fetchPartnerStatement(userId, fromDate, toDate) {
+  const { data, error } = await supabase.rpc('fn_partner_coin_statement', {
+    p_user_id: userId,
+    p_from: fromDate,
+    p_to: toDate,
+  });
+  if (error) throw error;
+  return data ?? [];
+}
+
+function PartnerStatementTab() {
+  const { currentUser } = useAuth();
+  // fn_partner_coin_statement itself only allows viewing your own
+  // statement unless you're a manager/admin (0055) — mirrored here so a
+  // regular partner isn't offered a dropdown of everyone else's names
+  // just to have it fail server-side when they pick one.
+  const canViewOthers = isManager(currentUser) || isAdminRole(currentUser);
+  const [partners, setPartners] = useState([]);
+  const [partnerId, setPartnerId] = useState('');
+  const [fromDate, setFromDate] = useState(toInputDate(new Date(new Date().getFullYear(), 0, 1)));
+  const [toDate, setToDate] = useState(toInputDate(new Date()));
+  const [rows, setRows] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState(null);
+  const [hasGenerated, setHasGenerated] = useState(false);
+
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    if (!canViewOthers) {
+      setPartners([{ id: currentUser.id, full_name: currentUser.full_name, email: currentUser.email }]);
+      setPartnerId(currentUser.id);
+      return;
+    }
+    supabase
+      .from('users')
+      .select('id, full_name, email')
+      .order('full_name')
+      .then(({ data, error }) => {
+        if (error) {
+          console.error('Failed to load partners for statement report', error);
+          return;
+        }
+        setPartners(data ?? []);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id, canViewOthers]);
+
+  async function handleGenerate() {
+    if (!partnerId) {
+      setErrorMessage('יש לבחור שותף.');
+      return;
+    }
+    setIsLoading(true);
+    setErrorMessage(null);
+    try {
+      const data = await fetchPartnerStatement(partnerId, fromDate, toDate);
+      setRows(data);
+      setHasGenerated(true);
+    } catch (err) {
+      console.error('Failed to load partner statement', err);
+      setErrorMessage('אירעה שגיאה בהפקת הדוח.');
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  // Chronological already (fn_partner_coin_statement's own order-by) —
+  // just carry each type's running balance forward across rows that
+  // belong to a different type.
+  const lastKnownBalance = {};
+  const displayRows = rows.map((r) => {
+    lastKnownBalance[r.coin_type] = r.running_balance;
+    return {
+      ...r,
+      debit: r.delta < 0 ? Math.abs(r.delta) : null,
+      credit: r.delta > 0 ? r.delta : null,
+      balancesByType: { ...lastKnownBalance },
+    };
+  });
+
+  const partnerName = partners.find((p) => p.id === partnerId)?.full_name ?? partners.find((p) => p.id === partnerId)?.email;
+
+  function handleExport() {
+    exportPartnerStatementToXlsx({
+      partnerName,
+      fromDate,
+      toDate,
+      rows: displayRows.map((r) => ({
+        ...r,
+        coinTypeLabel: STATEMENT_COIN_TYPES.find((t) => t.value === r.coin_type)?.label ?? r.coin_type,
+        reasonLabel: STATEMENT_REASON_LABELS_HE[r.reason] ?? r.reason,
+      })),
+    });
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-slate-700">שותף</label>
+          <select
+            value={partnerId}
+            onChange={(e) => setPartnerId(e.target.value)}
+            disabled={!canViewOthers}
+            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[180px] disabled:bg-slate-50 disabled:text-slate-500"
+          >
+            {canViewOthers && <option value="">בחרו שותף...</option>}
+            {partners.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.full_name ?? p.email}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-slate-700">מתאריך</label>
+          <input
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-slate-700">עד תאריך</label>
+          <input
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <button
+          type="button"
+          onClick={handleGenerate}
+          disabled={isLoading}
+          className="flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed text-white text-sm font-semibold px-4 py-2 transition-colors"
+        >
+          <Play size={15} />
+          {isLoading ? 'מפיק...' : 'הפק דוח'}
+        </button>
+        {hasGenerated && (
+          <button
+            type="button"
+            onClick={handleExport}
+            disabled={displayRows.length === 0}
+            className="flex items-center gap-1.5 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-semibold px-4 py-2 transition-colors"
+          >
+            <Download size={15} />
+            יצוא ל-EXCEL
+          </button>
+        )}
+      </div>
+
+      {errorMessage && (
+        <p className="text-sm text-rose-600 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2">{errorMessage}</p>
+      )}
+
+      {!hasGenerated ? (
+        <p className="p-10 text-center text-sm text-slate-400">בחרו שותף וטווח תאריכים ולחצו "הפק דוח".</p>
+      ) : isLoading ? (
+        <p className="p-10 text-center text-sm text-slate-400">טוען...</p>
+      ) : displayRows.length === 0 ? (
+        <p className="p-10 text-center text-sm text-slate-400">אין תנועות מטבעות בטווח התאריכים שנבחר.</p>
+      ) : (
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="overflow-auto max-h-[65dvh]">
+            <table className="w-full text-sm">
+              <thead className="sticky-thead">
+                <tr className="border-b border-slate-100 text-start text-slate-500">
+                  <th rowSpan={2} className="px-4 py-3 font-bold text-start align-bottom whitespace-nowrap">
+                    תאריך ערך
+                  </th>
+                  <th rowSpan={2} className="px-4 py-3 font-bold text-start align-bottom whitespace-nowrap">
+                    סיבה
+                  </th>
+                  {STATEMENT_COIN_TYPES.map((t) => (
+                    <th key={t.value} colSpan={3} className="px-4 py-2 font-bold text-center border-s border-slate-100 whitespace-nowrap">
+                      {t.label}
+                    </th>
+                  ))}
+                  <th rowSpan={2} className="px-4 py-3 font-bold text-start align-bottom whitespace-nowrap">
+                    הערה
+                  </th>
+                </tr>
+                <tr className="border-b border-slate-200 text-start text-slate-500">
+                  {STATEMENT_COIN_TYPES.map((t) => (
+                    <Fragment key={t.value}>
+                      <th className="px-3 py-2 font-medium text-start border-s border-slate-100 whitespace-nowrap">
+                        חובה
+                      </th>
+                      <th className="px-3 py-2 font-medium text-start whitespace-nowrap">זכות</th>
+                      <th className="px-3 py-2 font-medium text-start whitespace-nowrap">יתרה</th>
+                    </Fragment>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {displayRows.map((r, idx) => (
+                  <tr key={idx} className="border-b border-slate-50 last:border-0">
+                    <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{r.value_date}</td>
+                    <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
+                      {STATEMENT_REASON_LABELS_HE[r.reason] ?? r.reason}
+                    </td>
+                    {STATEMENT_COIN_TYPES.map((t) => {
+                      const isThisType = t.value === r.coin_type;
+                      return (
+                        <Fragment key={t.value}>
+                          <td className="px-3 py-3 border-s border-slate-50 text-rose-600 whitespace-nowrap">
+                            {isThisType && r.debit !== null ? formatCoinAmount(r.debit) : '—'}
+                          </td>
+                          <td className="px-3 py-3 text-emerald-700 whitespace-nowrap">
+                            {isThisType && r.credit !== null ? formatCoinAmount(r.credit) : '—'}
+                          </td>
+                          <td className="px-3 py-3 font-semibold text-slate-800 whitespace-nowrap">
+                            {r.balancesByType[t.value] !== undefined ? formatCoinAmount(r.balancesByType[t.value]) : '—'}
+                          </td>
+                        </Fragment>
+                      );
+                    })}
+                    <td className="px-4 py-3 text-slate-500">{r.note ?? '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ReportsPage() {
   const [activeTab, setActiveTab] = useState('past');
 
@@ -525,6 +789,7 @@ export default function ReportsPage() {
         />
       )}
       {activeTab === 'balances' && <PartnerBalancesTab key="balances" />}
+      {activeTab === 'statement' && <PartnerStatementTab key="statement" />}
     </div>
   );
 }
