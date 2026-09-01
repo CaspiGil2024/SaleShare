@@ -125,8 +125,12 @@ function ManualCoinEntryForm({ onSaved }) {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        <div className="flex flex-col gap-1.5">
+      {/* flex-wrap (not a fixed-column grid) so every field — the
+          button included — flows on one line whenever there's room,
+          and only wraps to a second line on a genuinely narrow
+          viewport, instead of always breaking into fixed rows of N. */}
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="flex flex-col gap-1.5 w-44">
           <label className="text-sm font-medium text-slate-700">שותף</label>
           <select
             value={partnerId}
@@ -142,7 +146,7 @@ function ManualCoinEntryForm({ onSaved }) {
           </select>
         </div>
 
-        <div className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-1.5 w-36">
           <label className="text-sm font-medium text-slate-700">סוג מטבע</label>
           <select
             value={coinType}
@@ -157,7 +161,7 @@ function ManualCoinEntryForm({ onSaved }) {
           </select>
         </div>
 
-        <div className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-1.5 w-32">
           <label className="text-sm font-medium text-slate-700">חובה / זכות</label>
           <div className="flex rounded-lg border border-slate-300 overflow-hidden">
             <button
@@ -181,7 +185,7 @@ function ManualCoinEntryForm({ onSaved }) {
           </div>
         </div>
 
-        <div className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-1.5 w-28">
           <label className="text-sm font-medium text-slate-700">סכום</label>
           <input
             type="number"
@@ -193,7 +197,7 @@ function ManualCoinEntryForm({ onSaved }) {
           />
         </div>
 
-        <div className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-1.5 w-40">
           <label className="text-sm font-medium text-slate-700">תאריך ערך</label>
           <input
             type="date"
@@ -203,7 +207,7 @@ function ManualCoinEntryForm({ onSaved }) {
           />
         </div>
 
-        <div className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-1.5 flex-1 min-w-[160px]">
           <label className="text-sm font-medium text-slate-700">הערה (אופציונלי)</label>
           <input
             type="text"
@@ -213,6 +217,14 @@ function ManualCoinEntryForm({ onSaved }) {
             className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
+
+        <button
+          type="submit"
+          disabled={submitting}
+          className="shrink-0 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed text-white text-sm font-semibold px-5 py-2.5 transition-colors"
+        >
+          {submitting ? 'רושם...' : 'רישום תנועה'}
+        </button>
       </div>
 
       {errorMessage && (
@@ -223,14 +235,6 @@ function ManualCoinEntryForm({ onSaved }) {
           {successMessage}
         </p>
       )}
-
-      <button
-        type="submit"
-        disabled={submitting}
-        className="self-start rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed text-white text-sm font-semibold px-5 py-2.5 transition-colors"
-      >
-        {submitting ? 'רושם...' : 'רישום תנועה'}
-      </button>
     </form>
   );
 }
