@@ -11,6 +11,7 @@ import {
   Archive,
   Trash2,
   UserPlus,
+  Coins,
 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../auth/AuthProvider';
@@ -20,6 +21,7 @@ import EditPartnerModal from '../components/EditPartnerModal';
 import AddPartnerModal from '../components/AddPartnerModal';
 import BookingHistoryModal from '../components/BookingHistoryModal';
 import ChangePasswordModal from '../components/ChangePasswordModal';
+import PartnerCoinBreakdownModal from '../components/PartnerCoinBreakdownModal';
 import { formatCoinAmount } from '../lib/coinCalculator';
 
 // Per-item role gate (2026-08-26 rule). Deliberately narrower/different
@@ -234,42 +236,36 @@ function RowActionsMenu({
   );
 }
 
-// Michael's Method's 4 coin types (0021+) as a compact 2x2 grid — one
-// small labeled chip per type, so all four fit cleanly in a table row
-// instead of one flat number. A partner with no real account yet (no
-// wallet row — hasn't signed up) falls back to the legacy roster
-// balance as a single "starting point" figure, clearly labeled as such
-// rather than presented as if it were a real per-type balance.
-const COIN_CELLS = [
-  { key: 'coins_midweek_day', label: 'אמצ"ש יום', className: 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300' },
-  { key: 'coins_midweek_night', label: 'אמצ"ש לילה', className: 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300' },
-  { key: 'coins_weekend_day', label: 'סופ"ש יום', className: 'bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300' },
-  { key: 'coins_weekend_night', label: 'סופ"ש לילה', className: 'bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300' },
-];
+// Michael's Method's 4 coin types (0021+) — a single total badge per
+// row instead of 4 stacked chips, so the table stays compact; clicking
+// it opens PartnerCoinBreakdownModal for the exact per-type figures. A
+// partner with no real account yet (no wallet row — hasn't signed up)
+// falls back to the legacy roster balance as a single "starting point"
+// figure, clearly labeled as such rather than presented as if it were a
+// real per-type balance — the modal shows the same caveat.
+const COIN_BALANCE_KEYS = ['coins_midweek_day', 'coins_midweek_night', 'coins_weekend_day', 'coins_weekend_night'];
 
 function PartnerCoinBalances({ partner }) {
-  if (!partner.wallet) {
-    return (
-      <div className="flex flex-col gap-0.5">
-        <span className="px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 text-xs font-medium w-fit">
-          {formatCoinAmount(partner.balance)} מטבעות (טרם נרשם)
-        </span>
-      </div>
-    );
-  }
+  const [isBreakdownOpen, setIsBreakdownOpen] = useState(false);
+  const total = partner.wallet
+    ? COIN_BALANCE_KEYS.reduce((sum, key) => sum + (partner.wallet[key] ?? 0), 0)
+    : (partner.balance ?? 0);
 
   return (
-    <div className="flex flex-col gap-1 min-w-[130px]">
-      {COIN_CELLS.map((cell) => (
-        <div
-          key={cell.key}
-          className={`flex items-center justify-between gap-3 px-2.5 py-1 rounded-md text-xs whitespace-nowrap ${cell.className}`}
-        >
-          <span className="font-normal opacity-80">{cell.label}</span>
-          <span className="font-semibold">{formatCoinAmount(partner.wallet[cell.key])}</span>
-        </div>
-      ))}
-    </div>
+    <>
+      <button
+        type="button"
+        onClick={() => setIsBreakdownOpen(true)}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 text-xs font-semibold hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors"
+        title="לחצו לפירוט לפי סוג מטבע"
+      >
+        <Coins size={13} />
+        {formatCoinAmount(total)}
+        {!partner.wallet && <span className="font-normal opacity-70">(טרם נרשם)</span>}
+      </button>
+
+      <PartnerCoinBreakdownModal isOpen={isBreakdownOpen} onClose={() => setIsBreakdownOpen(false)} partner={partner} />
+    </>
   );
 }
 
