@@ -14,7 +14,7 @@ const TABS = [
 const FILES_BUCKET = 'important-files';
 
 function EmptyRow({ label }) {
-  return <p className="p-8 text-center text-sm text-slate-400">{label}</p>;
+  return <p className="p-8 text-center text-sm text-slate-400 dark:text-slate-500">{label}</p>;
 }
 
 function PhonesTab({ phones, canManage, onDelete, onAdd, onEdit }) {
@@ -44,25 +44,25 @@ function PhonesTab({ phones, canManage, onDelete, onAdd, onEdit }) {
             <button
               type="button"
               onClick={() => setIsAdding(true)}
-              className="flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700"
+              className="flex items-center gap-1.5 text-sm font-medium text-blue-600 dark:text-blue-300 hover:text-blue-700 dark:hover:text-blue-300"
             >
               <Plus size={16} /> הוספת מספר טלפון
             </button>
           ) : (
-            <form onSubmit={handleSubmit} className="flex flex-wrap items-center gap-2 bg-slate-50 rounded-xl p-3">
+            <form onSubmit={handleSubmit} className="flex flex-wrap items-center gap-2 bg-slate-50 dark:bg-slate-800 rounded-xl p-3">
               <input
                 type="text"
                 placeholder="שם איש הקשר"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="flex-1 min-w-[140px] rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                className="flex-1 min-w-[140px] rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm"
               />
               <input
                 type="tel"
                 placeholder="מספר טלפון"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                className="flex-1 min-w-[140px] rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                className="flex-1 min-w-[140px] rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm"
               />
               <button
                 type="submit"
@@ -74,7 +74,7 @@ function PhonesTab({ phones, canManage, onDelete, onAdd, onEdit }) {
               <button
                 type="button"
                 onClick={() => setIsAdding(false)}
-                className="w-9 h-9 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-200"
+                className="w-9 h-9 flex items-center justify-center rounded-lg text-slate-400 dark:text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-600"
               >
                 <X size={16} />
               </button>
@@ -86,17 +86,17 @@ function PhonesTab({ phones, canManage, onDelete, onAdd, onEdit }) {
       {phones.length === 0 ? (
         <EmptyRow label="לא נמצאו מספרי טלפון." />
       ) : (
-        <ul className="flex flex-col divide-y divide-slate-50">
+        <ul className="flex flex-col divide-y divide-slate-50 dark:divide-slate-800">
           {phones.map((p) => (
             <li key={p.id} className="flex items-center justify-between py-3">
               <div>
-                <p className="text-sm font-semibold text-slate-800">{p.name}</p>
-                <p className="text-sm text-slate-500">{p.phone}</p>
+                <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{p.name}</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">{p.phone}</p>
               </div>
               <div className="flex items-center gap-1">
                 <a
                   href={`tel:${p.phone}`}
-                  className="w-9 h-9 flex items-center justify-center rounded-lg text-green-600 hover:bg-green-50"
+                  className="w-9 h-9 flex items-center justify-center rounded-lg text-green-600 dark:text-green-300 hover:bg-green-50 dark:hover:bg-green-900"
                   aria-label={`חייג ל${p.name}`}
                 >
                   <Phone size={16} />
@@ -106,7 +106,7 @@ function PhonesTab({ phones, canManage, onDelete, onAdd, onEdit }) {
                     <button
                       type="button"
                       onClick={() => onEdit(p)}
-                      className="w-9 h-9 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                      className="w-9 h-9 flex items-center justify-center rounded-lg text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-600 dark:hover:text-slate-300"
                       aria-label="ערוך"
                     >
                       <Pencil size={15} />
@@ -114,7 +114,7 @@ function PhonesTab({ phones, canManage, onDelete, onAdd, onEdit }) {
                     <button
                       type="button"
                       onClick={() => onDelete(p)}
-                      className="w-9 h-9 flex items-center justify-center rounded-lg text-rose-500 hover:bg-rose-50"
+                      className="w-9 h-9 flex items-center justify-center rounded-lg text-rose-500 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900"
                       aria-label="מחק"
                     >
                       <Trash2 size={16} />
@@ -157,25 +157,25 @@ function LinksTab({ links, canManage, onDelete, onAdd }) {
             <button
               type="button"
               onClick={() => setIsAdding(true)}
-              className="flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700"
+              className="flex items-center gap-1.5 text-sm font-medium text-blue-600 dark:text-blue-300 hover:text-blue-700 dark:hover:text-blue-300"
             >
               <Plus size={16} /> הוספת קישור
             </button>
           ) : (
-            <form onSubmit={handleSubmit} className="flex flex-wrap items-center gap-2 bg-slate-50 rounded-xl p-3">
+            <form onSubmit={handleSubmit} className="flex flex-wrap items-center gap-2 bg-slate-50 dark:bg-slate-800 rounded-xl p-3">
               <input
                 type="text"
                 placeholder="כותרת"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="flex-1 min-w-[140px] rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                className="flex-1 min-w-[140px] rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm"
               />
               <input
                 type="url"
                 placeholder="https://..."
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                className="flex-1 min-w-[180px] rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                className="flex-1 min-w-[180px] rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm"
               />
               <button
                 type="submit"
@@ -187,7 +187,7 @@ function LinksTab({ links, canManage, onDelete, onAdd }) {
               <button
                 type="button"
                 onClick={() => setIsAdding(false)}
-                className="w-9 h-9 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-200"
+                className="w-9 h-9 flex items-center justify-center rounded-lg text-slate-400 dark:text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-600"
               >
                 <X size={16} />
               </button>
@@ -199,19 +199,19 @@ function LinksTab({ links, canManage, onDelete, onAdd }) {
       {links.length === 0 ? (
         <EmptyRow label="לא נמצאו קישורים." />
       ) : (
-        <ul className="flex flex-col divide-y divide-slate-50">
+        <ul className="flex flex-col divide-y divide-slate-50 dark:divide-slate-800">
           {links.map((l) => (
             <li key={l.id} className="flex items-center justify-between py-3">
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-slate-800 truncate">{l.title}</p>
-                <p className="text-sm text-slate-500 truncate">{l.url}</p>
+                <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{l.title}</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400 truncate">{l.url}</p>
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 <a
                   href={l.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-9 h-9 flex items-center justify-center rounded-lg text-blue-600 hover:bg-blue-50"
+                  className="w-9 h-9 flex items-center justify-center rounded-lg text-blue-600 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900"
                   aria-label={`פתח את ${l.title}`}
                 >
                   <ExternalLink size={16} />
@@ -220,7 +220,7 @@ function LinksTab({ links, canManage, onDelete, onAdd }) {
                   <button
                     type="button"
                     onClick={() => onDelete(l)}
-                    className="w-9 h-9 flex items-center justify-center rounded-lg text-rose-500 hover:bg-rose-50"
+                    className="w-9 h-9 flex items-center justify-center rounded-lg text-rose-500 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900"
                     aria-label="מחק"
                   >
                     <Trash2 size={16} />
@@ -246,7 +246,7 @@ function FilesTab({ files, canManage, onDelete, onUpload, onDownload, isUploadin
     <div className="flex flex-col gap-3">
       {canManage && (
         <div>
-          <label className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 cursor-pointer">
+          <label className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 dark:text-blue-300 hover:text-blue-700 dark:hover:text-blue-300 cursor-pointer">
             <Plus size={16} />
             {isUploading ? 'מעלה...' : 'העלאת קובץ'}
             <input type="file" className="hidden" onChange={handleFileChange} disabled={isUploading} />
@@ -257,18 +257,18 @@ function FilesTab({ files, canManage, onDelete, onUpload, onDownload, isUploadin
       {files.length === 0 ? (
         <EmptyRow label="לא נמצאו קבצים." />
       ) : (
-        <ul className="flex flex-col divide-y divide-slate-50">
+        <ul className="flex flex-col divide-y divide-slate-50 dark:divide-slate-800">
           {files.map((f) => (
             <li key={f.id} className="flex items-center justify-between py-3">
               <div className="min-w-0 flex items-center gap-2.5">
-                <FileText size={18} className="text-slate-400 shrink-0" />
-                <p className="text-sm font-semibold text-slate-800 truncate">{f.file_name}</p>
+                <FileText size={18} className="text-slate-400 dark:text-slate-500 shrink-0" />
+                <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{f.file_name}</p>
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 <button
                   type="button"
                   onClick={() => onDownload(f)}
-                  className="w-9 h-9 flex items-center justify-center rounded-lg text-blue-600 hover:bg-blue-50"
+                  className="w-9 h-9 flex items-center justify-center rounded-lg text-blue-600 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900"
                   aria-label={`הורד את ${f.file_name}`}
                 >
                   <Download size={16} />
@@ -277,7 +277,7 @@ function FilesTab({ files, canManage, onDelete, onUpload, onDownload, isUploadin
                   <button
                     type="button"
                     onClick={() => onDelete(f)}
-                    className="w-9 h-9 flex items-center justify-center rounded-lg text-rose-500 hover:bg-rose-50"
+                    className="w-9 h-9 flex items-center justify-center rounded-lg text-rose-500 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900"
                     aria-label="מחק"
                   >
                     <Trash2 size={16} />
@@ -476,17 +476,17 @@ export default function ImportantInfoPage() {
   return (
     <div className="flex flex-col gap-6 p-6" dir="rtl">
       <header>
-        <h2 className="text-2xl font-bold text-slate-800">מידע חשוב</h2>
-        <p className="text-sm text-slate-500">טלפונים, קבצים וקישורים חשובים</p>
+        <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">מידע חשוב</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400">טלפונים, קבצים וקישורים חשובים</p>
       </header>
 
       {actionError && (
-        <p className="text-sm text-rose-600 bg-rose-50 border border-rose-100 rounded-lg px-4 py-2.5">
+        <p className="text-sm text-rose-600 dark:text-rose-300 bg-rose-50 dark:bg-rose-950 border border-rose-100 dark:border-rose-900 rounded-lg px-4 py-2.5">
           {actionError}
         </p>
       )}
 
-      <div className="flex items-center gap-2 border-b border-slate-200">
+      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-700">
         {TABS.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.key;
@@ -497,8 +497,8 @@ export default function ImportantInfoPage() {
               onClick={() => setActiveTab(tab.key)}
               className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
                 isActive
-                  ? 'border-blue-600 text-blue-700'
-                  : 'border-transparent text-slate-500 hover:text-slate-800'
+                  ? 'border-blue-600 text-blue-700 dark:text-blue-300'
+                  : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100'
               }`}
             >
               <Icon size={16} />
@@ -508,7 +508,7 @@ export default function ImportantInfoPage() {
         })}
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-4">
         {isLoading ? (
           <EmptyRow label="טוען נתונים..." />
         ) : errorMessage ? (

@@ -78,16 +78,16 @@ function NoticeCard({ notice, canManage, onChanged }) {
   }
 
   return (
-    <div className="border border-slate-200 rounded-xl p-4 flex flex-col gap-2">
+    <div className="border border-slate-200 dark:border-slate-700 rounded-xl p-4 flex flex-col gap-2">
       {isEditing ? (
         <form onSubmit={handleSaveEdit} className="flex flex-col gap-2">
           <textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
             rows={2}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm text-slate-800 dark:text-slate-100 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
           />
-          {errorMessage && <p className="text-xs text-rose-600">{errorMessage}</p>}
+          {errorMessage && <p className="text-xs text-rose-600 dark:text-rose-300">{errorMessage}</p>}
           <div className="flex items-center gap-2">
             <button
               type="submit"
@@ -102,7 +102,7 @@ function NoticeCard({ notice, canManage, onChanged }) {
                 setIsEditing(false);
                 setContent(notice.content);
               }}
-              className="rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 text-sm font-semibold px-3.5 py-1.5 transition-colors"
+              className="rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 text-sm font-semibold px-3.5 py-1.5 transition-colors"
             >
               ביטול
             </button>
@@ -110,10 +110,10 @@ function NoticeCard({ notice, canManage, onChanged }) {
         </form>
       ) : (
         <div className="flex items-start justify-between gap-3">
-          <p className="text-sm text-slate-700 whitespace-pre-wrap">{notice.content}</p>
+          <p className="text-sm text-slate-700 dark:text-slate-200 whitespace-pre-wrap">{notice.content}</p>
           <span
             className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
-              notice.is_active ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-500'
+              notice.is_active ? 'bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
             }`}
           >
             {notice.is_active ? 'פעילה' : 'סגורה'}
@@ -121,7 +121,7 @@ function NoticeCard({ notice, canManage, onChanged }) {
         </div>
       )}
 
-      <p className="text-xs text-slate-400">
+      <p className="text-xs text-slate-400 dark:text-slate-500">
         {notice.created_by_name ?? 'שותף'} · {formatDateHe(notice.created_at)}
         {!notice.is_active && notice.closed_at && (
           <> · נסגרה ע"י {notice.closed_by_name ?? 'שותף'} ב-{formatDateHe(notice.closed_at)}</>
@@ -133,7 +133,7 @@ function NoticeCard({ notice, canManage, onChanged }) {
           <button
             type="button"
             onClick={() => setIsEditing(true)}
-            className="flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700"
+            className="flex items-center gap-1.5 text-sm font-medium text-blue-600 dark:text-blue-300 hover:text-blue-700 dark:hover:text-blue-300"
           >
             <Pencil size={14} />
             עריכה
@@ -142,7 +142,7 @@ function NoticeCard({ notice, canManage, onChanged }) {
             <button
               type="button"
               onClick={handleClose}
-              className="flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-700"
+              className="flex items-center gap-1.5 text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
             >
               <X size={14} />
               סגירת הודעה
@@ -150,7 +150,7 @@ function NoticeCard({ notice, canManage, onChanged }) {
           )}
         </div>
       )}
-      {errorMessage && !isEditing && <p className="text-xs text-rose-600">{errorMessage}</p>}
+      {errorMessage && !isEditing && <p className="text-xs text-rose-600 dark:text-rose-300">{errorMessage}</p>}
     </div>
   );
 }
@@ -205,18 +205,18 @@ function NewNoticeForm({ onCreated }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="bg-slate-50 rounded-xl border border-slate-200 p-4 flex flex-col gap-3">
+    <form onSubmit={handleSubmit} className="bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 flex flex-col gap-3">
       <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-medium text-slate-700">תוכן ההודעה</label>
+        <label className="text-sm font-medium text-slate-700 dark:text-slate-200">תוכן ההודעה</label>
         <textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}
           rows={3}
-          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm text-slate-800 dark:text-slate-100 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
         />
       </div>
       {errorMessage && (
-        <p className="text-sm text-rose-600 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2">{errorMessage}</p>
+        <p className="text-sm text-rose-600 dark:text-rose-300 bg-rose-50 dark:bg-rose-950 border border-rose-100 dark:border-rose-900 rounded-lg px-3 py-2">{errorMessage}</p>
       )}
       <div className="flex items-center gap-2">
         <button
@@ -230,7 +230,7 @@ function NewNoticeForm({ onCreated }) {
           type="button"
           onClick={() => setIsOpen(false)}
           disabled={submitting}
-          className="rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 text-sm font-semibold px-4 py-2 transition-colors"
+          className="rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 text-sm font-semibold px-4 py-2 transition-colors"
         >
           ביטול
         </button>
@@ -268,23 +268,23 @@ function SystemNoticesSection({ currentUser }) {
   }, []);
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col gap-4">
+    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 flex flex-col gap-4">
       <div>
-        <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
-          <Megaphone size={18} className="text-blue-600" />
+        <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+          <Megaphone size={18} className="text-blue-600 dark:text-blue-300" />
           הודעות מערכת
         </h3>
-        <p className="text-sm text-slate-500 mt-1">הודעות פעילות מוצגות ללוח הבקרה של כל השותפים</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">הודעות פעילות מוצגות ללוח הבקרה של כל השותפים</p>
       </div>
 
       {canManage && <NewNoticeForm onCreated={fetchNotices} />}
 
       {isLoading ? (
-        <p className="p-10 text-center text-sm text-slate-400">טוען...</p>
+        <p className="p-10 text-center text-sm text-slate-400 dark:text-slate-500">טוען...</p>
       ) : errorMessage ? (
-        <p className="p-10 text-center text-sm text-rose-600">{errorMessage}</p>
+        <p className="p-10 text-center text-sm text-rose-600 dark:text-rose-300">{errorMessage}</p>
       ) : notices.length === 0 ? (
-        <p className="p-10 text-center text-sm text-slate-400">אין הודעות מערכת.</p>
+        <p className="p-10 text-center text-sm text-slate-400 dark:text-slate-500">אין הודעות מערכת.</p>
       ) : (
         <div className="flex flex-col gap-3">
           {notices.map((notice) => (
@@ -381,27 +381,27 @@ function NewIssueForm({ onCreated }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="bg-slate-50 rounded-xl border border-slate-200 p-4 flex flex-col gap-3">
+    <form onSubmit={handleSubmit} className="bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 flex flex-col gap-3">
       <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-medium text-slate-700">תקציר</label>
+        <label className="text-sm font-medium text-slate-700 dark:text-slate-200">תקציר</label>
         <input
           type="text"
           value={summary}
           onChange={(e) => setSummary(e.target.value)}
-          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
         />
       </div>
       <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-medium text-slate-700">תיאור הבעיה</label>
+        <label className="text-sm font-medium text-slate-700 dark:text-slate-200">תיאור הבעיה</label>
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           rows={3}
-          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm text-slate-800 dark:text-slate-100 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
         />
       </div>
       <div className="flex flex-col gap-1.5">
-        <label className="inline-flex w-fit items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 cursor-pointer">
+        <label className="inline-flex w-fit items-center gap-1.5 text-sm font-medium text-blue-600 dark:text-blue-300 hover:text-blue-700 dark:hover:text-blue-300 cursor-pointer">
           <ImagePlus size={16} />
           {files.length > 0 ? `${files.length} תמונות נבחרו` : 'הוספת תמונות'}
           <input type="file" accept="image/*" multiple className="hidden" onChange={handleFilesChange} />
@@ -409,7 +409,7 @@ function NewIssueForm({ onCreated }) {
       </div>
 
       {errorMessage && (
-        <p className="text-sm text-rose-600 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2">{errorMessage}</p>
+        <p className="text-sm text-rose-600 dark:text-rose-300 bg-rose-50 dark:bg-rose-950 border border-rose-100 dark:border-rose-900 rounded-lg px-3 py-2">{errorMessage}</p>
       )}
 
       <div className="flex items-center gap-2 pt-1">
@@ -424,7 +424,7 @@ function NewIssueForm({ onCreated }) {
           type="button"
           onClick={() => setIsOpen(false)}
           disabled={submitting}
-          className="rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 text-sm font-semibold px-4 py-2 transition-colors"
+          className="rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 text-sm font-semibold px-4 py-2 transition-colors"
         >
           ביטול
         </button>
@@ -481,15 +481,15 @@ function IssueCard({ issue, canManage, onResolved }) {
   }
 
   return (
-    <div className="border border-slate-200 rounded-xl p-4 flex flex-col gap-2.5">
+    <div className="border border-slate-200 dark:border-slate-700 rounded-xl p-4 flex flex-col gap-2.5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h4 className="font-semibold text-slate-800">{issue.summary}</h4>
-          <p className="text-sm text-slate-600 mt-1 whitespace-pre-wrap">{issue.description}</p>
+          <h4 className="font-semibold text-slate-800 dark:text-slate-100">{issue.summary}</h4>
+          <p className="text-sm text-slate-600 dark:text-slate-300 mt-1 whitespace-pre-wrap">{issue.description}</p>
         </div>
         <span
           className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
-            issue.status === 'resolved' ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'
+            issue.status === 'resolved' ? 'bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300' : 'bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300'
           }`}
         >
           {issue.status === 'resolved' ? 'נפתרה' : 'פתוחה'}
@@ -503,22 +503,22 @@ function IssueCard({ issue, canManage, onResolved }) {
               <img
                 src={imagePublicUrl(img.storage_path)}
                 alt=""
-                className="w-20 h-20 object-cover rounded-lg border border-slate-200"
+                className="w-20 h-20 object-cover rounded-lg border border-slate-200 dark:border-slate-700"
               />
             </a>
           ))}
         </div>
       )}
 
-      <p className="text-xs text-slate-400">
+      <p className="text-xs text-slate-400 dark:text-slate-500">
         דווח ע"י {issue.createdByName ?? 'שותף'} · {formatDateHe(issue.created_at)}
       </p>
 
       {issue.status === 'resolved' && (
-        <div className="rounded-lg bg-green-50 border border-green-100 px-3 py-2 text-sm text-green-800">
+        <div className="rounded-lg bg-green-50 dark:bg-green-950 border border-green-100 dark:border-green-900 px-3 py-2 text-sm text-green-800 dark:text-green-300">
           <p className="font-medium">פתרון:</p>
           <p className="whitespace-pre-wrap">{issue.resolution_notes}</p>
-          <p className="text-xs text-green-600 mt-1">
+          <p className="text-xs text-green-600 dark:text-green-300 mt-1">
             ע"י {issue.resolvedByName ?? 'שותף'} · {formatDateHe(issue.resolved_at)}
           </p>
         </div>
@@ -530,21 +530,21 @@ function IssueCard({ issue, canManage, onResolved }) {
             <button
               type="button"
               onClick={() => setIsResolving(true)}
-              className="flex items-center gap-1.5 text-sm font-medium text-green-700 hover:text-green-800"
+              className="flex items-center gap-1.5 text-sm font-medium text-green-700 dark:text-green-300 hover:text-green-800 dark:hover:text-green-300"
             >
               <CheckCircle2 size={16} />
               סמן כנפתרה
             </button>
           ) : (
-            <form onSubmit={handleResolve} className="flex flex-col gap-2 bg-slate-50 rounded-lg p-3">
-              <label className="text-sm font-medium text-slate-700">פתרון הבעיה</label>
+            <form onSubmit={handleResolve} className="flex flex-col gap-2 bg-slate-50 dark:bg-slate-800 rounded-lg p-3">
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-200">פתרון הבעיה</label>
               <textarea
                 value={resolutionNotes}
                 onChange={(e) => setResolutionNotes(e.target.value)}
                 rows={2}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm text-slate-800 dark:text-slate-100 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
               />
-              {errorMessage && <p className="text-xs text-rose-600">{errorMessage}</p>}
+              {errorMessage && <p className="text-xs text-rose-600 dark:text-rose-300">{errorMessage}</p>}
               <div className="flex items-center gap-2">
                 <button
                   type="submit"
@@ -557,7 +557,7 @@ function IssueCard({ issue, canManage, onResolved }) {
                   type="button"
                   onClick={() => setIsResolving(false)}
                   disabled={submitting}
-                  className="rounded-lg border border-slate-300 text-slate-700 hover:bg-white text-sm font-semibold px-3.5 py-1.5 transition-colors"
+                  className="rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-700 text-sm font-semibold px-3.5 py-1.5 transition-colors"
                 >
                   ביטול
                 </button>
@@ -625,20 +625,20 @@ function MaintenanceIssuesSection({ currentUser }) {
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col gap-4">
+    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 flex flex-col gap-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
-            <Wrench size={18} className="text-blue-600" />
+          <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+            <Wrench size={18} className="text-blue-600 dark:text-blue-300" />
             הודעות תקלות תחזוקה
           </h3>
-          <p className="text-sm text-slate-500 mt-1">רשימת כל התקלות שדווחו, פתוחות וסגורות</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">רשימת כל התקלות שדווחו, פתוחות וסגורות</p>
         </div>
         <button
           type="button"
           onClick={handleExport}
           disabled={isLoading || issues.length === 0}
-          className="flex items-center gap-1.5 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-semibold px-3.5 py-2 transition-colors"
+          className="flex items-center gap-1.5 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-semibold px-3.5 py-2 transition-colors"
         >
           <Download size={15} />
           יצוא לאקסל
@@ -648,11 +648,11 @@ function MaintenanceIssuesSection({ currentUser }) {
       {canManage && <NewIssueForm onCreated={fetchIssues} />}
 
       {isLoading ? (
-        <p className="p-10 text-center text-sm text-slate-400">טוען...</p>
+        <p className="p-10 text-center text-sm text-slate-400 dark:text-slate-500">טוען...</p>
       ) : errorMessage ? (
-        <p className="p-10 text-center text-sm text-rose-600">{errorMessage}</p>
+        <p className="p-10 text-center text-sm text-rose-600 dark:text-rose-300">{errorMessage}</p>
       ) : issues.length === 0 ? (
-        <p className="p-10 text-center text-sm text-slate-400">לא דווחו תקלות.</p>
+        <p className="p-10 text-center text-sm text-slate-400 dark:text-slate-500">לא דווחו תקלות.</p>
       ) : (
         <div className="flex flex-col gap-3">
           {issues.map((issue) => (
@@ -670,11 +670,11 @@ export default function MessagesPage() {
   return (
     <div className="flex flex-col gap-6 p-6" dir="rtl">
       <header>
-        <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-          <Bell size={22} className="text-blue-600" />
+        <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+          <Bell size={22} className="text-blue-600 dark:text-blue-300" />
           הודעות
         </h2>
-        <p className="text-sm text-slate-500">הודעות מערכת ותקלות תחזוקה</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">הודעות מערכת ותקלות תחזוקה</p>
       </header>
 
       <SystemNoticesSection currentUser={currentUser} />

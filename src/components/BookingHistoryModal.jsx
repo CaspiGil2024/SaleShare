@@ -127,11 +127,11 @@ export default function BookingHistoryModal({ isOpen, onClose, partner }) {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div dir="rtl" className="w-full max-w-3xl max-h-[85dvh] overflow-y-auto rounded-2xl bg-white shadow-xl">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+      <div dir="rtl" className="w-full max-w-3xl max-h-[85dvh] overflow-y-auto rounded-2xl bg-white dark:bg-slate-800 shadow-xl">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800">
           <div>
-            <h3 className="text-lg font-bold text-slate-800">היסטוריית הזמנות</h3>
-            <p className="text-sm text-slate-500">{partner.full_name}</p>
+            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">היסטוריית הזמנות</h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400">{partner.full_name}</p>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -146,7 +146,7 @@ export default function BookingHistoryModal({ isOpen, onClose, partner }) {
             <button
               type="button"
               onClick={onClose}
-              className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+              className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-600 dark:hover:text-slate-300"
               aria-label="סגור"
             >
               <X size={18} />
@@ -156,20 +156,20 @@ export default function BookingHistoryModal({ isOpen, onClose, partner }) {
 
         <div className="p-6">
           {isLoading ? (
-            <p className="p-10 text-center text-sm text-slate-400">טוען היסטוריה...</p>
+            <p className="p-10 text-center text-sm text-slate-400 dark:text-slate-500">טוען היסטוריה...</p>
           ) : errorMessage ? (
-            <p className="p-10 text-center text-sm text-rose-600">{errorMessage}</p>
+            <p className="p-10 text-center text-sm text-rose-600 dark:text-rose-300">{errorMessage}</p>
           ) : !hasAccount ? (
-            <p className="p-10 text-center text-sm text-slate-400">
+            <p className="p-10 text-center text-sm text-slate-400 dark:text-slate-500">
               לשותף זה עדיין אין חשבון פעיל במערכת, ולכן אין היסטוריית הזמנות.
             </p>
           ) : rows.length === 0 ? (
-            <p className="p-10 text-center text-sm text-slate-400">לא נמצאו הזמנות עבור שותף זה.</p>
+            <p className="p-10 text-center text-sm text-slate-400 dark:text-slate-500">לא נמצאו הזמנות עבור שותף זה.</p>
           ) : (
-            <div className="overflow-auto max-h-[60dvh] rounded-2xl border border-slate-200">
+            <div className="overflow-auto max-h-[60dvh] rounded-2xl border border-slate-200 dark:border-slate-700">
               <table className="w-full text-sm">
                 <thead className="sticky-thead">
-                  <tr className="border-b border-slate-100 text-start text-slate-500 bg-slate-50">
+                  <tr className="border-b border-slate-100 dark:border-slate-800 text-start text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800">
                     <th className="px-4 py-3 font-medium text-start">תפקיד</th>
                     <th className="px-4 py-3 font-medium text-start">סוג</th>
                     <th className="px-4 py-3 font-medium text-start">סטטוס</th>
@@ -180,29 +180,29 @@ export default function BookingHistoryModal({ isOpen, onClose, partner }) {
                 </thead>
                 <tbody>
                   {rows.map((r, idx) => (
-                    <tr key={`${r.id}-${r.role}-${idx}`} className="border-b border-slate-50 last:border-0">
-                      <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{r.role}</td>
-                      <td className="px-4 py-3 text-slate-800 font-medium whitespace-nowrap">
+                    <tr key={`${r.id}-${r.role}-${idx}`} className="border-b border-slate-50 dark:border-slate-800 last:border-0">
+                      <td className="px-4 py-3 text-slate-600 dark:text-slate-300 whitespace-nowrap">{r.role}</td>
+                      <td className="px-4 py-3 text-slate-800 dark:text-slate-100 font-medium whitespace-nowrap">
                         {r.bookingTypeLabel}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <span
                           className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                             r.statusLabel === 'בוטלה'
-                              ? 'bg-rose-50 text-rose-600'
-                              : 'bg-green-50 text-green-700'
+                              ? 'bg-rose-50 dark:bg-rose-950 text-rose-600 dark:text-rose-300'
+                              : 'bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300'
                           }`}
                         >
                           {r.statusLabel}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-slate-600 whitespace-nowrap">
+                      <td className="px-4 py-3 text-slate-600 dark:text-slate-300 whitespace-nowrap">
                         {r.start_time ? formatDateTimeHe(r.start_time) : '—'}
                       </td>
-                      <td className="px-4 py-3 text-slate-600 whitespace-nowrap">
+                      <td className="px-4 py-3 text-slate-600 dark:text-slate-300 whitespace-nowrap">
                         {r.end_time ? formatDateTimeHe(r.end_time) : '—'}
                       </td>
-                      <td className="px-4 py-3 text-amber-700 font-semibold whitespace-nowrap">
+                      <td className="px-4 py-3 text-amber-700 dark:text-amber-300 font-semibold whitespace-nowrap">
                         {formatCoinAmount(r.coinsForThisPartner)}
                       </td>
                     </tr>

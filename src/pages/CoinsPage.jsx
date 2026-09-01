@@ -114,24 +114,24 @@ export default function CoinsPage() {
   return (
     <div className="flex flex-col gap-6 p-6" dir="rtl">
       <header>
-        <h2 className="text-2xl font-bold text-slate-800">המטבעות שלי</h2>
-        <p className="text-sm text-slate-500">
+        <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">המטבעות שלי</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400">
           {canViewAll ? 'יתרה ויומן תנועות מטבעות - כל השותפים' : 'היתרה והיסטוריית התנועות שלכם'}
         </p>
       </header>
 
       {/* Top section: rates (left) + balance (right) side by side */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-5">
           <div className="flex items-center gap-2 mb-4">
-            <ListChecks size={18} className="text-slate-500" />
-            <h3 className="text-base font-bold text-slate-800">תעריפים</h3>
+            <ListChecks size={18} className="text-slate-500 dark:text-slate-400" />
+            <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">תעריפים</h3>
           </div>
-          <ul className="flex flex-col divide-y divide-slate-50">
+          <ul className="flex flex-col divide-y divide-slate-50 dark:divide-slate-800">
             {RATE_CARD_ITEMS.map((item) => (
               <li key={item.label} className="flex items-center justify-between py-2.5 text-sm">
-                <span className="text-slate-600">{item.label}</span>
-                <span className="font-semibold text-slate-800">{item.value}</span>
+                <span className="text-slate-600 dark:text-slate-300">{item.label}</span>
+                <span className="font-semibold text-slate-800 dark:text-slate-100">{item.value}</span>
               </li>
             ))}
           </ul>
@@ -170,22 +170,22 @@ export default function CoinsPage() {
       </div>
 
       {/* Bottom section: transaction history */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-100">
-          <h3 className="text-base font-bold text-slate-800">היסטוריית עסקאות</h3>
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+        <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800">
+          <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">היסטוריית עסקאות</h3>
         </div>
 
         {isLoading ? (
-          <p className="p-10 text-center text-sm text-slate-400">טוען...</p>
+          <p className="p-10 text-center text-sm text-slate-400 dark:text-slate-500">טוען...</p>
         ) : errorMessage ? (
-          <p className="p-10 text-center text-sm text-rose-600">{errorMessage}</p>
+          <p className="p-10 text-center text-sm text-rose-600 dark:text-rose-300">{errorMessage}</p>
         ) : transactions.length === 0 ? (
-          <p className="p-10 text-center text-sm text-slate-400">אין עדיין תנועות מטבעות.</p>
+          <p className="p-10 text-center text-sm text-slate-400 dark:text-slate-500">אין עדיין תנועות מטבעות.</p>
         ) : (
           <div className="overflow-auto max-h-[65dvh]">
             <table className="w-full text-sm">
               <thead className="sticky-thead">
-                <tr className="border-b border-slate-100 text-start text-slate-500">
+                <tr className="border-b border-slate-100 dark:border-slate-800 text-start text-slate-500 dark:text-slate-400">
                   <th className="px-4 py-3 font-medium text-start">תאריך פעולה</th>
                   {canViewAll && <th className="px-4 py-3 font-medium text-start">שותף</th>}
                   <th className="px-4 py-3 font-medium text-start">פעולה</th>
@@ -196,26 +196,26 @@ export default function CoinsPage() {
               </thead>
               <tbody>
                 {transactions.map((t) => (
-                  <tr key={t.id} className="border-b border-slate-50 last:border-0">
-                    <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
+                  <tr key={t.id} className="border-b border-slate-50 dark:border-slate-800 last:border-0">
+                    <td className="px-4 py-3 text-slate-500 dark:text-slate-400 whitespace-nowrap">
                       {formatDateTimeHe(t.created_at)}
                     </td>
                     {canViewAll && (
-                      <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
+                      <td className="px-4 py-3 text-slate-700 dark:text-slate-200 whitespace-nowrap">
                         {t.users?.full_name ?? t.users?.email ?? '—'}
                       </td>
                     )}
-                    <td className="px-4 py-3 font-medium text-slate-800">{transactionTitle(t)}</td>
-                    <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
+                    <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-100">{transactionTitle(t)}</td>
+                    <td className="px-4 py-3 text-slate-500 dark:text-slate-400 whitespace-nowrap">
                       {COIN_TYPE_SHORT_LABELS_HE[t.coin_type] ?? '—'}
                     </td>
-                    <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
+                    <td className="px-4 py-3 text-slate-500 dark:text-slate-400 whitespace-nowrap">
                       {t.bookings?.start_time ? formatDateHe(t.bookings.start_time) : '—'}
                     </td>
                     <td className="px-4 py-3">
                       <span
                         className={`inline-flex items-center gap-1 font-semibold ${
-                          t.delta >= 0 ? 'text-emerald-600' : 'text-rose-600'
+                          t.delta >= 0 ? 'text-emerald-600 dark:text-emerald-300' : 'text-rose-600 dark:text-rose-300'
                         }`}
                       >
                         {t.delta >= 0 ? <ArrowUpCircle size={14} /> : <ArrowDownCircle size={14} />}

@@ -359,24 +359,24 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div dir="rtl" className="w-full max-w-xl max-h-[95dvh] overflow-y-auto rounded-2xl bg-white shadow-xl">
-        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
+      <div dir="rtl" className="w-full max-w-xl max-h-[95dvh] overflow-y-auto rounded-2xl bg-white dark:bg-slate-800 shadow-xl">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 dark:border-slate-800">
           <div>
-            <h3 className="text-base font-bold text-slate-800">הוספת הפלגה</h3>
-            <p className="text-xs text-slate-400">{currentUser?.full_name ?? currentUser?.email ?? ''}</p>
+            <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">הוספת הפלגה</h3>
+            <p className="text-xs text-slate-400 dark:text-slate-500">{currentUser?.full_name ?? currentUser?.email ?? ''}</p>
             {/* Balances PRIOR to this booking — see coinBreakdown below
                 for the estimated cost/impact this booking would have. */}
             {walletLoading ? (
-              <p className="text-[11px] text-slate-400 mt-0.5">טוען יתרות...</p>
+              <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">טוען יתרות...</p>
             ) : wallet ? (
               <div className="flex flex-wrap items-center gap-1.5 mt-1">
                 {Object.entries(COIN_TYPE_LABELS_HE).map(([key, label]) => (
                   <span
                     key={key}
-                    className="flex items-center gap-1 px-2 py-1 rounded-full bg-slate-100 text-slate-600 whitespace-nowrap"
+                    className="flex items-center gap-1 px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 whitespace-nowrap"
                   >
                     <span className="text-[11px] font-medium">{label}</span>
-                    <span className="text-base font-bold text-slate-800">
+                    <span className="text-base font-bold text-slate-800 dark:text-slate-100">
                       {formatCoinAmount(wallet[WALLET_COLUMN_BY_TYPE[key]] ?? 0)}
                     </span>
                   </span>
@@ -387,7 +387,7 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-600 dark:hover:text-slate-300"
             aria-label="סגור"
           >
             <X size={18} />
@@ -396,8 +396,8 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
 
         <form onSubmit={handleSubmit} className="px-5 py-3 flex flex-col gap-2.5">
           {/* Top summary line */}
-          <div className="rounded-lg bg-blue-50 border border-blue-100 px-3 py-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-            <span className="flex items-center gap-1.5 text-blue-900 font-semibold">
+          <div className="rounded-lg bg-blue-50 dark:bg-blue-950 border border-blue-100 dark:border-blue-900 px-3 py-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+            <span className="flex items-center gap-1.5 text-blue-900 dark:text-blue-300 font-semibold">
               <CalendarIcon size={14} />
               {formattedDateHe}
               <input
@@ -409,40 +409,40 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
                   setSelectedDate(new Date(y, m - 1, d));
                 }}
                 aria-label="שנה תאריך"
-                className="mr-1 text-xs font-medium text-blue-700 bg-white border border-blue-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="mr-1 text-xs font-medium text-blue-700 dark:text-blue-300 bg-white dark:bg-slate-800 border border-blue-200 dark:border-blue-800 rounded px-1.5 py-0.5 focus:outline-none focus:ring-2 focus:ring-blue-400"
               />
             </span>
             {isCyprusType && (
-              <span className="flex items-center gap-1.5 text-blue-800">
+              <span className="flex items-center gap-1.5 text-blue-800 dark:text-blue-300">
                 <CalendarIcon size={13} className="opacity-60" />
                 עד {formattedEndDateHe}
               </span>
             )}
-            <span className="flex items-center gap-1.5 text-blue-800">
+            <span className="flex items-center gap-1.5 text-blue-800 dark:text-blue-300">
               <Clock size={14} />
               {formattedTimeRange} • {formattedDuration}
             </span>
           </div>
 
           {exceedsMaxDuration && (
-            <p className="text-sm text-rose-600 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2">
+            <p className="text-sm text-rose-600 dark:text-rose-300 bg-rose-50 dark:bg-rose-950 border border-rose-100 dark:border-rose-900 rounded-lg px-3 py-2">
               {isCyprusType
                 ? `משך שייט לקפריסין לא יכול לעלות על ${CYPRUS_MAX_DURATION_DAYS} ימים.`
                 : `משך הפלגה מקסימלי הוא ${MAX_STANDARD_DURATION_HOURS} שעות. אנא קצרו את משך ההפלגה.`}
             </p>
           )}
           {insufficientCyprusDuration && (
-            <p className="text-sm text-rose-600 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2">
+            <p className="text-sm text-rose-600 dark:text-rose-300 bg-rose-50 dark:bg-rose-950 border border-rose-100 dark:border-rose-900 rounded-lg px-3 py-2">
               שייט לקפריסין חייב להימשך לפחות {CYPRUS_MIN_DURATION_DAYS} ימים. אנא הגדילו את משך ההפלגה.
             </p>
           )}
           {!exceedsMaxDuration && exceedsDayHourLimit && (
-            <p className="text-sm text-rose-600 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2">
+            <p className="text-sm text-rose-600 dark:text-rose-300 bg-rose-50 dark:bg-rose-950 border border-rose-100 dark:border-rose-900 rounded-lg px-3 py-2">
               הזמנה זו כוללת יותר מ-{MAX_DAY_HOURS} שעות יום. אנא בחרו שעת התחלה/משך אחרים.
             </p>
           )}
           {!exceedsMaxDuration && exceedsNightHourLimit && (
-            <p className="text-sm text-rose-600 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2">
+            <p className="text-sm text-rose-600 dark:text-rose-300 bg-rose-50 dark:bg-rose-950 border border-rose-100 dark:border-rose-900 rounded-lg px-3 py-2">
               הזמנה זו כוללת יותר מ-{MAX_NIGHT_HOURS} שעות לילה. אנא בחרו שעת התחלה/משך אחרים.
             </p>
           )}
@@ -470,7 +470,7 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
                     setDurationHours(1);
                   }
                 }}
-                className="flex-1 rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex-1 rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-1.5 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
               >
                 {BOOKING_TYPE_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -480,21 +480,21 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
               </select>
               {bookingType === 'Private' && (
                 <label
-                  className="flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs text-amber-800 cursor-pointer whitespace-nowrap"
+                  className="flex items-center gap-1.5 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950 px-2.5 py-1.5 text-xs text-amber-800 dark:text-amber-300 cursor-pointer whitespace-nowrap"
                   title="הפלגת עוגן (אירוע חיים משמעותי) — עד 2 בשנה, פטורה ממגבלת S אך עדיין מחייבת מטבעות."
                 >
                   <input
                     type="checkbox"
                     checked={isAnchor}
                     onChange={(e) => setIsAnchor(e.target.checked)}
-                    className="rounded border-amber-300 text-amber-600 focus:ring-amber-500"
+                    className="rounded border-amber-300 text-amber-600 dark:text-amber-300 focus:ring-amber-500 dark:focus:ring-amber-400"
                   />
-                  <Anchor size={13} className="text-amber-600 shrink-0" />
+                  <Anchor size={13} className="text-amber-600 dark:text-amber-300 shrink-0" />
                   הפלגת עוגן
                 </label>
               )}
             </div>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-slate-400 dark:text-slate-500">
               {BOOKING_TYPE_OPTIONS.find((opt) => opt.value === bookingType)?.helper}
             </p>
           </div>
@@ -502,11 +502,11 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
           {/* Start time + duration */}
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-slate-700">שעת התחלה</label>
+              <label className="text-xs font-medium text-slate-700 dark:text-slate-200">שעת התחלה</label>
               <select
                 value={startHour}
                 onChange={(e) => setStartHour(Number(e.target.value))}
-                className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-1.5 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
               >
                 {START_HOUR_OPTIONS.map((hour) => (
                   <option key={hour} value={hour}>
@@ -517,12 +517,12 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-slate-700">משך ההפלגה</label>
+              <label className="text-xs font-medium text-slate-700 dark:text-slate-200">משך ההפלגה</label>
               {isCyprusType ? (
                 <select
                   value={durationHours / 24}
                   onChange={(e) => setDurationHours(Number(e.target.value) * 24)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-1.5 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                 >
                   {CYPRUS_DURATION_DAY_OPTIONS.map((days) => (
                     <option key={days} value={days}>
@@ -534,7 +534,7 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
                 <select
                   value={durationHours}
                   onChange={(e) => setDurationHours(Number(e.target.value))}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-1.5 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                 >
                   {DURATION_OPTIONS.map((hours) => (
                     <option key={hours} value={hours}>
@@ -551,7 +551,7 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
             // organizer pays the full coin cost regardless of headcount,
             // so there's nothing for a selector to feed into. Guests are
             // still welcome; this is a capacity notice, not a field.
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+            <div className="rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950 px-3 py-2 text-sm text-emerald-800 dark:text-emerald-300">
               אורחים מוזמנים בשמחה! כל עוד סך האנשים על הסירה (שותף + אורחים)
               אינו עולה על 8 — עד למגבלת הקיבולת המקסימלית של הסירה, 9 אנשים בסך הכל.
             </div>
@@ -563,11 +563,11 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
             // cost once other partners join an existing Shared/Cyprus
             // sail — see EditBookingModal.jsx's proportional split.
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-slate-700">מספר אורחים</label>
+              <label className="text-xs font-medium text-slate-700 dark:text-slate-200">מספר אורחים</label>
               <select
                 value={guestsCount}
                 onChange={(e) => setGuestsCount(Number(e.target.value))}
-                className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-1.5 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
               >
                 {GUEST_OPTIONS.map((count) => (
                   <option key={count} value={count}>
@@ -576,7 +576,7 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
                 ))}
               </select>
               {isSharedType && (
-                <p className={`text-xs ${exceedsCapacity ? 'text-rose-600 font-medium' : 'text-slate-400'}`}>
+                <p className={`text-xs ${exceedsCapacity ? 'text-rose-600 dark:text-rose-300 font-medium' : 'text-slate-400 dark:text-slate-500'}`}>
                   סה"כ משתתפים: {totalParticipants} / {MAX_TOTAL_PARTICIPANTS}
                 </p>
               )}
@@ -588,9 +588,9 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
               optional notes field, so it's visible as soon as those
               choices are made rather than buried at the bottom below
               free-text input a user might not scroll past on mobile. */}
-          <div className="rounded-lg border border-slate-200 px-3 py-2">
-            <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700 mb-1.5">
-              <CoinsIcon size={14} className="text-amber-500" />
+          <div className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2">
+            <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 mb-1.5">
+              <CoinsIcon size={14} className="text-amber-500 dark:text-amber-400" />
               <span>עלות משוערת</span>
             </div>
             {coinBreakdown ? (
@@ -608,7 +608,7 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
                       <div
                         key={key}
                         className={`rounded-lg px-2.5 py-1.5 ${
-                          cost > 0 ? 'bg-amber-50 text-amber-800' : 'bg-slate-50 text-slate-500'
+                          cost > 0 ? 'bg-amber-50 dark:bg-amber-950 text-amber-800 dark:text-amber-300' : 'bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
                         }`}
                       >
                         <div className="flex items-center justify-between gap-2">
@@ -627,24 +627,24 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
                 </span>
               </div>
             ) : (
-              <p className="text-xs text-slate-500">תחזוקה אינה מחייבת מטבעות.</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">תחזוקה אינה מחייבת מטבעות.</p>
             )}
           </div>
 
           {/* Notes */}
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-700">הערות (אופציונלי)</label>
+            <label className="text-xs font-medium text-slate-700 dark:text-slate-200">הערות (אופציונלי)</label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="הערות נוספות..."
               rows={1}
-              className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-800 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-1.5 text-sm text-slate-800 dark:text-slate-100 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
             />
           </div>
 
           {errorMessage && (
-            <p className="text-sm text-rose-600 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2">
+            <p className="text-sm text-rose-600 dark:text-rose-300 bg-rose-50 dark:bg-rose-950 border border-rose-100 dark:border-rose-900 rounded-lg px-3 py-2">
               {errorMessage}
             </p>
           )}
@@ -672,7 +672,7 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
               type="button"
               onClick={onClose}
               disabled={submitting}
-              className="flex-1 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-semibold py-2 transition-colors"
+              className="flex-1 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-semibold py-2 transition-colors"
             >
               ביטול
             </button>

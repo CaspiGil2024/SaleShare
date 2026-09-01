@@ -96,17 +96,17 @@ export default function AnnouncementsPanel() {
   }
 
   return (
-    <div className="rounded-2xl bg-white shadow-sm border border-slate-200 p-5">
+    <div className="rounded-2xl bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 p-5">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <Megaphone size={18} className="text-blue-600" />
-          <h3 className="text-base font-bold text-slate-800">הודעות ועדכונים</h3>
+          <Megaphone size={18} className="text-blue-600 dark:text-blue-300" />
+          <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">הודעות ועדכונים</h3>
         </div>
         {canManage && !isAdding && (
           <button
             type="button"
             onClick={() => setIsAdding(true)}
-            className="flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 min-h-[36px]"
+            className="flex items-center gap-1.5 text-sm font-medium text-blue-600 dark:text-blue-300 hover:text-blue-700 dark:hover:text-blue-300 min-h-[36px]"
           >
             <Plus size={16} /> הודעה חדשה
           </button>
@@ -114,26 +114,26 @@ export default function AnnouncementsPanel() {
       </div>
 
       {actionError && (
-        <p className="text-sm text-rose-600 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2 mb-3">
+        <p className="text-sm text-rose-600 dark:text-rose-300 bg-rose-50 dark:bg-rose-950 border border-rose-100 dark:border-rose-900 rounded-lg px-3 py-2 mb-3">
           {actionError}
         </p>
       )}
 
       {canManage && isAdding && (
-        <form onSubmit={handleAdd} className="flex flex-col gap-2 bg-slate-50 rounded-xl p-3 mb-4">
+        <form onSubmit={handleAdd} className="flex flex-col gap-2 bg-slate-50 dark:bg-slate-800 rounded-xl p-3 mb-4">
           <input
             type="text"
             placeholder="כותרת ההודעה"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            className="rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm"
           />
           <textarea
             placeholder="תוכן ההודעה (אופציונלי)"
             value={body}
             onChange={(e) => setBody(e.target.value)}
             rows={2}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm resize-none"
+            className="rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm resize-none"
           />
           <div className="flex items-center gap-2">
             <button
@@ -146,7 +146,7 @@ export default function AnnouncementsPanel() {
             <button
               type="button"
               onClick={() => setIsAdding(false)}
-              className="w-9 h-9 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-200"
+              className="w-9 h-9 flex items-center justify-center rounded-lg text-slate-400 dark:text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-600"
             >
               <X size={16} />
             </button>
@@ -155,19 +155,19 @@ export default function AnnouncementsPanel() {
       )}
 
       {isLoading ? (
-        <p className="p-6 text-center text-sm text-slate-400">טוען...</p>
+        <p className="p-6 text-center text-sm text-slate-400 dark:text-slate-500">טוען...</p>
       ) : errorMessage ? (
-        <p className="p-6 text-center text-sm text-rose-600">{errorMessage}</p>
+        <p className="p-6 text-center text-sm text-rose-600 dark:text-rose-300">{errorMessage}</p>
       ) : announcements.length === 0 ? (
-        <p className="p-6 text-center text-sm text-slate-400">אין הודעות חדשות.</p>
+        <p className="p-6 text-center text-sm text-slate-400 dark:text-slate-500">אין הודעות חדשות.</p>
       ) : (
-        <ul className="flex flex-col divide-y divide-slate-50">
+        <ul className="flex flex-col divide-y divide-slate-50 dark:divide-slate-800">
           {announcements.map((a) => (
             <li key={a.id} className="flex items-start justify-between gap-3 py-3">
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-slate-800">{a.title}</p>
-                {a.body && <p className="text-sm text-slate-600 mt-0.5">{a.body}</p>}
-                <p className="text-xs text-slate-400 mt-1">
+                <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{a.title}</p>
+                {a.body && <p className="text-sm text-slate-600 dark:text-slate-300 mt-0.5">{a.body}</p>}
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
                   {a.created_by_name} · {timeAgoHe(a.created_at)}
                 </p>
               </div>
@@ -175,7 +175,7 @@ export default function AnnouncementsPanel() {
                 <button
                   type="button"
                   onClick={() => handleDelete(a)}
-                  className="w-9 h-9 shrink-0 flex items-center justify-center rounded-lg text-rose-400 hover:bg-rose-50"
+                  className="w-9 h-9 shrink-0 flex items-center justify-center rounded-lg text-rose-400 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900"
                   aria-label="מחק הודעה"
                 >
                   <Trash2 size={15} />

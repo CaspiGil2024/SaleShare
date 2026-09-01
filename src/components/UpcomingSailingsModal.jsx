@@ -48,16 +48,16 @@ export default function UpcomingSailingsModal({ isOpen, onClose }) {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div dir="rtl" className="w-full max-w-lg max-h-[80dvh] rounded-2xl bg-white shadow-xl flex flex-col">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
-          <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
-            <CalendarClock size={18} className="text-blue-600" />
+      <div dir="rtl" className="w-full max-w-lg max-h-[80dvh] rounded-2xl bg-white dark:bg-slate-800 shadow-xl flex flex-col">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800 shrink-0">
+          <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+            <CalendarClock size={18} className="text-blue-600 dark:text-blue-300" />
             הפלגות קרובות
           </h3>
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-600 dark:hover:text-slate-300"
             aria-label="סגור"
           >
             <X size={18} />
@@ -66,13 +66,13 @@ export default function UpcomingSailingsModal({ isOpen, onClose }) {
 
         <div className="overflow-y-auto p-3">
           {isLoading ? (
-            <p className="p-10 text-center text-sm text-slate-400">טוען...</p>
+            <p className="p-10 text-center text-sm text-slate-400 dark:text-slate-500">טוען...</p>
           ) : errorMessage ? (
-            <p className="p-10 text-center text-sm text-rose-600">{errorMessage}</p>
+            <p className="p-10 text-center text-sm text-rose-600 dark:text-rose-300">{errorMessage}</p>
           ) : rows.length === 0 ? (
-            <p className="p-10 text-center text-sm text-slate-400">אין הפלגות קרובות מתוכננות.</p>
+            <p className="p-10 text-center text-sm text-slate-400 dark:text-slate-500">אין הפלגות קרובות מתוכננות.</p>
           ) : (
-            <ul className="flex flex-col divide-y divide-slate-50">
+            <ul className="flex flex-col divide-y divide-slate-50 dark:divide-slate-800">
               {rows.map((r) => {
                 const start = new Date(r.start_time);
                 const end = new Date(r.end_time);
@@ -80,17 +80,17 @@ export default function UpcomingSailingsModal({ isOpen, onClose }) {
                 return (
                   <li key={r.id} className="flex items-center justify-between gap-3 py-3 px-2">
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-slate-800 truncate">
+                      <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">
                         {r.booker?.full_name ?? r.booker?.email ?? 'שותף'}
                       </p>
-                      <p className="text-xs text-slate-500">{bookingTypeLabelHe(r.booking_type)}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">{bookingTypeLabelHe(r.booking_type)}</p>
                     </div>
                     <div className="text-end shrink-0">
-                      <p className="text-sm text-slate-700">
+                      <p className="text-sm text-slate-700 dark:text-slate-200">
                         {start.toLocaleDateString('he-IL', { day: 'numeric', month: 'numeric' })}{' '}
                         {start.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}
                       </p>
-                      <p className="text-xs text-slate-400">{durationHours} שעות</p>
+                      <p className="text-xs text-slate-400 dark:text-slate-500">{durationHours} שעות</p>
                     </div>
                   </li>
                 );

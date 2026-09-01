@@ -96,9 +96,9 @@ function dayHeaderLabel(group) {
 // just enough contrast to make stronger wind pop out at a glance,
 // matching the multi-color arrows in the reference design.
 function windSpeedColorClass(knots) {
-  if (knots >= 13) return 'text-amber-600';
+  if (knots >= 13) return 'text-amber-600 dark:text-amber-300';
   if (knots >= 8) return 'text-cyan-600';
-  return 'text-emerald-600';
+  return 'text-emerald-600 dark:text-emerald-300';
 }
 
 export default function WeatherWidget() {
@@ -217,11 +217,11 @@ export default function WeatherWidget() {
       </div>
 
       {!errorMessage && waveGroups.length > 0 && (
-        <div className="rounded-2xl bg-white shadow-sm border border-slate-200 p-5">
+        <div className="rounded-2xl bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 p-5">
           <div className="flex items-center gap-2 mb-4">
             <Waves size={18} className="text-sky-600" />
-            <h3 className="text-base font-bold text-slate-800">תחזית גלים</h3>
-            <span className="text-xs text-slate-400">גובה גל (מ') כל 3 שעות - {DAYS_TO_SHOW} ימים קדימה</span>
+            <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">תחזית גלים</h3>
+            <span className="text-xs text-slate-400 dark:text-slate-500">גובה גל (מ') כל 3 שעות - {DAYS_TO_SHOW} ימים קדימה</span>
           </div>
 
           <div
@@ -232,13 +232,13 @@ export default function WeatherWidget() {
             <div className="flex items-start gap-4 min-w-max px-1">
               {waveGroups.map((group) => (
                 <div key={group.dayKey} className="flex flex-col gap-2">
-                  <p className={`text-sm ${group.isToday ? 'font-extrabold text-blue-900' : 'font-bold text-slate-600'}`}>
+                  <p className={`text-sm ${group.isToday ? 'font-extrabold text-blue-900 dark:text-blue-300' : 'font-bold text-slate-600 dark:text-slate-300'}`}>
                     {dayHeaderLabel(group)}
                   </p>
-                  <div className="flex items-end gap-2 h-36 border-e border-slate-100 pe-4 last:border-e-0 last:pe-0">
+                  <div className="flex items-end gap-2 h-36 border-e border-slate-100 dark:border-slate-800 pe-4 last:border-e-0 last:pe-0">
                     {group.entries.map((h) => (
                       <div key={h.time.toISOString()} className="flex flex-col items-center gap-1.5 w-11 shrink-0">
-                        <span className={`text-sm font-extrabold ${h.isNow ? 'text-blue-900' : 'text-blue-700'}`}>
+                        <span className={`text-sm font-extrabold ${h.isNow ? 'text-blue-900 dark:text-blue-300' : 'text-blue-700 dark:text-blue-300'}`}>
                           {h.waveHeight.toFixed(1)}
                         </span>
                         <div className="w-full h-24 flex items-end">
@@ -250,7 +250,7 @@ export default function WeatherWidget() {
                             style={{ height: `${Math.max((h.waveHeight / maxWaveHeight) * 100, 6)}%` }}
                           />
                         </div>
-                        <span className={`text-xs font-bold ${h.isNow ? 'text-blue-900' : 'text-slate-500'}`}>
+                        <span className={`text-xs font-bold ${h.isNow ? 'text-blue-900 dark:text-blue-300' : 'text-slate-500 dark:text-slate-400'}`}>
                           {h.isNow ? 'עכשיו' : h.time.toLocaleTimeString('he-IL', { hour: '2-digit' })}
                         </span>
                       </div>
@@ -264,11 +264,11 @@ export default function WeatherWidget() {
       )}
 
       {!errorMessage && windGroups.length > 0 && (
-        <div className="rounded-2xl bg-white shadow-sm border border-slate-200 p-5">
+        <div className="rounded-2xl bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 p-5">
           <div className="flex items-center gap-2 mb-4">
             <Wind size={18} className="text-sky-600" />
-            <h3 className="text-base font-bold text-slate-800">תחזית רוח</h3>
-            <span className="text-xs text-slate-400">קשר וכיוון כל 3 שעות - {DAYS_TO_SHOW} ימים קדימה</span>
+            <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">תחזית רוח</h3>
+            <span className="text-xs text-slate-400 dark:text-slate-500">קשר וכיוון כל 3 שעות - {DAYS_TO_SHOW} ימים קדימה</span>
           </div>
 
           <div
@@ -279,15 +279,15 @@ export default function WeatherWidget() {
             <div className="flex items-start gap-4 min-w-max px-1">
               {windGroups.map((group) => (
                 <div key={group.dayKey} className="flex flex-col gap-2">
-                  <p className={`text-sm ${group.isToday ? 'font-extrabold text-blue-900' : 'font-bold text-slate-600'}`}>
+                  <p className={`text-sm ${group.isToday ? 'font-extrabold text-blue-900 dark:text-blue-300' : 'font-bold text-slate-600 dark:text-slate-300'}`}>
                     {dayHeaderLabel(group)}
                   </p>
-                  <div className="flex items-end gap-2 border-e border-slate-100 pe-4 last:border-e-0 last:pe-0">
+                  <div className="flex items-end gap-2 border-e border-slate-100 dark:border-slate-800 pe-4 last:border-e-0 last:pe-0">
                     {group.entries.map((h) => (
                       <div
                         key={h.time.toISOString()}
                         className={`flex flex-col items-center gap-1.5 w-11 shrink-0 rounded-lg py-2 ${
-                          h.isNow ? 'bg-blue-50 ring-2 ring-blue-700' : ''
+                          h.isNow ? 'bg-blue-50 dark:bg-blue-950 ring-2 ring-blue-700' : ''
                         }`}
                       >
                         <span className={`text-sm font-extrabold ${windSpeedColorClass(h.windSpeed)}`}>
@@ -299,7 +299,7 @@ export default function WeatherWidget() {
                           style={{ transform: `rotate(${h.windDirection}deg)` }}
                           title={`${Math.round(h.windDirection)}°`}
                         />
-                        <span className={`text-xs font-bold ${h.isNow ? 'text-blue-900' : 'text-slate-500'}`}>
+                        <span className={`text-xs font-bold ${h.isNow ? 'text-blue-900 dark:text-blue-300' : 'text-slate-500 dark:text-slate-400'}`}>
                           {h.isNow ? 'עכשיו' : h.time.toLocaleTimeString('he-IL', { hour: '2-digit' })}
                         </span>
                       </div>

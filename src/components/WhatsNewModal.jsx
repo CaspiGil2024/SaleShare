@@ -33,17 +33,17 @@ export default function WhatsNewModal({ isOpen, onClose }) {
     >
       <div
         dir="rtl"
-        className="w-full max-w-lg max-h-[80dvh] rounded-2xl bg-white shadow-xl flex flex-col text-right"
+        className="w-full max-w-lg max-h-[80dvh] rounded-2xl bg-white dark:bg-slate-800 shadow-xl flex flex-col text-right"
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
-          <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
-            <Sparkles size={18} className="text-blue-600 shrink-0" />
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800 shrink-0">
+          <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+            <Sparkles size={18} className="text-blue-600 dark:text-blue-300 shrink-0" />
             מה חדש?
           </h3>
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600 shrink-0"
+            className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-600 dark:hover:text-slate-300 shrink-0"
             aria-label="סגור"
           >
             <X size={18} />
@@ -53,10 +53,10 @@ export default function WhatsNewModal({ isOpen, onClose }) {
         <div className="overflow-y-auto p-5 flex flex-col gap-6 text-right">
           {RELEASE_NOTES.map((entry) => (
             <div key={entry.date} className="text-right">
-              <p className="text-xs font-semibold text-blue-600 mb-2">{formatDateHe(entry.date)}</p>
+              <p className="text-xs font-semibold text-blue-600 dark:text-blue-300 mb-2">{formatDateHe(entry.date)}</p>
               <ul className="flex flex-col gap-2 list-none p-0 m-0">
                 {entry.items.map((item, idx) => (
-                  <li key={idx} className="text-sm text-slate-700 leading-relaxed ps-4 relative">
+                  <li key={idx} className="text-sm text-slate-700 dark:text-slate-200 leading-relaxed ps-4 relative">
                     <span className="absolute top-2 start-0 w-1 h-1 rounded-full bg-slate-400" />
                     {item}
                   </li>

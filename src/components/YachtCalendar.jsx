@@ -181,7 +181,7 @@ export default function YachtCalendar({ bookings, onSelectRange, onEventClick, i
   );
 
   return (
-    <div className="flex flex-col h-[calc(100dvh-205px)] overflow-hidden bg-white rounded-2xl shadow-sm border border-slate-200 p-2 sm:p-4">
+    <div className="flex flex-col h-[calc(100dvh-205px)] overflow-hidden bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-2 sm:p-4">
       <FullCalendar
         ref={calendarRef}
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
@@ -246,7 +246,7 @@ export default function YachtCalendar({ bookings, onSelectRange, onEventClick, i
               {holiday && (
                 <div
                   className={`text-[10px] font-medium truncate ${
-                    holiday.type === 'holiday' ? 'text-amber-700' : 'text-amber-600'
+                    holiday.type === 'holiday' ? 'text-amber-700 dark:text-amber-300' : 'text-amber-600 dark:text-amber-300'
                   }`}
                   title={holiday.label}
                 >
@@ -268,7 +268,7 @@ export default function YachtCalendar({ bookings, onSelectRange, onEventClick, i
               {holiday && (
                 <div
                   className={`text-[9px] font-medium truncate ${
-                    holiday.type === 'holiday' ? 'text-amber-700' : 'text-amber-600'
+                    holiday.type === 'holiday' ? 'text-amber-700 dark:text-amber-300' : 'text-amber-600 dark:text-amber-300'
                   }`}
                   title={holiday.label}
                 >

@@ -36,10 +36,10 @@ export default function SystemNoticesBanner() {
       {notices.map((n) => (
         <div
           key={n.id}
-          className="flex items-start gap-3 rounded-2xl bg-amber-50 border border-amber-200 px-5 py-4 shadow-sm"
+          className="flex items-start gap-3 rounded-2xl bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 px-5 py-4 shadow-sm"
         >
-          <Megaphone size={20} className="text-amber-600 shrink-0 mt-0.5" />
-          <p className="text-sm font-medium text-amber-900 whitespace-pre-wrap">{n.content}</p>
+          <Megaphone size={20} className="text-amber-600 dark:text-amber-300 shrink-0 mt-0.5" />
+          <p className="text-sm font-medium text-amber-900 dark:text-amber-300 whitespace-pre-wrap">{n.content}</p>
         </div>
       ))}
     </div>

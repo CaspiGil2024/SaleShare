@@ -111,7 +111,7 @@ export default function Dashboard({ onNavigate }) {
   }, [currentUser?.id]);
 
   return (
-    <div className="flex flex-col gap-6 p-6 bg-slate-50 min-h-screen">
+    <div className="flex flex-col gap-6 p-6 bg-slate-50 dark:bg-slate-800 min-h-screen">
       <WelcomeHeader currentUser={currentUser} />
 
       <SystemNoticesBanner />

@@ -172,40 +172,40 @@ export default function SailingLogPage() {
       <CoinBalanceBadge currentUser={currentUser} />
 
       <header>
-        <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
-          <BookOpen size={26} className="text-blue-600" />
+        <h2 className="text-3xl font-extrabold text-slate-900 dark:text-slate-50 tracking-tight flex items-center gap-2">
+          <BookOpen size={26} className="text-blue-600 dark:text-blue-300" />
           יומן הפלגות וסגירת סירה
         </h2>
-        <p className="text-sm text-slate-500 mt-1">
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
           רישום אוטומטי של כל יציאה להפלגה וסגירת הסירה (ביטול הפלגה או תחזוקה)
         </p>
       </header>
 
       <div className="flex flex-wrap items-end gap-3">
         <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium text-slate-700">מתאריך</label>
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-200">מתאריך</label>
           <input
             type="date"
             value={fromDate}
             onChange={(e) => setFromDate(e.target.value)}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800"
+            className="rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm text-slate-800 dark:text-slate-100"
           />
         </div>
         <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium text-slate-700">עד תאריך</label>
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-200">עד תאריך</label>
           <input
             type="date"
             value={toDate}
             onChange={(e) => setToDate(e.target.value)}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800"
+            className="rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm text-slate-800 dark:text-slate-100"
           />
         </div>
         <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium text-slate-700">שותף</label>
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-200">שותף</label>
           <select
             value={selectedPartnerId}
             onChange={(e) => setSelectedPartnerId(e.target.value)}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 min-w-[160px]"
+            className="rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm text-slate-800 dark:text-slate-100 min-w-[160px]"
           >
             <option value="">כל השותפים</option>
             {partners.map((p) => (
@@ -228,7 +228,7 @@ export default function SailingLogPage() {
           type="button"
           onClick={handleExport}
           disabled={!hasGenerated || isLoading || rows.length === 0}
-          className="flex items-center gap-1.5 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-semibold px-4 py-2.5 transition-colors"
+          className="flex items-center gap-1.5 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-semibold px-4 py-2.5 transition-colors"
         >
           <Download size={15} />
           יצוא ל-EXCEL
@@ -236,19 +236,19 @@ export default function SailingLogPage() {
       </div>
 
       {!hasGenerated ? (
-        <p className="p-10 text-center text-sm text-slate-400">בחרו טווח תאריכים ולחצו על "הצג יומן" כדי להציג נתונים.</p>
+        <p className="p-10 text-center text-sm text-slate-400 dark:text-slate-500">בחרו טווח תאריכים ולחצו על "הצג יומן" כדי להציג נתונים.</p>
       ) : isLoading ? (
-        <p className="p-10 text-center text-sm text-slate-400">טוען...</p>
+        <p className="p-10 text-center text-sm text-slate-400 dark:text-slate-500">טוען...</p>
       ) : errorMessage ? (
-        <p className="p-10 text-center text-sm text-rose-600">{errorMessage}</p>
+        <p className="p-10 text-center text-sm text-rose-600 dark:text-rose-300">{errorMessage}</p>
       ) : rows.length === 0 ? (
-        <p className="p-10 text-center text-sm text-slate-400">אין רשומות יומן בטווח התאריכים שנבחר.</p>
+        <p className="p-10 text-center text-sm text-slate-400 dark:text-slate-500">אין רשומות יומן בטווח התאריכים שנבחר.</p>
       ) : (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
           <div className="overflow-auto max-h-[65dvh]">
             <table className="w-full text-sm">
               <thead className="sticky-thead">
-                <tr className="border-b border-slate-200 text-start text-slate-700">
+                <tr className="border-b border-slate-200 dark:border-slate-700 text-start text-slate-700 dark:text-slate-200">
                   <th className="px-4 py-3 font-bold text-start">תאריך ושעה</th>
                   <th className="px-4 py-3 font-bold text-start">פעולה</th>
                   <th className="px-4 py-3 font-bold text-start">שותף</th>
@@ -264,38 +264,38 @@ export default function SailingLogPage() {
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.id} className="border-b border-slate-50 last:border-0">
-                    <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
+                  <tr key={r.id} className="border-b border-slate-50 dark:border-slate-800 last:border-0">
+                    <td className="px-4 py-3 text-slate-500 dark:text-slate-400 whitespace-nowrap">
                       {formatDateTimeHe(r.logged_at)}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <span
                         className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                          r.action === 'departure' ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-600'
+                          r.action === 'departure' ? 'bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
                         }`}
                       >
                         {r.actionLabel}
                       </span>
                     </td>
-                    <td className="px-4 py-3 font-medium text-slate-800 whitespace-nowrap">{r.partnerName}</td>
-                    <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{r.bookingTypeLabel}</td>
-                    <td className="px-4 py-3 text-slate-600 whitespace-nowrap">
+                    <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-100 whitespace-nowrap">{r.partnerName}</td>
+                    <td className="px-4 py-3 text-slate-600 dark:text-slate-300 whitespace-nowrap">{r.bookingTypeLabel}</td>
+                    <td className="px-4 py-3 text-slate-600 dark:text-slate-300 whitespace-nowrap">
                       {r.start_time ? formatDateTimeHe(r.start_time) : '—'}
                     </td>
-                    <td className="px-4 py-3 text-slate-600 whitespace-nowrap">
+                    <td className="px-4 py-3 text-slate-600 dark:text-slate-300 whitespace-nowrap">
                       {r.end_time ? formatDateTimeHe(r.end_time) : '—'}
                     </td>
-                    <td className="px-4 py-3 text-slate-500">{r.reasonLabel ?? '—'}</td>
-                    <td className="px-4 py-3 text-emerald-700 font-medium whitespace-nowrap">
+                    <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{r.reasonLabel ?? '—'}</td>
+                    <td className="px-4 py-3 text-emerald-700 dark:text-emerald-300 font-medium whitespace-nowrap">
                       {r.coins.midweekDay ? formatCoin(r.coins.midweekDay) : '—'}
                     </td>
-                    <td className="px-4 py-3 text-slate-600 font-medium whitespace-nowrap">
+                    <td className="px-4 py-3 text-slate-600 dark:text-slate-300 font-medium whitespace-nowrap">
                       {r.coins.midweekNight ? formatCoin(r.coins.midweekNight) : '—'}
                     </td>
-                    <td className="px-4 py-3 text-amber-700 font-medium whitespace-nowrap">
+                    <td className="px-4 py-3 text-amber-700 dark:text-amber-300 font-medium whitespace-nowrap">
                       {r.coins.weekendDay ? formatCoin(r.coins.weekendDay) : '—'}
                     </td>
-                    <td className="px-4 py-3 text-indigo-700 font-medium whitespace-nowrap">
+                    <td className="px-4 py-3 text-indigo-700 dark:text-indigo-300 font-medium whitespace-nowrap">
                       {r.coins.weekendNight ? formatCoin(r.coins.weekendNight) : '—'}
                     </td>
                   </tr>

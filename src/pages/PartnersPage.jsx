@@ -198,7 +198,7 @@ function RowActionsMenu({
         type="button"
         onClick={() => (isOpen ? setIsOpen(false) : openMenu())}
         aria-label="פעולות נוספות"
-        className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+        className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-600 dark:hover:text-slate-300"
       >
         <MoreVertical size={16} />
       </button>
@@ -209,7 +209,7 @@ function RowActionsMenu({
           <div
             ref={menuRef}
             style={{ position: 'fixed', top: menuPosition.top, left: menuPosition.left, width: MENU_WIDTH }}
-            className="z-50 rounded-xl bg-white border border-slate-200 shadow-lg py-1.5"
+            className="z-50 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-lg py-1.5"
           >
             {menuItems.map((item) => {
               const Icon = item.icon;
@@ -218,11 +218,11 @@ function RowActionsMenu({
                   key={item.key}
                   type="button"
                   onClick={() => handleAction(item.key)}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm text-start hover:bg-slate-50 ${
-                    item.destructive ? 'text-rose-600' : 'text-slate-700'
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm text-start hover:bg-slate-50 dark:hover:bg-slate-700 ${
+                    item.destructive ? 'text-rose-600 dark:text-rose-300' : 'text-slate-700 dark:text-slate-200'
                   }`}
                 >
-                  <Icon size={15} className={item.destructive ? 'text-rose-500' : 'text-slate-400'} />
+                  <Icon size={15} className={item.destructive ? 'text-rose-500 dark:text-rose-400' : 'text-slate-400 dark:text-slate-500'} />
                   <span>{item.key === 'freeze' && partner.is_frozen ? 'ביטול הקפאה' : item.label}</span>
                 </button>
               );
@@ -241,17 +241,17 @@ function RowActionsMenu({
 // balance as a single "starting point" figure, clearly labeled as such
 // rather than presented as if it were a real per-type balance.
 const COIN_CELLS = [
-  { key: 'coins_midweek_day', label: 'אמצ"ש יום', className: 'bg-emerald-50 text-emerald-700' },
-  { key: 'coins_midweek_night', label: 'אמצ"ש לילה', className: 'bg-slate-100 text-slate-600' },
-  { key: 'coins_weekend_day', label: 'סופ"ש יום', className: 'bg-amber-50 text-amber-700' },
-  { key: 'coins_weekend_night', label: 'סופ"ש לילה', className: 'bg-indigo-50 text-indigo-700' },
+  { key: 'coins_midweek_day', label: 'אמצ"ש יום', className: 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300' },
+  { key: 'coins_midweek_night', label: 'אמצ"ש לילה', className: 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300' },
+  { key: 'coins_weekend_day', label: 'סופ"ש יום', className: 'bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300' },
+  { key: 'coins_weekend_night', label: 'סופ"ש לילה', className: 'bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300' },
 ];
 
 function PartnerCoinBalances({ partner }) {
   if (!partner.wallet) {
     return (
       <div className="flex flex-col gap-0.5">
-        <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 text-xs font-medium w-fit">
+        <span className="px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 text-xs font-medium w-fit">
           {formatCoinAmount(partner.balance)} מטבעות (טרם נרשם)
         </span>
       </div>
@@ -452,8 +452,8 @@ export default function PartnersPage() {
     <div className="flex flex-col gap-6 p-6" dir="rtl">
       <header className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800">שותפים</h2>
-          <p className="text-sm text-slate-500">רשימת כל השותפים במערכת</p>
+          <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">שותפים</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400">רשימת כל השותפים במערכת</p>
         </div>
         {canAddPartner && (
           <button
@@ -468,18 +468,18 @@ export default function PartnersPage() {
       </header>
 
       {actionError && (
-        <p className="text-sm text-rose-600 bg-rose-50 border border-rose-100 rounded-lg px-4 py-2.5">
+        <p className="text-sm text-rose-600 dark:text-rose-300 bg-rose-50 dark:bg-rose-950 border border-rose-100 dark:border-rose-900 rounded-lg px-4 py-2.5">
           {actionError}
         </p>
       )}
 
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
         {isLoading ? (
-          <p className="p-10 text-center text-sm text-slate-400">טוען נתוני שותפים...</p>
+          <p className="p-10 text-center text-sm text-slate-400 dark:text-slate-500">טוען נתוני שותפים...</p>
         ) : errorMessage ? (
-          <p className="p-10 text-center text-sm text-rose-600">{errorMessage}</p>
+          <p className="p-10 text-center text-sm text-rose-600 dark:text-rose-300">{errorMessage}</p>
         ) : partners.length === 0 ? (
-          <p className="p-10 text-center text-sm text-slate-400">לא נמצאו שותפים.</p>
+          <p className="p-10 text-center text-sm text-slate-400 dark:text-slate-500">לא נמצאו שותפים.</p>
         ) : (
           <div className="overflow-auto max-h-[65dvh]">
             {/*
@@ -491,7 +491,7 @@ export default function PartnersPage() {
             */}
             <table className="w-full text-sm">
               <thead className="sticky-thead">
-                <tr className="border-b border-slate-100 text-start text-slate-500">
+                <tr className="border-b border-slate-100 dark:border-slate-800 text-start text-slate-500 dark:text-slate-400">
                   <th className="px-4 py-3 font-medium text-start">שם מלא</th>
                   <th className="px-4 py-3 font-medium text-start">אימייל</th>
                   <th className="px-4 py-3 font-medium text-start">טלפון</th>
@@ -503,18 +503,18 @@ export default function PartnersPage() {
               </thead>
               <tbody>
                 {partners.map((partner) => (
-                  <tr key={partner.email} className="border-b border-slate-50 last:border-0">
-                    <td className="px-4 py-3 font-medium text-slate-800 whitespace-nowrap">
+                  <tr key={partner.email} className="border-b border-slate-50 dark:border-slate-800 last:border-0">
+                    <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-100 whitespace-nowrap">
                       {partner.full_name}
                     </td>
-                    <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{partner.email}</td>
-                    <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{partner.phone ?? '—'}</td>
+                    <td className="px-4 py-3 text-slate-600 dark:text-slate-300 whitespace-nowrap">{partner.email}</td>
+                    <td className="px-4 py-3 text-slate-600 dark:text-slate-300 whitespace-nowrap">{partner.phone ?? '—'}</td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1.5">
                         {(partner.roles ?? []).map((role) => (
                           <span
                             key={role}
-                            className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-xs font-medium"
+                            className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-medium"
                           >
                             {roleLabelHe(role)}
                           </span>
@@ -525,7 +525,7 @@ export default function PartnersPage() {
                       <div className="flex flex-wrap gap-1.5">
                         {!partner.inRoster ? (
                           <span
-                            className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700"
+                            className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300"
                             title="נרשם/ה ישירות למערכת ולא נוסף/ה לרשימת השותפים — ניתן לתקן כאן רק את השם המלא."
                           >
                             לא ברשימת שותפים
@@ -535,8 +535,8 @@ export default function PartnersPage() {
                             <span
                               className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                                 partner.is_active
-                                  ? 'bg-green-50 text-green-700'
-                                  : 'bg-slate-100 text-slate-500'
+                                  ? 'bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300'
+                                  : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
                               }`}
                             >
                               {partner.is_active ? 'פעיל' : 'לא פעיל'}
@@ -558,7 +558,7 @@ export default function PartnersPage() {
                         <a
                           href={`tel:${partner.phone ?? ''}`}
                           aria-label={`חייג ל${partner.full_name}`}
-                          className={`w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 ${
+                          className={`w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-600 dark:hover:text-slate-300 ${
                             !partner.phone ? 'pointer-events-none opacity-30' : ''
                           }`}
                         >
@@ -567,7 +567,7 @@ export default function PartnersPage() {
                         <a
                           href={`mailto:${partner.email}`}
                           aria-label={`שלח אימייל ל${partner.full_name}`}
-                          className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                          className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-600 dark:hover:text-slate-300"
                         >
                           <Mail size={15} />
                         </a>

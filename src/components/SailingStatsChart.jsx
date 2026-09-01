@@ -87,17 +87,17 @@ export default function SailingStatsChart({ onClick }) {
       type="button"
       onClick={onClick}
       title="לחצו למעבר ליומן"
-      className="w-full text-start bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-md hover:border-slate-300 transition-shadow cursor-pointer"
+      className="w-full text-start bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 hover:shadow-md hover:border-slate-300 transition-shadow cursor-pointer"
     >
       <div className="flex items-center justify-between mb-6">
-        <h3 className="text-base font-semibold text-slate-800">סטטיסטיקת הפלגות שבועית</h3>
-        <span className="text-xs text-slate-400">שעות שיט</span>
+        <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">סטטיסטיקת הפלגות שבועית</h3>
+        <span className="text-xs text-slate-400 dark:text-slate-500">שעות שיט</span>
       </div>
 
       {isLoading ? (
-        <p className="h-40 flex items-center justify-center text-sm text-slate-400">טוען...</p>
+        <p className="h-40 flex items-center justify-center text-sm text-slate-400 dark:text-slate-500">טוען...</p>
       ) : errorMessage ? (
-        <p className="h-40 flex items-center justify-center text-sm text-rose-600">{errorMessage}</p>
+        <p className="h-40 flex items-center justify-center text-sm text-rose-600 dark:text-rose-300">{errorMessage}</p>
       ) : (
         <div className="flex items-end justify-between gap-3 h-40">
           {DAY_LABELS_HE.map((label, index) => {
@@ -111,7 +111,7 @@ export default function SailingStatsChart({ onClick }) {
                     style={{ height: `${(hours / maxHours) * 100}%` }}
                   />
                 </div>
-                <span className="text-xs text-slate-500">{label}</span>
+                <span className="text-xs text-slate-500 dark:text-slate-400">{label}</span>
               </div>
             );
           })}

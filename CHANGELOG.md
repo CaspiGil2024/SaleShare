@@ -9,6 +9,26 @@ developers.
 
 ## Unreleased
 
+### Changed
+- **Dark mode extended app-wide.** The theme toggle (added 2026-09-01,
+  sidebar only) previously left every page's content on hardcoded
+  light-mode Tailwind classes. Applied a systematic `dark:` variant to
+  every card, table, form, modal, and text color across all 33
+  page/component files via a scripted, rule-based pass
+  (`scripts/apply-dark-mode.py`) — neutral chrome (backgrounds, text,
+  borders) and colored badges/alerts (blue/rose/emerald/amber/etc.) both
+  covered; solid filled buttons were deliberately left unchanged since
+  they already read fine on a dark background. `Sidebar.jsx`/`App.jsx`
+  were excluded from the script (already hand-done) to avoid duplicate
+  `dark:` classes on the same element — one such duplication slipped in
+  on `App.jsx` before that exclusion was added and was cleaned up by hand.
+  Not visually verified in a browser this session (no such tool
+  available) — please flag anything that looks off.
+- Synced the in-app "מה חדש" modal (`src/data/releaseNotes.js`) with
+  everything shipped since the 2026-08-30 entry — it had fallen behind
+  because new work was only being logged here, not in the array the
+  modal actually reads from. Both are now updated together going forward.
+
 ### Fixed
 - Shared/Cyprus sailing: a partner who already joined had no way to change
   their own guest count afterward (only leave-and-rejoin) — added
@@ -30,6 +50,16 @@ developers.
   join/leave/admin add-remove, not deferred to the sailing's start time —
   confirmed this is the intended, already-correct design (participants can
   still join/leave up to 7 days after a sailing starts, per `0046`).
+
+## 2026-09-01 — Day/Night mode toggle (sidebar foundation)
+
+### Added
+- Theme toggle icon (sun/moon) in the sidebar's user-profile row —
+  persists to `localStorage`, falls back to OS preference on first visit,
+  smooth color transitions. `src/theme/ThemeProvider.jsx` +
+  `darkMode: 'class'` in `tailwind.config.js`. Scoped at the time to the
+  sidebar/header chrome only — see "Unreleased" above for the app-wide
+  follow-up.
 
 ## 2026-09-01 — Double-entry coin ledger
 

@@ -90,8 +90,8 @@ export default function CalendarPage() {
   return (
     <div className="flex flex-col gap-6 p-6">
       <header>
-        <h2 className="text-2xl font-bold text-slate-800">יומן הפלגות</h2>
-        <p className="text-sm text-slate-500">לחצו וגררו על משבצת פנויה כדי לפתוח הזמנה חדשה, או לחצו על הפלגה קיימת לעריכה</p>
+        <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">יומן הפלגות</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400">לחצו וגררו על משבצת פנויה כדי לפתוח הזמנה חדשה, או לחצו על הפלגה קיימת לעריכה</p>
       </header>
 
       <CoinBalanceBadge currentUser={currentUser} refreshToken={walletRefreshToken} />
@@ -106,7 +106,7 @@ export default function CalendarPage() {
         margin) without pushing the page into vertical overflow.
       */}
       {profileLoading ? (
-        <div className="flex items-center justify-center h-[calc(100dvh-205px)] bg-white rounded-2xl shadow-sm border border-slate-200 text-sm text-slate-400">
+        <div className="flex items-center justify-center h-[calc(100dvh-205px)] bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 text-sm text-slate-400 dark:text-slate-500">
           טוען...
         </div>
       ) : (

@@ -24,13 +24,13 @@ function AddItemForm({ onAdd, onCancel }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex items-center gap-2 bg-slate-50 rounded-xl p-3">
+    <form onSubmit={handleSubmit} className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800 rounded-xl p-3">
       <input
         type="text"
         placeholder="טקסט הפריט"
         value={text}
         onChange={(e) => setText(e.target.value)}
-        className="flex-1 rounded-lg border border-slate-300 px-3 py-3 text-base min-h-[44px]"
+        className="flex-1 rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-3 text-base min-h-[44px]"
       />
       <button
         type="submit"
@@ -42,7 +42,7 @@ function AddItemForm({ onAdd, onCancel }) {
       <button
         type="button"
         onClick={onCancel}
-        className="w-11 h-11 shrink-0 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-200"
+        className="w-11 h-11 shrink-0 flex items-center justify-center rounded-lg text-slate-400 dark:text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-600"
       >
         <X size={18} />
       </button>
@@ -185,17 +185,17 @@ export default function ChecklistsPage() {
   return (
     <div className="flex flex-col gap-6 p-6" dir="rtl">
       <header>
-        <h2 className="text-2xl font-bold text-slate-800">בדיקות לפני / אחרי הפלגה</h2>
-        <p className="text-sm text-slate-500">סמנו כל פריט ברשימה וחתמו בסיום</p>
+        <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">בדיקות לפני / אחרי הפלגה</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400">סמנו כל פריט ברשימה וחתמו בסיום</p>
       </header>
 
       {actionError && (
-        <p className="text-sm text-rose-600 bg-rose-50 border border-rose-100 rounded-lg px-4 py-2.5">
+        <p className="text-sm text-rose-600 dark:text-rose-300 bg-rose-50 dark:bg-rose-950 border border-rose-100 dark:border-rose-900 rounded-lg px-4 py-2.5">
           {actionError}
         </p>
       )}
 
-      <div className="flex items-center gap-2 border-b border-slate-200">
+      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-700">
         {CHECKLIST_TYPES.map((type) => {
           const Icon = type.icon;
           const isActive = activeType === type.key;
@@ -206,8 +206,8 @@ export default function ChecklistsPage() {
               onClick={() => setActiveType(type.key)}
               className={`flex items-center gap-2 px-4 py-3.5 text-sm font-medium border-b-2 -mb-px transition-colors min-h-[44px] ${
                 isActive
-                  ? 'border-blue-600 text-blue-700'
-                  : 'border-transparent text-slate-500 hover:text-slate-800'
+                  ? 'border-blue-600 text-blue-700 dark:text-blue-300'
+                  : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100'
               }`}
             >
               <Icon size={18} />
@@ -217,11 +217,11 @@ export default function ChecklistsPage() {
         })}
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex flex-col gap-4">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-5 flex flex-col gap-4">
         {isLoading ? (
-          <p className="p-8 text-center text-sm text-slate-400">טוען...</p>
+          <p className="p-8 text-center text-sm text-slate-400 dark:text-slate-500">טוען...</p>
         ) : errorMessage ? (
-          <p className="p-8 text-center text-sm text-rose-600">{errorMessage}</p>
+          <p className="p-8 text-center text-sm text-rose-600 dark:text-rose-300">{errorMessage}</p>
         ) : (
           <>
             {canManage && (
@@ -230,7 +230,7 @@ export default function ChecklistsPage() {
                   <button
                     type="button"
                     onClick={() => setIsAddingItem(true)}
-                    className="flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 min-h-[44px] px-2 -mx-2 rounded-lg"
+                    className="flex items-center gap-1.5 text-sm font-medium text-blue-600 dark:text-blue-300 hover:text-blue-700 dark:hover:text-blue-300 min-h-[44px] px-2 -mx-2 rounded-lg"
                   >
                     <Plus size={18} /> הוספת פריט לרשימה
                   </button>
@@ -241,23 +241,23 @@ export default function ChecklistsPage() {
             )}
 
             {activeItems.length === 0 ? (
-              <p className="p-8 text-center text-sm text-slate-400">
+              <p className="p-8 text-center text-sm text-slate-400 dark:text-slate-500">
                 אין עדיין פריטים ברשימה זו{canManage ? ' — הוסיפו את הפריט הראשון למעלה.' : '.'}
               </p>
             ) : (
-              <ul className="flex flex-col divide-y divide-slate-50">
+              <ul className="flex flex-col divide-y divide-slate-50 dark:divide-slate-800">
                 {activeItems.map((item) => (
                   <li key={item.id} className="flex items-center justify-between gap-2 py-4">
-                    <label className="flex items-center gap-4 text-base text-slate-700 cursor-pointer flex-1 min-h-[44px]">
+                    <label className="flex items-center gap-4 text-base text-slate-700 dark:text-slate-200 cursor-pointer flex-1 min-h-[44px]">
                       <input
                         type="checkbox"
                         checked={!!checkedIds[item.id]}
                         onChange={() => toggleItem(item.id)}
-                        className="w-6 h-6 shrink-0 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                        className="w-6 h-6 shrink-0 rounded border-slate-300 dark:border-slate-600 text-blue-600 dark:text-blue-300 focus:ring-blue-500 dark:focus:ring-blue-400"
                       />
                       <span
                         className={`font-semibold ${
-                          checkedIds[item.id] ? 'text-slate-400 line-through' : 'text-slate-800'
+                          checkedIds[item.id] ? 'text-slate-400 dark:text-slate-500 line-through' : 'text-slate-800 dark:text-slate-100'
                         }`}
                       >
                         {item.item_text}
@@ -267,7 +267,7 @@ export default function ChecklistsPage() {
                       <button
                         type="button"
                         onClick={() => handleDeleteItem(item)}
-                        className="w-11 h-11 shrink-0 flex items-center justify-center rounded-lg text-rose-400 hover:bg-rose-50"
+                        className="w-11 h-11 shrink-0 flex items-center justify-center rounded-lg text-rose-400 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900"
                         aria-label="מחק פריט"
                       >
                         <Trash2 size={16} />
@@ -279,15 +279,15 @@ export default function ChecklistsPage() {
             )}
 
             {activeItems.length > 0 && (
-              <div className="flex flex-col gap-3 pt-2 border-t border-slate-100">
+              <div className="flex flex-col gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium text-slate-700">הערות נוספות</label>
+                  <label className="text-sm font-medium text-slate-700 dark:text-slate-200">הערות נוספות</label>
                   <textarea
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                     placeholder="הערות אופציונליות..."
                     rows={3}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-3 text-base resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-3 text-base resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                   />
                 </div>
 
@@ -305,7 +305,7 @@ export default function ChecklistsPage() {
                 </button>
 
                 {lastSubmission && (
-                  <p className="flex items-center gap-1.5 text-sm text-green-700 bg-green-50 border border-green-100 rounded-lg px-3 py-2">
+                  <p className="flex items-center gap-1.5 text-sm text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950 border border-green-100 dark:border-green-900 rounded-lg px-3 py-2">
                     <CheckCircle2 size={16} />
                     נחתם בהצלחה על ידי {lastSubmission.name} ב-{formatDateTimeHe(lastSubmission.at)}
                   </p>

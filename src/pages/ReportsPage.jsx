@@ -115,12 +115,12 @@ function PartnerBalancesTab() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <p className="text-xs text-slate-400">יתרות נוכחיות לפי סוג מטבע, לתקופה הנוכחית</p>
+        <p className="text-xs text-slate-400 dark:text-slate-500">יתרות נוכחיות לפי סוג מטבע, לתקופה הנוכחית</p>
         <button
           type="button"
           onClick={() => exportPartnerBalancesToXlsx({ rows })}
           disabled={isLoading || rows.length === 0}
-          className="flex items-center gap-1.5 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-semibold px-4 py-2.5 transition-colors"
+          className="flex items-center gap-1.5 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-semibold px-4 py-2.5 transition-colors"
         >
           <Download size={15} />
           יצוא ל-EXCEL
@@ -128,35 +128,35 @@ function PartnerBalancesTab() {
       </div>
 
       {isLoading ? (
-        <p className="p-10 text-center text-sm text-slate-400">טוען...</p>
+        <p className="p-10 text-center text-sm text-slate-400 dark:text-slate-500">טוען...</p>
       ) : errorMessage ? (
-        <p className="p-10 text-center text-sm text-rose-600">{errorMessage}</p>
+        <p className="p-10 text-center text-sm text-rose-600 dark:text-rose-300">{errorMessage}</p>
       ) : rows.length === 0 ? (
-        <p className="p-10 text-center text-sm text-slate-400">אין שותפים רשומים.</p>
+        <p className="p-10 text-center text-sm text-slate-400 dark:text-slate-500">אין שותפים רשומים.</p>
       ) : (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
           <div className="overflow-auto max-h-[65dvh]">
             <table className="w-full text-sm">
               <thead className="sticky-thead">
-                <tr className="border-b border-slate-100 text-start text-slate-500">
+                <tr className="border-b border-slate-100 dark:border-slate-800 text-start text-slate-500 dark:text-slate-400">
                   <th className="px-4 py-3 font-medium text-start">שותף</th>
                   <th className="px-4 py-3 font-medium text-start">אמצ"ש יום</th>
                   <th className="px-4 py-3 font-medium text-start">אמצ"ש לילה</th>
                   <th className="px-4 py-3 font-medium text-start">סופ"ש יום</th>
                   <th className="px-4 py-3 font-medium text-start">סופ"ש לילה</th>
-                  <th className="px-4 py-3 font-bold text-start border-s border-slate-100">יתרה כוללת</th>
+                  <th className="px-4 py-3 font-bold text-start border-s border-slate-100 dark:border-slate-800">יתרה כוללת</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.userId} className="border-b border-slate-50 last:border-0">
-                    <td className="px-4 py-3 font-medium text-slate-800 whitespace-nowrap">{r.name}</td>
-                    <td className="px-4 py-3 text-emerald-700 font-semibold">{formatCoinAmount(r.midweekDay)}</td>
-                    <td className="px-4 py-3 text-slate-600 font-semibold">{formatCoinAmount(r.midweekNight)}</td>
-                    <td className="px-4 py-3 text-amber-700 font-semibold">{formatCoinAmount(r.weekendDay)}</td>
-                    <td className="px-4 py-3 text-indigo-700 font-semibold">{formatCoinAmount(r.weekendNight)}</td>
-                    <td className="px-4 py-3 border-s border-slate-50">
-                      <span className="inline-flex items-center rounded-full bg-blue-50 text-blue-800 font-bold px-2.5 py-1 whitespace-nowrap">
+                  <tr key={r.userId} className="border-b border-slate-50 dark:border-slate-800 last:border-0">
+                    <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-100 whitespace-nowrap">{r.name}</td>
+                    <td className="px-4 py-3 text-emerald-700 dark:text-emerald-300 font-semibold">{formatCoinAmount(r.midweekDay)}</td>
+                    <td className="px-4 py-3 text-slate-600 dark:text-slate-300 font-semibold">{formatCoinAmount(r.midweekNight)}</td>
+                    <td className="px-4 py-3 text-amber-700 dark:text-amber-300 font-semibold">{formatCoinAmount(r.weekendDay)}</td>
+                    <td className="px-4 py-3 text-indigo-700 dark:text-indigo-300 font-semibold">{formatCoinAmount(r.weekendNight)}</td>
+                    <td className="px-4 py-3 border-s border-slate-50 dark:border-slate-800">
+                      <span className="inline-flex items-center rounded-full bg-blue-50 dark:bg-blue-950 text-blue-800 dark:text-blue-300 font-bold px-2.5 py-1 whitespace-nowrap">
                         {formatCoinAmount(r.total)}
                       </span>
                     </td>
@@ -317,21 +317,21 @@ function ActivityReportTab({ defaultFrom, defaultTo, reportLabel }) {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-end gap-3">
         <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium text-slate-700">מתאריך</label>
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-200">מתאריך</label>
           <input
             type="date"
             value={fromDate}
             onChange={(e) => setFromDate(e.target.value)}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800"
+            className="rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm text-slate-800 dark:text-slate-100"
           />
         </div>
         <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium text-slate-700">עד תאריך</label>
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-200">עד תאריך</label>
           <input
             type="date"
             value={toDate}
             onChange={(e) => setToDate(e.target.value)}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800"
+            className="rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm text-slate-800 dark:text-slate-100"
           />
         </div>
         <button
@@ -347,30 +347,30 @@ function ActivityReportTab({ defaultFrom, defaultTo, reportLabel }) {
           type="button"
           onClick={handleExport}
           disabled={!hasGenerated || isLoading || rows.length === 0}
-          className="flex items-center gap-1.5 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-semibold px-4 py-2.5 transition-colors"
+          className="flex items-center gap-1.5 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-semibold px-4 py-2.5 transition-colors"
         >
           <Download size={15} />
           יצוא ל-EXCEL
         </button>
 
-        <div className="flex items-center gap-3 ms-auto rounded-lg border border-slate-200 px-3 py-2">
-          <label className="flex items-center gap-1.5 text-sm text-slate-700 cursor-pointer">
+        <div className="flex items-center gap-3 ms-auto rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2">
+          <label className="flex items-center gap-1.5 text-sm text-slate-700 dark:text-slate-200 cursor-pointer">
             <input
               type="radio"
               name={`${reportLabel}-view-mode`}
               checked={viewMode === 'summary'}
               onChange={() => setViewMode('summary')}
-              className="text-blue-600 focus:ring-blue-500"
+              className="text-blue-600 dark:text-blue-300 focus:ring-blue-500 dark:focus:ring-blue-400"
             />
             מקוצר
           </label>
-          <label className="flex items-center gap-1.5 text-sm text-slate-700 cursor-pointer">
+          <label className="flex items-center gap-1.5 text-sm text-slate-700 dark:text-slate-200 cursor-pointer">
             <input
               type="radio"
               name={`${reportLabel}-view-mode`}
               checked={viewMode === 'detailed'}
               onChange={() => setViewMode('detailed')}
-              className="text-blue-600 focus:ring-blue-500"
+              className="text-blue-600 dark:text-blue-300 focus:ring-blue-500 dark:focus:ring-blue-400"
             />
             מפורט
           </label>
@@ -378,28 +378,28 @@ function ActivityReportTab({ defaultFrom, defaultTo, reportLabel }) {
       </div>
 
       {!hasGenerated ? (
-        <p className="p-10 text-center text-sm text-slate-400">בחרו טווח תאריכים ולחצו על "בצע דוח" כדי להציג נתונים.</p>
+        <p className="p-10 text-center text-sm text-slate-400 dark:text-slate-500">בחרו טווח תאריכים ולחצו על "בצע דוח" כדי להציג נתונים.</p>
       ) : isLoading ? (
-        <p className="p-10 text-center text-sm text-slate-400">טוען...</p>
+        <p className="p-10 text-center text-sm text-slate-400 dark:text-slate-500">טוען...</p>
       ) : errorMessage ? (
-        <p className="p-10 text-center text-sm text-rose-600">{errorMessage}</p>
+        <p className="p-10 text-center text-sm text-rose-600 dark:text-rose-300">{errorMessage}</p>
       ) : rows.length === 0 ? (
-        <p className="p-10 text-center text-sm text-slate-400">אין נתוני פעילות בטווח התאריכים שנבחר.</p>
+        <p className="p-10 text-center text-sm text-slate-400 dark:text-slate-500">אין נתוני פעילות בטווח התאריכים שנבחר.</p>
       ) : viewMode === 'summary' ? (
         <>
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
-            <p className="text-xs text-slate-400 mb-4">שעות הפלגה לפי שותף (מהגבוה לנמוך)</p>
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-5">
+            <p className="text-xs text-slate-400 dark:text-slate-500 mb-4">שעות הפלגה לפי שותף (מהגבוה לנמוך)</p>
             <div className="flex flex-col gap-2.5">
               {rows.map((r) => (
                 <div key={r.userId} className="flex items-center gap-3">
-                  <span className="w-28 shrink-0 text-sm text-slate-700 truncate">{r.name}</span>
-                  <div className="flex-1 h-5 bg-slate-100 rounded-full overflow-hidden">
+                  <span className="w-28 shrink-0 text-sm text-slate-700 dark:text-slate-200 truncate">{r.name}</span>
+                  <div className="flex-1 h-5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-gradient-to-l from-blue-600 to-sky-400 rounded-full"
                       style={{ width: `${(r.hours / maxHours) * 100}%` }}
                     />
                   </div>
-                  <span className="w-16 shrink-0 text-sm font-semibold text-slate-800 text-end">
+                  <span className="w-16 shrink-0 text-sm font-semibold text-slate-800 dark:text-slate-100 text-end">
                     {r.hours.toFixed(1)} ש'
                   </span>
                 </div>
@@ -407,11 +407,11 @@ function ActivityReportTab({ defaultFrom, defaultTo, reportLabel }) {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
             <div className="overflow-auto max-h-[65dvh]">
               <table className="w-full text-sm">
                 <thead className="sticky-thead">
-                  <tr className="border-b border-slate-100 text-start text-slate-500">
+                  <tr className="border-b border-slate-100 dark:border-slate-800 text-start text-slate-500 dark:text-slate-400">
                     <th className="px-4 py-3 font-medium text-start">שותף</th>
                     <th className="px-4 py-3 font-medium text-start">מספר הפלגות</th>
                     <th className="px-4 py-3 font-medium text-start">סה"כ שעות</th>
@@ -420,11 +420,11 @@ function ActivityReportTab({ defaultFrom, defaultTo, reportLabel }) {
                 </thead>
                 <tbody>
                   {rows.map((r) => (
-                    <tr key={r.userId} className="border-b border-slate-50 last:border-0">
-                      <td className="px-4 py-3 font-medium text-slate-800">{r.name}</td>
-                      <td className="px-4 py-3 text-slate-600">{r.sailCount}</td>
-                      <td className="px-4 py-3 text-slate-600">{r.hours.toFixed(1)}</td>
-                      <td className="px-4 py-3 text-slate-600">{formatCoinAmount(r.coins)}</td>
+                    <tr key={r.userId} className="border-b border-slate-50 dark:border-slate-800 last:border-0">
+                      <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-100">{r.name}</td>
+                      <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{r.sailCount}</td>
+                      <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{r.hours.toFixed(1)}</td>
+                      <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{formatCoinAmount(r.coins)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -437,17 +437,17 @@ function ActivityReportTab({ defaultFrom, defaultTo, reportLabel }) {
         // ranking, each followed by their own complete itemized log.
         <div className="flex flex-col gap-4">
           {rows.map((r) => (
-            <div key={r.userId} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-                <h4 className="font-bold text-slate-800">{r.name}</h4>
-                <p className="text-xs text-slate-400">
+            <div key={r.userId} className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+              <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                <h4 className="font-bold text-slate-800 dark:text-slate-100">{r.name}</h4>
+                <p className="text-xs text-slate-400 dark:text-slate-500">
                   {r.sailCount} הפלגות · {r.hours.toFixed(1)} שעות · {formatCoinAmount(r.coins)} מטבעות
                 </p>
               </div>
               <div className="overflow-auto max-h-[40dvh]">
               <table className="w-full text-sm">
                 <thead className="sticky-thead">
-                  <tr className="border-b border-slate-100 text-start text-slate-500">
+                  <tr className="border-b border-slate-100 dark:border-slate-800 text-start text-slate-500 dark:text-slate-400">
                     <th className="px-4 py-2 font-medium text-start">תפקיד</th>
                     <th className="px-4 py-2 font-medium text-start">סוג</th>
                     <th className="px-4 py-2 font-medium text-start">התחלה</th>
@@ -461,26 +461,26 @@ function ActivityReportTab({ defaultFrom, defaultTo, reportLabel }) {
                 </thead>
                 <tbody>
                   {r.entries.map((e, idx) => (
-                    <tr key={idx} className="border-b border-slate-50 last:border-0">
-                      <td className="px-4 py-2 text-slate-600 whitespace-nowrap">{e.role}</td>
-                      <td className="px-4 py-2 text-slate-800 font-medium whitespace-nowrap">{e.bookingTypeLabel}</td>
-                      <td className="px-4 py-2 text-slate-600 whitespace-nowrap">
+                    <tr key={idx} className="border-b border-slate-50 dark:border-slate-800 last:border-0">
+                      <td className="px-4 py-2 text-slate-600 dark:text-slate-300 whitespace-nowrap">{e.role}</td>
+                      <td className="px-4 py-2 text-slate-800 dark:text-slate-100 font-medium whitespace-nowrap">{e.bookingTypeLabel}</td>
+                      <td className="px-4 py-2 text-slate-600 dark:text-slate-300 whitespace-nowrap">
                         {formatDateTimeHe(e.start_time)}
                       </td>
-                      <td className="px-4 py-2 text-slate-600 whitespace-nowrap">
+                      <td className="px-4 py-2 text-slate-600 dark:text-slate-300 whitespace-nowrap">
                         {formatDateTimeHe(e.end_time)}
                       </td>
-                      <td className="px-4 py-2 text-slate-600">{e.hours.toFixed(1)}</td>
-                      <td className="px-4 py-2 text-emerald-700 font-medium whitespace-nowrap">
+                      <td className="px-4 py-2 text-slate-600 dark:text-slate-300">{e.hours.toFixed(1)}</td>
+                      <td className="px-4 py-2 text-emerald-700 dark:text-emerald-300 font-medium whitespace-nowrap">
                         {e.coinBreakdown.midweekDay ? formatCoinAmount(e.coinBreakdown.midweekDay) : '—'}
                       </td>
-                      <td className="px-4 py-2 text-slate-600 font-medium whitespace-nowrap">
+                      <td className="px-4 py-2 text-slate-600 dark:text-slate-300 font-medium whitespace-nowrap">
                         {e.coinBreakdown.midweekNight ? formatCoinAmount(e.coinBreakdown.midweekNight) : '—'}
                       </td>
-                      <td className="px-4 py-2 text-amber-700 font-medium whitespace-nowrap">
+                      <td className="px-4 py-2 text-amber-700 dark:text-amber-300 font-medium whitespace-nowrap">
                         {e.coinBreakdown.weekendDay ? formatCoinAmount(e.coinBreakdown.weekendDay) : '—'}
                       </td>
-                      <td className="px-4 py-2 text-indigo-700 font-medium whitespace-nowrap">
+                      <td className="px-4 py-2 text-indigo-700 dark:text-indigo-300 font-medium whitespace-nowrap">
                         {e.coinBreakdown.weekendNight ? formatCoinAmount(e.coinBreakdown.weekendNight) : '—'}
                       </td>
                     </tr>
@@ -620,12 +620,12 @@ function PartnerStatementTab() {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-end gap-3">
         <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium text-slate-700">שותף</label>
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-200">שותף</label>
           <select
             value={partnerId}
             onChange={(e) => setPartnerId(e.target.value)}
             disabled={!canViewOthers}
-            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[180px] disabled:bg-slate-50 disabled:text-slate-500"
+            className="rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-1.5 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 min-w-[180px] disabled:bg-slate-50 disabled:text-slate-500"
           >
             {canViewOthers && <option value="">בחרו שותף...</option>}
             {partners.map((p) => (
@@ -636,21 +636,21 @@ function PartnerStatementTab() {
           </select>
         </div>
         <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium text-slate-700">מתאריך</label>
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-200">מתאריך</label>
           <input
             type="date"
             value={fromDate}
             onChange={(e) => setFromDate(e.target.value)}
-            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-1.5 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
           />
         </div>
         <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium text-slate-700">עד תאריך</label>
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-200">עד תאריך</label>
           <input
             type="date"
             value={toDate}
             onChange={(e) => setToDate(e.target.value)}
-            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-1.5 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
           />
         </div>
         <button
@@ -667,7 +667,7 @@ function PartnerStatementTab() {
             type="button"
             onClick={handleExport}
             disabled={!hasOpening && displayRows.length === 0}
-            className="flex items-center gap-1.5 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-semibold px-4 py-2 transition-colors"
+            className="flex items-center gap-1.5 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-semibold px-4 py-2 transition-colors"
           >
             <Download size={15} />
             יצוא ל-EXCEL
@@ -676,21 +676,21 @@ function PartnerStatementTab() {
       </div>
 
       {errorMessage && (
-        <p className="text-sm text-rose-600 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2">{errorMessage}</p>
+        <p className="text-sm text-rose-600 dark:text-rose-300 bg-rose-50 dark:bg-rose-950 border border-rose-100 dark:border-rose-900 rounded-lg px-3 py-2">{errorMessage}</p>
       )}
 
       {!hasGenerated ? (
-        <p className="p-10 text-center text-sm text-slate-400">בחרו שותף וטווח תאריכים ולחצו "הפק דוח".</p>
+        <p className="p-10 text-center text-sm text-slate-400 dark:text-slate-500">בחרו שותף וטווח תאריכים ולחצו "הפק דוח".</p>
       ) : isLoading ? (
-        <p className="p-10 text-center text-sm text-slate-400">טוען...</p>
+        <p className="p-10 text-center text-sm text-slate-400 dark:text-slate-500">טוען...</p>
       ) : !hasOpening && displayRows.length === 0 ? (
-        <p className="p-10 text-center text-sm text-slate-400">אין תנועות מטבעות בטווח התאריכים שנבחר.</p>
+        <p className="p-10 text-center text-sm text-slate-400 dark:text-slate-500">אין תנועות מטבעות בטווח התאריכים שנבחר.</p>
       ) : (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
           <div className="overflow-auto max-h-[65dvh]">
             <table className="w-full text-sm">
               <thead className="sticky-thead">
-                <tr className="border-b border-slate-100 text-start text-slate-500">
+                <tr className="border-b border-slate-100 dark:border-slate-800 text-start text-slate-500 dark:text-slate-400">
                   <th rowSpan={2} className="px-4 py-3 font-bold text-start align-bottom whitespace-nowrap">
                     תאריך ערך
                   </th>
@@ -698,7 +698,7 @@ function PartnerStatementTab() {
                     סיבה
                   </th>
                   {STATEMENT_COIN_TYPES.map((t) => (
-                    <th key={t.value} colSpan={3} className="px-4 py-2 font-bold text-center border-s border-slate-100 whitespace-nowrap">
+                    <th key={t.value} colSpan={3} className="px-4 py-2 font-bold text-center border-s border-slate-100 dark:border-slate-800 whitespace-nowrap">
                       {t.label}
                     </th>
                   ))}
@@ -706,10 +706,10 @@ function PartnerStatementTab() {
                     הערה
                   </th>
                 </tr>
-                <tr className="border-b border-slate-200 text-start text-slate-500">
+                <tr className="border-b border-slate-200 dark:border-slate-700 text-start text-slate-500 dark:text-slate-400">
                   {STATEMENT_COIN_TYPES.map((t) => (
                     <Fragment key={t.value}>
-                      <th className="px-3 py-2 font-medium text-start border-s border-slate-100 whitespace-nowrap">
+                      <th className="px-3 py-2 font-medium text-start border-s border-slate-100 dark:border-slate-800 whitespace-nowrap">
                         חובה
                       </th>
                       <th className="px-3 py-2 font-medium text-start whitespace-nowrap">זכות</th>
@@ -720,53 +720,53 @@ function PartnerStatementTab() {
               </thead>
               <tbody>
                 {hasOpening && (
-                  <tr className="border-b border-slate-200 bg-slate-50 font-medium">
-                    <td className="px-4 py-3 text-slate-400 whitespace-nowrap">—</td>
-                    <td className="px-4 py-3 text-slate-800 whitespace-nowrap">
+                  <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-medium">
+                    <td className="px-4 py-3 text-slate-400 dark:text-slate-500 whitespace-nowrap">—</td>
+                    <td className="px-4 py-3 text-slate-800 dark:text-slate-100 whitespace-nowrap">
                       {STATEMENT_REASON_LABELS_HE.opening_balance}
                     </td>
                     {STATEMENT_COIN_TYPES.map((t) => {
                       const o = openingByType[t.value];
                       return (
                         <Fragment key={t.value}>
-                          <td className="px-3 py-3 border-s border-slate-100 text-rose-600 whitespace-nowrap">
+                          <td className="px-3 py-3 border-s border-slate-100 dark:border-slate-800 text-rose-600 dark:text-rose-300 whitespace-nowrap">
                             {o?.debit != null ? formatCoinAmount(o.debit) : '—'}
                           </td>
-                          <td className="px-3 py-3 text-emerald-700 whitespace-nowrap">
+                          <td className="px-3 py-3 text-emerald-700 dark:text-emerald-300 whitespace-nowrap">
                             {o?.credit != null ? formatCoinAmount(o.credit) : '—'}
                           </td>
-                          <td className="px-3 py-3 font-semibold text-slate-800 whitespace-nowrap">
+                          <td className="px-3 py-3 font-semibold text-slate-800 dark:text-slate-100 whitespace-nowrap">
                             {formatCoinAmount(o?.running_balance ?? 0)}
                           </td>
                         </Fragment>
                       );
                     })}
-                    <td className="px-4 py-3 text-slate-500">—</td>
+                    <td className="px-4 py-3 text-slate-500 dark:text-slate-400">—</td>
                   </tr>
                 )}
                 {displayRows.map((r, idx) => (
-                  <tr key={idx} className="border-b border-slate-50 last:border-0">
-                    <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{formatDateOnlyHe(r.value_date)}</td>
-                    <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
+                  <tr key={idx} className="border-b border-slate-50 dark:border-slate-800 last:border-0">
+                    <td className="px-4 py-3 text-slate-600 dark:text-slate-300 whitespace-nowrap">{formatDateOnlyHe(r.value_date)}</td>
+                    <td className="px-4 py-3 text-slate-700 dark:text-slate-200 whitespace-nowrap">
                       {STATEMENT_REASON_LABELS_HE[r.reason] ?? r.reason}
                     </td>
                     {STATEMENT_COIN_TYPES.map((t) => {
                       const isThisType = t.value === r.coin_type;
                       return (
                         <Fragment key={t.value}>
-                          <td className="px-3 py-3 border-s border-slate-50 text-rose-600 whitespace-nowrap">
+                          <td className="px-3 py-3 border-s border-slate-50 dark:border-slate-800 text-rose-600 dark:text-rose-300 whitespace-nowrap">
                             {isThisType && r.debit != null ? formatCoinAmount(r.debit) : '—'}
                           </td>
-                          <td className="px-3 py-3 text-emerald-700 whitespace-nowrap">
+                          <td className="px-3 py-3 text-emerald-700 dark:text-emerald-300 whitespace-nowrap">
                             {isThisType && r.credit != null ? formatCoinAmount(r.credit) : '—'}
                           </td>
-                          <td className="px-3 py-3 font-semibold text-slate-800 whitespace-nowrap">
+                          <td className="px-3 py-3 font-semibold text-slate-800 dark:text-slate-100 whitespace-nowrap">
                             {r.balancesByType[t.value] !== undefined ? formatCoinAmount(r.balancesByType[t.value]) : '—'}
                           </td>
                         </Fragment>
                       );
                     })}
-                    <td className="px-4 py-3 text-slate-500">{r.note ?? '—'}</td>
+                    <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{r.note ?? '—'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -784,14 +784,14 @@ export default function ReportsPage() {
   return (
     <div className="flex flex-col gap-6 p-6" dir="rtl">
       <header>
-        <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-          <FileBarChart size={22} className="text-blue-600" />
+        <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+          <FileBarChart size={22} className="text-blue-600 dark:text-blue-300" />
           דוחות
         </h2>
-        <p className="text-sm text-slate-500">פעילות שותפים - היסטורית ועתידית</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">פעילות שותפים - היסטורית ועתידית</p>
       </header>
 
-      <div className="flex items-center gap-2 border-b border-slate-200">
+      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-700">
         {TABS.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.key;
@@ -802,8 +802,8 @@ export default function ReportsPage() {
               onClick={() => setActiveTab(tab.key)}
               className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
                 isActive
-                  ? 'border-blue-600 text-blue-700'
-                  : 'border-transparent text-slate-500 hover:text-slate-800'
+                  ? 'border-blue-600 text-blue-700 dark:text-blue-300'
+                  : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100'
               }`}
             >
               <Icon size={16} />

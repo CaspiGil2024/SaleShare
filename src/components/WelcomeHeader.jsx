@@ -1,9 +1,9 @@
 import { roleLabelHe } from '../auth/AuthProvider';
 
 const ROLE_BADGE_STYLES = {
-  admin: 'bg-blue-100 text-blue-700',
-  treasurer: 'bg-emerald-100 text-emerald-700',
-  partner: 'bg-emerald-100 text-emerald-700',
+  admin: 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300',
+  treasurer: 'bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300',
+  partner: 'bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300',
 };
 
 function RoleBadge({ role }) {

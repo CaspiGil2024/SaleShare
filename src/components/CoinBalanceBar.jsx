@@ -11,12 +11,12 @@ export default function CoinBalanceBar({ wallet }) {
       {COIN_DEFS.map((coin) => (
         <div
           key={coin.key}
-          className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex items-center gap-3"
+          className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 flex items-center gap-3"
         >
           <span className={`w-2.5 h-10 rounded-full ${coin.dotClass}`} />
           <div>
-            <p className="text-xs text-slate-500">{coin.label}</p>
-            <p className="text-2xl font-bold text-slate-800">{wallet?.[coin.key] ?? 0}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">{coin.label}</p>
+            <p className="text-2xl font-bold text-slate-800 dark:text-slate-100">{wallet?.[coin.key] ?? 0}</p>
           </div>
         </div>
       ))}

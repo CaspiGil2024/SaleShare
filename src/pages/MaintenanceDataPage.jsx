@@ -113,14 +113,14 @@ function ManualCoinEntryForm({ onSaved }) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col gap-4"
+      className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 flex flex-col gap-4"
     >
       <div>
-        <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
-          <PlusCircle size={18} className="text-blue-600" />
+        <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+          <PlusCircle size={18} className="text-blue-600 dark:text-blue-300" />
           תנועת מטבעות ידנית (חובה / זכות)
         </h3>
-        <p className="text-sm text-slate-500 mt-1">
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
           רישום ידני של תנועת חובה או זכות עבור שותף, כולל תאריך ערך — בהתאם לכללי הנהלת חשבונות כפולה
         </p>
       </div>
@@ -131,11 +131,11 @@ function ManualCoinEntryForm({ onSaved }) {
           viewport, instead of always breaking into fixed rows of N. */}
       <div className="flex flex-wrap items-end gap-3">
         <div className="flex flex-col gap-1.5 w-44">
-          <label className="text-sm font-medium text-slate-700">שותף</label>
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-200">שותף</label>
           <select
             value={partnerId}
             onChange={(e) => setPartnerId(e.target.value)}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
           >
             <option value="">בחרו שותף...</option>
             {partners.map((p) => (
@@ -147,11 +147,11 @@ function ManualCoinEntryForm({ onSaved }) {
         </div>
 
         <div className="flex flex-col gap-1.5 w-36">
-          <label className="text-sm font-medium text-slate-700">סוג מטבע</label>
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-200">סוג מטבע</label>
           <select
             value={coinType}
             onChange={(e) => setCoinType(e.target.value)}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
           >
             {COIN_TYPE_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -162,13 +162,13 @@ function ManualCoinEntryForm({ onSaved }) {
         </div>
 
         <div className="flex flex-col gap-1.5 w-32">
-          <label className="text-sm font-medium text-slate-700">חובה / זכות</label>
-          <div className="flex rounded-lg border border-slate-300 overflow-hidden">
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-200">חובה / זכות</label>
+          <div className="flex rounded-lg border border-slate-300 dark:border-slate-600 overflow-hidden">
             <button
               type="button"
               onClick={() => setDirection('debit')}
               className={`flex-1 py-2 text-sm font-semibold transition-colors ${
-                direction === 'debit' ? 'bg-rose-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'
+                direction === 'debit' ? 'bg-rose-600 text-white' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
               }`}
             >
               חובה
@@ -176,8 +176,8 @@ function ManualCoinEntryForm({ onSaved }) {
             <button
               type="button"
               onClick={() => setDirection('credit')}
-              className={`flex-1 py-2 text-sm font-semibold transition-colors border-r border-slate-300 ${
-                direction === 'credit' ? 'bg-emerald-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'
+              className={`flex-1 py-2 text-sm font-semibold transition-colors border-r border-slate-300 dark:border-slate-600 ${
+                direction === 'credit' ? 'bg-emerald-600 text-white' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
               }`}
             >
               זכות
@@ -186,35 +186,35 @@ function ManualCoinEntryForm({ onSaved }) {
         </div>
 
         <div className="flex flex-col gap-1.5 w-28">
-          <label className="text-sm font-medium text-slate-700">סכום</label>
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-200">סכום</label>
           <input
             type="number"
             step="0.01"
             min="0.01"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
           />
         </div>
 
         <div className="flex flex-col gap-1.5 w-40">
-          <label className="text-sm font-medium text-slate-700">תאריך ערך</label>
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-200">תאריך ערך</label>
           <input
             type="date"
             value={valueDate}
             onChange={(e) => setValueDate(e.target.value)}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
           />
         </div>
 
         <div className="flex flex-col gap-1.5 flex-1 min-w-[160px]">
-          <label className="text-sm font-medium text-slate-700">הערה (אופציונלי)</label>
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-200">הערה (אופציונלי)</label>
           <input
             type="text"
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder="סיבת התנועה..."
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
           />
         </div>
 
@@ -228,10 +228,10 @@ function ManualCoinEntryForm({ onSaved }) {
       </div>
 
       {errorMessage && (
-        <p className="text-sm text-rose-600 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2">{errorMessage}</p>
+        <p className="text-sm text-rose-600 dark:text-rose-300 bg-rose-50 dark:bg-rose-950 border border-rose-100 dark:border-rose-900 rounded-lg px-3 py-2">{errorMessage}</p>
       )}
       {successMessage && (
-        <p className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
+        <p className="text-sm text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950 border border-emerald-100 dark:border-emerald-900 rounded-lg px-3 py-2">
           {successMessage}
         </p>
       )}
@@ -326,16 +326,16 @@ function EditBalanceModal({ partner, onClose, onSaved }) {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div dir="rtl" className="w-full max-w-md rounded-2xl bg-white shadow-xl">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+      <div dir="rtl" className="w-full max-w-md rounded-2xl bg-white dark:bg-slate-800 shadow-xl">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800">
           <div>
-            <h3 className="text-base font-bold text-slate-800">שינוי יתרות</h3>
-            <p className="text-xs text-slate-500">{partner.partnerName}</p>
+            <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">שינוי יתרות</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400">{partner.partnerName}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-600 dark:hover:text-slate-300"
             aria-label="סגור"
           >
             <X size={18} />
@@ -346,37 +346,37 @@ function EditBalanceModal({ partner, onClose, onSaved }) {
           <div className="grid grid-cols-2 gap-3">
             {COIN_TYPE_OPTIONS.map((opt, i) => (
               <div key={opt.value} className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-slate-700">{opt.label}</label>
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-200">{opt.label}</label>
                 <input
                   type="number"
                   step="0.01"
                   autoFocus={i === 0}
                   value={values[opt.value] ?? ''}
                   onChange={(e) => setValues((prev) => ({ ...prev, [opt.value]: e.target.value }))}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                 />
               </div>
             ))}
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-slate-700">הערה (אופציונלי, חלה על כל שדה ששונה)</label>
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-200">הערה (אופציונלי, חלה על כל שדה ששונה)</label>
             <input
               type="text"
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="סיבת השינוי..."
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
             />
           </div>
 
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-slate-400 dark:text-slate-500">
             שינוי זה עוקף את מגבלת האוברדרפט (תיקון מנהלי מפורש) ומתועד באופן מלא ביומן הביקורת, כולל שם
             המבצע, יתרה קודמת/חדשה, וחותמת זמן — לכל שדה ששונה בנפרד.
           </p>
 
           {errorMessage && (
-            <p className="text-sm text-rose-600 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2">{errorMessage}</p>
+            <p className="text-sm text-rose-600 dark:text-rose-300 bg-rose-50 dark:bg-rose-950 border border-rose-100 dark:border-rose-900 rounded-lg px-3 py-2">{errorMessage}</p>
           )}
 
           <div className="flex items-center gap-3 pt-1">
@@ -391,7 +391,7 @@ function EditBalanceModal({ partner, onClose, onSaved }) {
               type="button"
               onClick={onClose}
               disabled={submitting}
-              className="flex-1 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-semibold py-2.5 transition-colors"
+              className="flex-1 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-semibold py-2.5 transition-colors"
             >
               ביטול
             </button>
@@ -474,26 +474,26 @@ function PartnerBalancesTable({ onAdjusted, refreshToken = 0 }) {
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-      <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
-        <Table2 size={18} className="text-blue-600" />
+    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+      <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
+        <Table2 size={18} className="text-blue-600 dark:text-blue-300" />
         <div>
-          <h3 className="text-base font-bold text-slate-800">יתרות שותפים - עריכה ידנית</h3>
-          <p className="text-xs text-slate-400">לחצו על עיפרון ליד כל יתרה כדי לערוך את כל 4 היתרות של אותו שותף יחד</p>
+          <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">יתרות שותפים - עריכה ידנית</h3>
+          <p className="text-xs text-slate-400 dark:text-slate-500">לחצו על עיפרון ליד כל יתרה כדי לערוך את כל 4 היתרות של אותו שותף יחד</p>
         </div>
       </div>
 
       {isLoading ? (
-        <p className="p-10 text-center text-sm text-slate-400">טוען...</p>
+        <p className="p-10 text-center text-sm text-slate-400 dark:text-slate-500">טוען...</p>
       ) : errorMessage ? (
-        <p className="p-10 text-center text-sm text-rose-600">{errorMessage}</p>
+        <p className="p-10 text-center text-sm text-rose-600 dark:text-rose-300">{errorMessage}</p>
       ) : partners.length === 0 ? (
-        <p className="p-10 text-center text-sm text-slate-400">אין שותפים רשומים.</p>
+        <p className="p-10 text-center text-sm text-slate-400 dark:text-slate-500">אין שותפים רשומים.</p>
       ) : (
         <div className={`overflow-auto max-h-[65dvh] transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
           <table className="w-full text-sm">
             <thead className="sticky-thead">
-              <tr className="border-b border-slate-100 text-start text-slate-500">
+              <tr className="border-b border-slate-100 dark:border-slate-800 text-start text-slate-500 dark:text-slate-400">
                 <th className="px-4 py-3 font-medium text-start whitespace-nowrap">שותף</th>
                 {COIN_TYPE_OPTIONS.map((opt) => (
                   <th key={opt.value} className="px-4 py-3 font-medium text-start whitespace-nowrap min-w-[110px]">
@@ -510,19 +510,19 @@ function PartnerBalancesTable({ onAdjusted, refreshToken = 0 }) {
                   COIN_TYPE_OPTIONS.map((opt) => [opt.value, wallet ? wallet[COIN_TYPE_COLUMN[opt.value]] : 0])
                 );
                 return (
-                  <tr key={p.id} className="border-b border-slate-50 last:border-0">
-                    <td className="px-4 py-3 font-medium text-slate-800 whitespace-nowrap">{partnerName}</td>
+                  <tr key={p.id} className="border-b border-slate-50 dark:border-slate-800 last:border-0">
+                    <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-100 whitespace-nowrap">{partnerName}</td>
                     {COIN_TYPE_OPTIONS.map((opt) => (
                       <td key={opt.value} className="px-4 py-3 whitespace-nowrap">
                         <button
                           type="button"
                           onClick={() => setEditingPartner({ partnerId: p.id, partnerName, balances })}
                           disabled={isRefreshing}
-                          className="flex items-center gap-1.5 rounded-lg px-2 py-1 hover:bg-amber-50 text-amber-700 font-semibold transition-colors whitespace-nowrap disabled:cursor-not-allowed"
+                          className="flex items-center gap-1.5 rounded-lg px-2 py-1 hover:bg-amber-50 dark:hover:bg-amber-900 text-amber-700 dark:text-amber-300 font-semibold transition-colors whitespace-nowrap disabled:cursor-not-allowed"
                           title="לחצו לעריכת כל היתרות של שותף זה"
                         >
                           {formatCoinAmount(balances[opt.value])}
-                          <Pencil size={12} className="text-amber-400" />
+                          <Pencil size={12} className="text-amber-400 dark:text-amber-400" />
                         </button>
                       </td>
                     ))}
@@ -580,17 +580,17 @@ function AdjustmentAuditLog({ refreshToken }) {
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-      <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between gap-2">
+    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+      <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <History size={18} className="text-slate-500" />
-          <h3 className="text-base font-bold text-slate-800">יומן ביקורת - שינויים ידניים ביתרות</h3>
+          <History size={18} className="text-slate-500 dark:text-slate-400" />
+          <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">יומן ביקורת - שינויים ידניים ביתרות</h3>
         </div>
         <button
           type="button"
           onClick={handleExport}
           disabled={isLoading || rows.length === 0}
-          className="flex items-center gap-1.5 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-semibold px-3.5 py-2 transition-colors"
+          className="flex items-center gap-1.5 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-semibold px-3.5 py-2 transition-colors"
         >
           <Download size={15} />
           יצוא ל-EXCEL
@@ -598,16 +598,16 @@ function AdjustmentAuditLog({ refreshToken }) {
       </div>
 
       {isLoading ? (
-        <p className="p-10 text-center text-sm text-slate-400">טוען...</p>
+        <p className="p-10 text-center text-sm text-slate-400 dark:text-slate-500">טוען...</p>
       ) : errorMessage ? (
-        <p className="p-10 text-center text-sm text-rose-600">{errorMessage}</p>
+        <p className="p-10 text-center text-sm text-rose-600 dark:text-rose-300">{errorMessage}</p>
       ) : rows.length === 0 ? (
-        <p className="p-10 text-center text-sm text-slate-400">אין עדיין שינויים ידניים רשומים.</p>
+        <p className="p-10 text-center text-sm text-slate-400 dark:text-slate-500">אין עדיין שינויים ידניים רשומים.</p>
       ) : (
         <div className="overflow-auto max-h-[65dvh]">
           <table className="w-full text-sm">
             <thead className="sticky-thead">
-              <tr className="border-b border-slate-100 text-start text-slate-500">
+              <tr className="border-b border-slate-100 dark:border-slate-800 text-start text-slate-500 dark:text-slate-400">
                 <th className="px-4 py-3 font-medium text-start">תאריך ושעה</th>
                 <th className="px-4 py-3 font-medium text-start">בוצע ע"י</th>
                 <th className="px-4 py-3 font-medium text-start">שותף</th>
@@ -619,20 +619,20 @@ function AdjustmentAuditLog({ refreshToken }) {
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.id} className="border-b border-slate-50 last:border-0">
-                  <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
+                <tr key={r.id} className="border-b border-slate-50 dark:border-slate-800 last:border-0">
+                  <td className="px-4 py-3 text-slate-500 dark:text-slate-400 whitespace-nowrap">
                     {formatDateTimeHe(r.created_at)}
                   </td>
-                  <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
+                  <td className="px-4 py-3 text-slate-700 dark:text-slate-200 whitespace-nowrap">
                     {r.actor?.full_name ?? r.actor?.email ?? '—'}
                   </td>
-                  <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
+                  <td className="px-4 py-3 text-slate-700 dark:text-slate-200 whitespace-nowrap">
                     {r.partner?.full_name ?? r.partner?.email ?? '—'}
                   </td>
-                  <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{COIN_TYPE_LABELS_HE[r.coin_type]}</td>
-                  <td className="px-4 py-3 text-slate-600">{formatCoinAmount(r.balance_before)}</td>
-                  <td className="px-4 py-3 font-semibold text-slate-800">{formatCoinAmount(r.balance_after)}</td>
-                  <td className="px-4 py-3 text-slate-500">{r.note ?? '—'}</td>
+                  <td className="px-4 py-3 text-slate-600 dark:text-slate-300 whitespace-nowrap">{COIN_TYPE_LABELS_HE[r.coin_type]}</td>
+                  <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{formatCoinAmount(r.balance_before)}</td>
+                  <td className="px-4 py-3 font-semibold text-slate-800 dark:text-slate-100">{formatCoinAmount(r.balance_after)}</td>
+                  <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{r.note ?? '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -720,20 +720,20 @@ function DatabaseBackupSection() {
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col gap-4 max-w-xl">
+    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 flex flex-col gap-4 max-w-xl">
       <div>
-        <h3 className="text-base font-bold text-slate-800">גיבוי DB (ייצוא ל-XLSX)</h3>
-        <p className="text-sm text-slate-500 mt-1">
+        <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">גיבוי DB (ייצוא ל-XLSX)</h3>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
           מוריד קובץ Excel עם שני גיליונות: פרטי שותפים, ופרטי הפלגות מתחילת הפעילות כולל מטבעות שנוצלו לכל
           הפלגה (הן על ידי המזמין והן על ידי שותפים משתתפים).
         </p>
       </div>
 
       {errorMessage && (
-        <p className="text-sm text-rose-600 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2">{errorMessage}</p>
+        <p className="text-sm text-rose-600 dark:text-rose-300 bg-rose-50 dark:bg-rose-950 border border-rose-100 dark:border-rose-900 rounded-lg px-3 py-2">{errorMessage}</p>
       )}
       {successMessage && (
-        <p className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
+        <p className="text-sm text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950 border border-emerald-100 dark:border-emerald-900 rounded-lg px-3 py-2">
           {successMessage}
         </p>
       )}
@@ -759,11 +759,11 @@ export default function MaintenanceDataPage() {
   return (
     <div className="flex flex-col gap-6 p-6" dir="rtl">
       <header>
-        <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-          <DatabaseBackup size={22} className="text-blue-600" />
+        <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+          <DatabaseBackup size={22} className="text-blue-600 dark:text-blue-300" />
           תחזוקה ונתונים
         </h2>
-        <p className="text-sm text-slate-500">יתרות שותפים, יומן ביקורת, וכלי גיבוי וייצוא נתונים</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">יתרות שותפים, יומן ביקורת, וכלי גיבוי וייצוא נתונים</p>
       </header>
 
       {canManageBalances && (

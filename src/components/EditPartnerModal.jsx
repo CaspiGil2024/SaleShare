@@ -174,13 +174,13 @@ export default function EditPartnerModal({ isOpen, onClose, partner, onSaved }) 
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div dir="rtl" className="w-full max-w-lg max-h-[90dvh] overflow-y-auto rounded-2xl bg-white shadow-xl">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-          <h3 className="text-lg font-bold text-slate-800">עריכת שותף</h3>
+      <div dir="rtl" className="w-full max-w-lg max-h-[90dvh] overflow-y-auto rounded-2xl bg-white dark:bg-slate-800 shadow-xl">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800">
+          <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">עריכת שותף</h3>
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-600 dark:hover:text-slate-300"
             aria-label="סגור"
           >
             <X size={18} />
@@ -189,40 +189,40 @@ export default function EditPartnerModal({ isOpen, onClose, partner, onSaved }) 
 
         <form onSubmit={handleSubmit} className="px-6 py-5 flex flex-col gap-5">
           {!partner.inRoster && (
-            <p className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+            <p className="text-sm text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950 border border-amber-100 dark:border-amber-900 rounded-lg px-3 py-2">
               חשבון זה נרשם ישירות למערכת ואינו ברשימת השותפים הרשמית (partner_roster) — ניתן לתקן כאן רק
               את השם המלא. כדי לנהל תפקידים/סטטוס/טלפון עבורו, יש להוסיף אותו לרשימת השותפים תחילה.
             </p>
           )}
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-slate-700">שם מלא</label>
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-200">שם מלא</label>
             <input
               type="text"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
             />
           </div>
 
           {partner.inRoster && (
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-slate-700">אימייל</label>
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-200">אימייל</label>
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-slate-700">טלפון</label>
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-200">טלפון</label>
                 <input
                   type="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                 />
               </div>
             </div>
@@ -253,18 +253,18 @@ export default function EditPartnerModal({ isOpen, onClose, partner, onSaved }) 
 
           {partner.inRoster && (
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-slate-700">תפקידים</label>
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-200">תפקידים</label>
               <div className="grid grid-cols-2 gap-2">
                 {ALL_PARTNER_ROLES.map((role) => (
                   <label
                     key={role}
-                    className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 cursor-pointer hover:bg-slate-50"
+                    className="flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm text-slate-700 dark:text-slate-200 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700"
                   >
                     <input
                       type="checkbox"
                       checked={roles.includes(role)}
                       onChange={() => toggleRole(role)}
-                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                      className="rounded border-slate-300 dark:border-slate-600 text-blue-600 dark:text-blue-300 focus:ring-blue-500 dark:focus:ring-blue-400"
                     />
                     {roleLabelHe(role)}
                   </label>
@@ -274,24 +274,24 @@ export default function EditPartnerModal({ isOpen, onClose, partner, onSaved }) 
           )}
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-slate-700">תצוגת יומן ברירת מחדל</label>
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-200">תצוגת יומן ברירת מחדל</label>
             {calendarViewLoading ? (
-              <p className="text-xs text-slate-400">טוען...</p>
+              <p className="text-xs text-slate-400 dark:text-slate-500">טוען...</p>
             ) : !userId ? (
-              <p className="text-xs text-slate-400">השותף טרם נרשם למערכת — אין יומן להגדיר עבורו כרגע.</p>
+              <p className="text-xs text-slate-400 dark:text-slate-500">השותף טרם נרשם למערכת — אין יומן להגדיר עבורו כרגע.</p>
             ) : (
               <div className="grid grid-cols-3 gap-2">
                 {CALENDAR_VIEW_OPTIONS.map((opt) => (
                   <label
                     key={opt.value}
-                    className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 cursor-pointer hover:bg-slate-50"
+                    className="flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm text-slate-700 dark:text-slate-200 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700"
                   >
                     <input
                       type="radio"
                       name="default_calendar_view"
                       checked={defaultCalendarView === opt.value}
                       onChange={() => setDefaultCalendarView(opt.value)}
-                      className="text-blue-600 focus:ring-blue-500"
+                      className="text-blue-600 dark:text-blue-300 focus:ring-blue-500 dark:focus:ring-blue-400"
                     />
                     {opt.label}
                   </label>
@@ -302,23 +302,23 @@ export default function EditPartnerModal({ isOpen, onClose, partner, onSaved }) 
 
           {!calendarViewLoading && userId && (
             <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-slate-700">הגדרות שותף</label>
-              <label className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 cursor-pointer hover:bg-slate-50">
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-200">הגדרות שותף</label>
+              <label className="flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm text-slate-700 dark:text-slate-200 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700">
                 <input
                   type="checkbox"
                   checked={emailsEnabled}
                   onChange={(e) => setEmailsEnabled(e.target.checked)}
-                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                  className="rounded border-slate-300 dark:border-slate-600 text-blue-600 dark:text-blue-300 focus:ring-blue-500 dark:focus:ring-blue-400"
                 />
                 שליחת מיילים
               </label>
               {emailsEnabled && (
-                <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 ms-6 text-sm text-slate-700 cursor-pointer hover:bg-white">
+                <label className="flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 ms-6 text-sm text-slate-700 dark:text-slate-200 cursor-pointer hover:bg-white dark:hover:bg-slate-700">
                   <input
                     type="checkbox"
                     checked={receiveSharedSailNotifications}
                     onChange={(e) => setReceiveSharedSailNotifications(e.target.checked)}
-                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                    className="rounded border-slate-300 dark:border-slate-600 text-blue-600 dark:text-blue-300 focus:ring-blue-500 dark:focus:ring-blue-400"
                   />
                   קבלת עדכונים על הפלגות שותפים
                 </label>
@@ -327,7 +327,7 @@ export default function EditPartnerModal({ isOpen, onClose, partner, onSaved }) 
           )}
 
           {errorMessage && (
-            <p className="text-sm text-rose-600 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2">
+            <p className="text-sm text-rose-600 dark:text-rose-300 bg-rose-50 dark:bg-rose-950 border border-rose-100 dark:border-rose-900 rounded-lg px-3 py-2">
               {errorMessage}
             </p>
           )}
@@ -344,7 +344,7 @@ export default function EditPartnerModal({ isOpen, onClose, partner, onSaved }) 
               type="button"
               onClick={onClose}
               disabled={submitting}
-              className="flex-1 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-semibold py-2.5 transition-colors"
+              className="flex-1 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-semibold py-2.5 transition-colors"
             >
               ביטול
             </button>

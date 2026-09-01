@@ -4,10 +4,10 @@ import { supabase } from '../lib/supabaseClient';
 import { formatCoinAmount } from '../lib/coinCalculator';
 
 const COIN_TYPES = [
-  { key: 'coins_midweek_day', label: 'אמצ"ש יום', className: 'bg-emerald-50 text-emerald-700' },
-  { key: 'coins_midweek_night', label: 'אמצ"ש לילה', className: 'bg-slate-100 text-slate-600' },
-  { key: 'coins_weekend_day', label: 'סופ"ש יום', className: 'bg-amber-50 text-amber-700' },
-  { key: 'coins_weekend_night', label: 'סופ"ש לילה', className: 'bg-indigo-50 text-indigo-700' },
+  { key: 'coins_midweek_day', label: 'אמצ"ש יום', className: 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300' },
+  { key: 'coins_midweek_night', label: 'אמצ"ש לילה', className: 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300' },
+  { key: 'coins_weekend_day', label: 'סופ"ש יום', className: 'bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300' },
+  { key: 'coins_weekend_night', label: 'סופ"ש לילה', className: 'bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300' },
 ];
 
 export default function CoinBreakdownModal({ isOpen, onClose, currentUser }) {
@@ -67,16 +67,16 @@ export default function CoinBreakdownModal({ isOpen, onClose, currentUser }) {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div dir="rtl" className="w-full max-w-sm rounded-2xl bg-white shadow-xl">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-          <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
-            <Coins size={18} className="text-amber-500" />
+      <div dir="rtl" className="w-full max-w-sm rounded-2xl bg-white dark:bg-slate-800 shadow-xl">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800">
+          <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+            <Coins size={18} className="text-amber-500 dark:text-amber-400" />
             פירוט יתרת מטבעות
           </h3>
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-600 dark:hover:text-slate-300"
             aria-label="סגור"
           >
             <X size={18} />
@@ -85,9 +85,9 @@ export default function CoinBreakdownModal({ isOpen, onClose, currentUser }) {
 
         <div className="p-5 flex flex-col gap-3">
           {isLoading ? (
-            <p className="p-6 text-center text-sm text-slate-400">טוען...</p>
+            <p className="p-6 text-center text-sm text-slate-400 dark:text-slate-500">טוען...</p>
           ) : errorMessage ? (
-            <p className="p-6 text-center text-sm text-rose-600">{errorMessage}</p>
+            <p className="p-6 text-center text-sm text-rose-600 dark:text-rose-300">{errorMessage}</p>
           ) : (
             <>
               <div className="grid grid-cols-2 gap-2.5">
