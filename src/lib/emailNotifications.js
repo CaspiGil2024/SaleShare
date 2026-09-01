@@ -1,20 +1,21 @@
 // =====================================================================
-// SailShare — EmailJS integration (booking confirmation + shared-sail
-// notifications)
+// SailShare — EmailJS integration (booking confirmation, shared-sail
+// creation + cancellation notifications)
 // =====================================================================
 // EmailJS is a BROWSER SDK — it sends mail directly from the client
 // using a public key (by design; that key isn't a secret the way a
 // service-role key is). There is no way to call it from a Postgres
 // trigger (no HTTP client in plpgsql here, and EmailJS doesn't offer a
 // server-callable REST endpoint suited to this without its own paid
-// backend features). So "send on booking creation" is implemented as
-// a plain function call made from NewBookingModal.jsx right after a
-// booking insert/RPC call succeeds — not a database trigger. Emails
-// are fire-and-forget: a failure here is logged and surfaced softly,
-// never blocks or unwinds an already-successful booking.
+// backend features). So "send on booking creation/cancellation" is
+// implemented as a plain function call made from NewBookingModal.jsx /
+// EditBookingModal.jsx right after the insert/update succeeds — not a
+// database trigger. Emails are fire-and-forget: a failure here is
+// logged and surfaced softly, never blocks or unwinds an already-
+// successful booking change.
 //
 // Requires real EmailJS account setup this codebase can't do for you
-// (external SaaS, its own login) — see the 4 VITE_EMAILJS_* env vars
+// (external SaaS, its own login) — see the 5 VITE_EMAILJS_* env vars
 // below and the template variable names each function documents.
 // Until those are set, every function here no-ops with a console.warn
 // rather than throwing, so a booking still works with email
@@ -33,6 +34,7 @@ const SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID;
 const PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
 const TEMPLATE_BOOKING_CONFIRMATION = import.meta.env.VITE_EMAILJS_TEMPLATE_BOOKING_CONFIRMATION;
 const TEMPLATE_SHARED_SAIL_NOTIFICATION = import.meta.env.VITE_EMAILJS_TEMPLATE_SHARED_SAIL_NOTIFICATION;
+const TEMPLATE_CANCEL_SHARED_SAIL = import.meta.env.VITE_EMAILJS_TEMPLATE_CANCEL_SHARED_SAIL;
 
 let hasWarnedMissingConfig = false;
 
@@ -185,5 +187,46 @@ export async function sendSharedSailNotificationEmails({ recipients, organizerNa
   const failures = results.filter((r) => r.status === 'rejected');
   if (failures.length > 0) {
     console.error(`Failed to send ${failures.length}/${recipients.length} shared-sail notification emails`, failures);
+  }
+}
+
+// Same opted-in broadcast audience and shape as sendSharedSailNotification
+// Emails above ("a shared sailing exists"), just the mirror-image event
+// ("...and it no longer does") — see EditBookingModal.jsx's
+// handleCancelSail, which fetches the recipient list the same way
+// NewBookingModal.jsx does (emails_enabled + receive_shared_sail_
+// notifications, excluding whoever triggered the cancellation).
+//
+// Template variables (VITE_EMAILJS_TEMPLATE_CANCEL_SHARED_SAIL):
+//   to_email, to_name, organizer_name, booking_type_label,
+//   start_time_he, end_time_he — no google_calendar_link here, there's
+//   nothing left to add to a calendar for a cancelled sailing.
+export async function sendCancelSharedSailNotificationEmails({ recipients, organizerName, bookingType, startTime, endTime }) {
+  if (!recipients?.length) return;
+  if (!isConfigured() || !TEMPLATE_CANCEL_SHARED_SAIL) return;
+
+  const bookingTypeLabel = bookingTypeLabelHe(bookingType);
+
+  const results = await Promise.allSettled(
+    recipients.map((r) =>
+      emailjs.send(
+        SERVICE_ID,
+        TEMPLATE_CANCEL_SHARED_SAIL,
+        {
+          to_email: r.email,
+          to_name: r.name ?? r.email,
+          organizer_name: organizerName,
+          booking_type_label: bookingTypeLabel,
+          start_time_he: formatHebrewDateTime(startTime),
+          end_time_he: formatHebrewDateTime(endTime),
+        },
+        { publicKey: PUBLIC_KEY }
+      )
+    )
+  );
+
+  const failures = results.filter((r) => r.status === 'rejected');
+  if (failures.length > 0) {
+    console.error(`Failed to send ${failures.length}/${recipients.length} shared-sail cancellation emails`, failures);
   }
 }

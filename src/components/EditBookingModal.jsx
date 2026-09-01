@@ -7,6 +7,7 @@ import { bookingTypeLabelHe } from '../lib/bookingColors';
 import { fetchIsraeliHolidayMap, syncIsraeliHolidays } from '../lib/israeliHolidays';
 import { friendlyBookingErrorMessage } from '../lib/bookingErrors';
 import { isManager, isAdminRole } from '../lib/permissions';
+import { sendCancelSharedSailNotificationEmails } from '../lib/emailNotifications';
 
 const MAX_TOTAL_PARTICIPANTS = 9;
 // Matches check_max_24_hours' Cyprus branch (0013_cyprus_duration.sql):
@@ -437,6 +438,34 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
       if (error) throw error;
       if (!data || data.length === 0) {
         throw new Error('הביטול לא בוצע בפועל — ייתכן שאין לכם הרשאה לבטל הזמנה זו.');
+      }
+
+      // Fire-and-forget, same opted-in broadcast audience as the
+      // creation notification (NewBookingModal.jsx) — sendCancelShared
+      // SailNotificationEmails already no-ops softly if EmailJS isn't
+      // configured, so this never risks the cancellation that already
+      // succeeded above. Only for Shared/Cyprus — a Private/Dockside/
+      // Maintenance cancellation has no "shared sail" audience to tell.
+      if (isSharedBookingType) {
+        supabase
+          .from('users')
+          .select('email, full_name')
+          .eq('emails_enabled', true)
+          .eq('receive_shared_sail_notifications', true)
+          .neq('id', currentUser.id)
+          .then(({ data: recipientRows, error: recipientsError }) => {
+            if (recipientsError) {
+              console.error('Failed to load shared-sail cancellation recipients', recipientsError);
+              return;
+            }
+            sendCancelSharedSailNotificationEmails({
+              recipients: (recipientRows ?? []).map((u) => ({ email: u.email, name: u.full_name })),
+              organizerName: booking.bookedByName ?? currentUser.full_name ?? currentUser.email,
+              bookingType: booking.booking_type,
+              startTime: booking.start_time,
+              endTime: booking.end_time,
+            });
+          });
       }
 
       await onBookingUpdated?.();
