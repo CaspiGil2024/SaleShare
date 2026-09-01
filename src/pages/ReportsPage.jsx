@@ -70,13 +70,18 @@ async function fetchPartnerBalances() {
 
   return users.map((u) => {
     const w = walletByUserId.get(u.id);
+    const weekendDay = w?.coins_weekend_day ?? 0;
+    const weekendNight = w?.coins_weekend_night ?? 0;
+    const midweekDay = w?.coins_midweek_day ?? 0;
+    const midweekNight = w?.coins_midweek_night ?? 0;
     return {
       userId: u.id,
       name: u.full_name ?? u.email,
-      weekendDay: w?.coins_weekend_day ?? 0,
-      weekendNight: w?.coins_weekend_night ?? 0,
-      midweekDay: w?.coins_midweek_day ?? 0,
-      midweekNight: w?.coins_midweek_night ?? 0,
+      weekendDay,
+      weekendNight,
+      midweekDay,
+      midweekNight,
+      total: weekendDay + weekendNight + midweekDay + midweekNight,
     };
   });
 }
@@ -139,6 +144,7 @@ function PartnerBalancesTab() {
                   <th className="px-4 py-3 font-medium text-start">אמצ"ש לילה</th>
                   <th className="px-4 py-3 font-medium text-start">סופ"ש יום</th>
                   <th className="px-4 py-3 font-medium text-start">סופ"ש לילה</th>
+                  <th className="px-4 py-3 font-bold text-start border-s border-slate-100">יתרה כוללת</th>
                 </tr>
               </thead>
               <tbody>
@@ -149,6 +155,11 @@ function PartnerBalancesTab() {
                     <td className="px-4 py-3 text-slate-600 font-semibold">{formatCoinAmount(r.midweekNight)}</td>
                     <td className="px-4 py-3 text-amber-700 font-semibold">{formatCoinAmount(r.weekendDay)}</td>
                     <td className="px-4 py-3 text-indigo-700 font-semibold">{formatCoinAmount(r.weekendNight)}</td>
+                    <td className="px-4 py-3 border-s border-slate-50">
+                      <span className="inline-flex items-center rounded-full bg-blue-50 text-blue-800 font-bold px-2.5 py-1 whitespace-nowrap">
+                        {formatCoinAmount(r.total)}
+                      </span>
+                    </td>
                   </tr>
                 ))}
               </tbody>

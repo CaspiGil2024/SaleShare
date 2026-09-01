@@ -92,7 +92,8 @@ export function exportActivityReportToXlsx({ rows, fromDate, toDate, reportLabel
 }
 
 // All-partners coin-balance report (ReportsPage.jsx's "יתרות שותפים"
-// tab) — the 4 real coin-type balances per partner, current period.
+// tab) — the 4 real coin-type balances per partner, current period,
+// plus their sum (the same "יתרה כוללת" total the table itself shows).
 export function exportPartnerBalancesToXlsx({ rows }) {
   const wb = XLSX.utils.book_new();
 
@@ -102,6 +103,7 @@ export function exportPartnerBalancesToXlsx({ rows }) {
     'אמצ"ש לילה': r.midweekNight,
     'סופ"ש יום': r.weekendDay,
     'סופ"ש לילה': r.weekendNight,
+    'יתרה כוללת': r.total,
   }));
   const sheet = XLSX.utils.json_to_sheet(sheetRows);
   XLSX.utils.book_append_sheet(wb, sheet, 'יתרות שותפים');
