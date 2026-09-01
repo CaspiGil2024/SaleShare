@@ -5,6 +5,7 @@ import { classifyHours, COIN_TYPE_LABELS_HE, formatCoinAmount } from '../lib/coi
 import { BOOKING_TYPE_OPTIONS, chargesCoins } from '../lib/bookingTypes';
 import { fetchIsraeliHolidayMap, syncIsraeliHolidays } from '../lib/israeliHolidays';
 import { friendlyBookingErrorMessage } from '../lib/bookingErrors';
+import { sendBookingConfirmationEmail, sendSharedSailNotificationEmails } from '../lib/emailNotifications';
 
 const MAX_TOTAL_PARTICIPANTS = 9;
 // Matches trg_fn_enforce_day_night_hour_limit's Cyprus branch
@@ -326,13 +327,48 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
         if (error) throw error;
       }
 
-      // Email sending (confirmation + shared-sail notifications) is
-      // intentionally disconnected for now, pending a real mail
-      // provider — see src/lib/emailNotifications.js, left in place
-      // and ready to reconnect here once that's set up. The
-      // emails_enabled/receive_shared_sail_notifications preferences
-      // still save normally from EditPartnerModal.jsx; nothing reads
-      // them yet.
+      // Fire-and-forget: sendBookingConfirmationEmail/
+      // sendSharedSailNotificationEmails already no-op softly (a
+      // console.warn/error only) when EmailJS isn't configured or a
+      // recipient hasn't opted in — see src/lib/emailNotifications.js —
+      // so this never blocks or risks the booking that already
+      // succeeded above. Not awaited on purpose, so the modal closes
+      // immediately rather than waiting on a mail round-trip.
+      sendBookingConfirmationEmail({
+        toEmail: currentUser.email,
+        toName: currentUser.full_name,
+        bookingType,
+        startTime: startDateTime,
+        endTime: endDateTime,
+        emailsEnabled: currentUser.emails_enabled,
+      });
+
+      if (isSharedType) {
+        // Broadcast to every OTHER partner who opted into shared-sail
+        // updates — at creation the organizer is always the sole
+        // participant (others join later, see EditBookingModal.jsx),
+        // so this is "a new shared sailing is open, come join" rather
+        // than a notice to already-attached crew.
+        supabase
+          .from('users')
+          .select('email, full_name')
+          .eq('emails_enabled', true)
+          .eq('receive_shared_sail_notifications', true)
+          .neq('id', authUser.id)
+          .then(({ data, error: recipientsError }) => {
+            if (recipientsError) {
+              console.error('Failed to load shared-sail notification recipients', recipientsError);
+              return;
+            }
+            sendSharedSailNotificationEmails({
+              recipients: (data ?? []).map((u) => ({ email: u.email, name: u.full_name })),
+              organizerName: currentUser.full_name ?? currentUser.email,
+              bookingType,
+              startTime: startDateTime,
+              endTime: endDateTime,
+            });
+          });
+      }
 
       // Re-fetch from the DB rather than locally patching in the new
       // event, so the calendar also stays correct for other partners'
