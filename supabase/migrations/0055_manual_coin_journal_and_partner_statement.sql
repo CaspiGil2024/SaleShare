@@ -158,44 +158,65 @@ begin
   ) into v_has_opening;
 
   return query
-  with opening as (
+  with opening_balance as (
+    -- The balance as it stood right before the range = balance_after of
+    -- the most recent pre-range row per type. Read directly rather than
+    -- re-summed from delta: user_wallets resets every period (no
+    -- rollover — see 0056's header), so balance_after already correctly
+    -- encodes that reset chain (thanks to 0056's recompute) while a
+    -- plain sum(delta) across period boundaries would NOT — it would
+    -- silently include leftover amounts from an earlier period that
+    -- were never actually carried into the next one.
+    select distinct on (ct.coin_type)
+      ct.coin_type as ob_coin_type,
+      ct.balance_after as ob_balance
+    from public.coin_transactions ct
+    where ct.user_id = p_user_id and ct.value_date < p_from
+    order by ct.coin_type, ct.value_date desc, ct.created_at desc, ct.id desc
+  ),
+  opening_totals as (
+    -- Cumulative debit/credit activity before the range (informational
+    -- — this is the ONE figure here that intentionally spans every
+    -- period in the partner's history, per the original request; only
+    -- the balance itself needed to become period-aware).
     select
       ct.coin_type as ot_coin_type,
       coalesce(sum(case when ct.delta < 0 then -ct.delta else 0 end), 0) as ot_debit,
-      coalesce(sum(case when ct.delta > 0 then ct.delta else 0 end), 0) as ot_credit,
-      coalesce(sum(ct.delta), 0) as ot_balance
+      coalesce(sum(case when ct.delta > 0 then ct.delta else 0 end), 0) as ot_credit
     from public.coin_transactions ct
     where ct.user_id = p_user_id and ct.value_date < p_from
     group by ct.coin_type
   ),
   in_range as (
     select ct.value_date as v_date, ct.coin_type as tx_coin_type, ct.reason as tx_reason,
-           ct.delta as tx_delta, ct.note as tx_note, ct.created_at as tx_created_at
+           ct.delta as tx_delta, ct.balance_after as tx_balance_after,
+           ct.note as tx_note, ct.created_at as tx_created_at
     from public.coin_transactions ct
     where ct.user_id = p_user_id and ct.value_date >= p_from and ct.value_date <= p_to
   ),
   combined as (
-    -- Opening-balance summary — one row per coin type, accumulating
-    -- every debit/credit/balance from BEFORE p_from — only included at
-    -- all when at least one transaction exists before the range.
+    -- Opening-balance summary — one row per coin type — only included
+    -- at all when at least one transaction exists before the range.
     select
       0 as sort_group,
       null::date as out_value_date,
       t.coin_type_value as out_coin_type,
       'opening_balance'::text as out_reason,
-      case when coalesce(o.ot_debit, 0) > 0 then o.ot_debit else null end as out_debit,
-      case when coalesce(o.ot_credit, 0) > 0 then o.ot_credit else null end as out_credit,
-      coalesce(o.ot_balance, 0) as out_balance,
+      case when coalesce(ot.ot_debit, 0) > 0 then ot.ot_debit else null end as out_debit,
+      case when coalesce(ot.ot_credit, 0) > 0 then ot.ot_credit else null end as out_credit,
+      coalesce(ob.ob_balance, 0) as out_balance,
       null::text as out_note,
       null::timestamptz as out_created_at
     from (values ('midweek_day'), ('midweek_night'), ('weekend_day'), ('weekend_night')) as t(coin_type_value)
-    left join opening o on o.ot_coin_type = t.coin_type_value
+    left join opening_balance ob on ob.ob_coin_type = t.coin_type_value
+    left join opening_totals ot on ot.ot_coin_type = t.coin_type_value
     where v_has_opening
 
     union all
 
-    -- Actual transactions inside the range, chronological, running
-    -- balance seeded from each type's real opening balance (0, if none).
+    -- Actual transactions inside the range, chronological. running_
+    -- balance is each row's own stored balance_after — already correct
+    -- and period-aware (0056), no re-derivation needed here.
     select
       1 as sort_group,
       r.v_date as out_value_date,
@@ -203,14 +224,10 @@ begin
       r.tx_reason as out_reason,
       case when r.tx_delta < 0 then -r.tx_delta else null end as out_debit,
       case when r.tx_delta > 0 then r.tx_delta else null end as out_credit,
-      coalesce(o.ot_balance, 0) + sum(r.tx_delta) over (
-        partition by r.tx_coin_type order by r.v_date, r.tx_created_at
-        rows between unbounded preceding and current row
-      ) as out_balance,
+      r.tx_balance_after as out_balance,
       r.tx_note as out_note,
       r.tx_created_at as out_created_at
     from in_range r
-    left join opening o on o.ot_coin_type = r.tx_coin_type
   )
   select out_value_date, out_coin_type, out_reason, out_debit, out_credit, out_balance, out_note
   from combined
