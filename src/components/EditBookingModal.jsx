@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { X, Calendar as CalendarIcon, Clock, Coins as CoinsIcon, User, Users, LogIn, LogOut, UserPlus } from 'lucide-react';
+import { X, Calendar as CalendarIcon, Clock, Coins as CoinsIcon, User, Users, LogIn, LogOut, UserPlus, Pencil } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { classifyHours, COIN_TYPE_LABELS_HE, formatCoinAmount } from '../lib/coinCalculator';
 import { BOOKING_TYPE_OPTIONS, chargesCoins } from '../lib/bookingTypes';
@@ -76,6 +76,12 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
   const [joinGuestCount, setJoinGuestCount] = useState(0);
   const [joinLeaveSubmitting, setJoinLeaveSubmitting] = useState(false);
   const [joinLeaveError, setJoinLeaveError] = useState(null);
+  // A joined (non-organizer) participant's own live-edited guest count —
+  // separate from joinGuestCount (only used before joining) and from
+  // guestsCount (the organizer's own field) — see fn_update_my_shared_
+  // participation_guests (0057).
+  const [myGuestCountEdit, setMyGuestCountEdit] = useState(0);
+  const [updatingMyGuests, setUpdatingMyGuests] = useState(false);
 
   // Organizer/admin explicit add — separate from the self-service join
   // above (fn_admin_add_shared_participant, not fn_join_shared_booking):
@@ -118,6 +124,11 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
     const organizerRow = rows.find((r) => r.user_id === booking.user_id);
     if (organizerRow) setGuestsCount(organizerRow.guest_count);
 
+    if (currentUser?.id && currentUser.id !== booking.user_id) {
+      const myRow = rows.find((r) => r.user_id === currentUser.id);
+      if (myRow) setMyGuestCountEdit(myRow.guest_count);
+    }
+
     setParticipantsLoading(false);
   }
 
@@ -135,6 +146,7 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
     setErrorMessage(null);
     setJoinLeaveError(null);
     setJoinGuestCount(0);
+    setMyGuestCountEdit(0);
     setParticipants([]);
     setSelectedAddPartnerId('');
     setAddPartnerGuestCount(0);
@@ -250,6 +262,12 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
   // (1 seat each) and their guests, minus the organizer's own seat.
   const otherSeatsUsed = otherParticipants.reduce((sum, p) => sum + 1 + p.guest_count, 0);
   const maxOwnGuests = Math.max(0, MAX_TOTAL_PARTICIPANTS - 1 - otherSeatsUsed);
+  // A joined (non-organizer) participant editing THEIR OWN guest count —
+  // same math as maxOwnGuests, just relative to the current viewer
+  // instead of always the organizer.
+  const othersExcludingMe = participants.filter((p) => p.user_id !== currentUser?.id);
+  const myOtherSeatsUsed = othersExcludingMe.reduce((sum, p) => sum + 1 + p.guest_count, 0);
+  const maxMyParticipationGuests = Math.max(0, MAX_TOTAL_PARTICIPANTS - 1 - myOtherSeatsUsed);
   // Join/admin-add selectors: identical math either way — adding ONE new
   // participant (self-join or admin-added) on top of everyone currently
   // on `participants` (organizer included), minus that new person's own
@@ -269,6 +287,10 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
     setJoinGuestCount((c) => Math.min(c, maxNewParticipantGuests));
     setAddPartnerGuestCount((c) => Math.min(c, maxNewParticipantGuests));
   }, [maxNewParticipantGuests]);
+  useEffect(() => {
+    setMyGuestCountEdit((c) => Math.min(c, maxMyParticipationGuests));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [maxMyParticipationGuests]);
 
   const coinBreakdown = useMemo(() => {
     if (!chargesCoins(bookingType)) return null;
@@ -473,6 +495,35 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
     }
   }
 
+  // Self-service: a joined (non-organizer) participant changes their OWN
+  // guest count without leaving and rejoining — see 0057_self_service_
+  // update_participation_guests.sql.
+  async function handleUpdateMyGuests() {
+    setJoinLeaveError(null);
+    if (myGuestCountEdit > maxMyParticipationGuests) {
+      setJoinLeaveError(
+        `סך האנשים על הסירה (שותפים ואורחים) לא יכול לעלות על ${MAX_TOTAL_PARTICIPANTS}. הפחיתו את מספר האורחים.`
+      );
+      return;
+    }
+    if (myParticipantRow && myGuestCountEdit === myParticipantRow.guest_count) return;
+    setUpdatingMyGuests(true);
+    try {
+      const { error } = await supabase.rpc('fn_update_my_shared_participation_guests', {
+        p_booking_id: booking.id,
+        p_guest_count: myGuestCountEdit,
+      });
+      if (error) throw error;
+      await refetchParticipants();
+      await onBookingUpdated?.();
+    } catch (err) {
+      console.error('Failed to update own guest count', err);
+      setJoinLeaveError(friendlyBookingErrorMessage(err));
+    } finally {
+      setUpdatingMyGuests(false);
+    }
+  }
+
   async function handleAdminAdd() {
     if (!selectedAddPartnerId) return;
     setJoinLeaveError(null);
@@ -655,7 +706,30 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
         )}
 
         {!isOrganizer && isCurrentUserParticipant && !isModificationWindowClosed && (
-          <div className="pt-2 border-t border-slate-100 mt-1">
+          <div className="flex flex-col gap-1.5 pt-2 border-t border-slate-100 mt-1">
+            <span className="text-xs font-medium text-slate-600">מספר האורחים שלכם</span>
+            <div className="flex items-center gap-2">
+              <select
+                value={myGuestCountEdit}
+                onChange={(e) => setMyGuestCountEdit(Number(e.target.value))}
+                className="w-28 shrink-0 rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {guestOptionsUpTo(maxMyParticipationGuests).map((count) => (
+                  <option key={count} value={count}>
+                    {formatGuestsLabel(count)}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={handleUpdateMyGuests}
+                disabled={updatingMyGuests || myGuestCountEdit === (myParticipantRow?.guest_count ?? 0)}
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed text-white text-xs font-semibold py-1.5 transition-colors"
+              >
+                <Pencil size={13} />
+                {updatingMyGuests ? 'מעדכן...' : 'עדכון אורחים'}
+              </button>
+            </div>
             <button
               type="button"
               onClick={handleLeave}

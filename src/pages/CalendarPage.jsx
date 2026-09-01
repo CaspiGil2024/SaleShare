@@ -11,6 +11,11 @@ export default function CalendarPage() {
   const [bookings, setBookings] = useState([]);
   const [selectedRange, setSelectedRange] = useState(null); // { start: Date, end: Date }
   const [editingBooking, setEditingBooking] = useState(null);
+  // Bumped every time fetchBookings runs (i.e. after any booking is
+  // created/edited/cancelled) so CoinBalanceBadge — which manages its
+  // own wallet fetch independently — knows to refetch too, instead of
+  // only updating the next time this page happens to remount.
+  const [walletRefreshToken, setWalletRefreshToken] = useState(0);
 
   const fetchBookings = useCallback(async () => {
     // Opportunistic sweep, same lazy-maintenance pattern as
@@ -51,6 +56,7 @@ export default function CalendarPage() {
         notes: b.notes,
       }))
     );
+    setWalletRefreshToken((n) => n + 1);
   }, []);
 
   useEffect(() => {
@@ -88,7 +94,7 @@ export default function CalendarPage() {
         <p className="text-sm text-slate-500">לחצו וגררו על משבצת פנויה כדי לפתוח הזמנה חדשה, או לחצו על הפלגה קיימת לעריכה</p>
       </header>
 
-      <CoinBalanceBadge currentUser={currentUser} />
+      <CoinBalanceBadge currentUser={currentUser} refreshToken={walletRefreshToken} />
 
       {/*
         FullCalendar only reads initialView once, at mount — waiting

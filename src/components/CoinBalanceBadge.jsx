@@ -8,7 +8,11 @@ import { formatCoinAmount } from '../lib/coinCalculator';
 // their exact standing at a glance without opening CoinBreakdownModal.
 // Same ensure_current_period + user_wallets fetch pattern used
 // everywhere else a balance is shown.
-export default function CoinBalanceBadge({ currentUser }) {
+// refreshToken: bump it (e.g. n => n+1) whenever the caller knows a
+// booking just changed the current user's coins — this component has
+// no other way to find out, since it manages its own wallet fetch
+// independently of whatever list/calendar state a parent page tracks.
+export default function CoinBalanceBadge({ currentUser, refreshToken = 0 }) {
   const [wallet, setWallet] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -41,7 +45,7 @@ export default function CoinBalanceBadge({ currentUser }) {
     return () => {
       isCancelled = true;
     };
-  }, [currentUser?.id]);
+  }, [currentUser?.id, refreshToken]);
 
   return (
     <div className="rounded-2xl bg-gradient-to-l from-amber-500 to-orange-400 px-5 py-3 shadow-sm text-white flex flex-wrap items-center gap-3">
