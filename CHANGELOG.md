@@ -9,6 +9,50 @@ developers.
 
 ## Unreleased
 
+### Added
+- **Full EmailJS notification system, wired end to end.** The client
+  wrapper (`src/lib/emailNotifications.js`) and env var placeholders
+  already existed from an earlier pass but the actual call sites had
+  been left deliberately disconnected pending a real mail provider —
+  now connected:
+  - `sendBookingConfirmationEmail` — fires from `NewBookingModal.jsx`
+    after any successful booking, to the organizer, respecting their
+    own `emails_enabled`.
+  - `sendSharedSailNotificationEmails` — fires from `NewBookingModal.jsx`
+    when a new Shared/Cyprus sailing is created, broadcasting to every
+    *other* partner with `emails_enabled` **and**
+    `receive_shared_sail_notifications` on ("a new shared sailing is
+    open, come join" — the organizer is always the sole participant at
+    creation time, so this isn't a notice to existing crew).
+  - `sendCancelSharedSailNotificationEmails` (new) — fires from
+    `EditBookingModal.jsx`'s `handleCancelSail`, same opted-in audience,
+    when a Shared/Cyprus sailing is cancelled. New env var
+    `VITE_EMAILJS_TEMPLATE_CANCEL_SHARED_SAIL`.
+  - All three are fire-and-forget (not awaited) and no-op softly
+    (console.warn/error, never throw) if EmailJS isn't configured or a
+    recipient hasn't opted in — never risks the booking/cancellation
+    that already succeeded.
+
+### QA pass
+- Re-ran `npm run build` clean (this project has no TypeScript and no
+  configured lint script — Vite's build is the only automated check
+  available, same as every prior pass in this changelog).
+- Verified `emails_enabled` / `receive_shared_sail_notifications` are
+  spelled identically everywhere they're read or written
+  (`AuthProvider.jsx`, `EditPartnerModal.jsx`, `NewBookingModal.jsx`,
+  `EditBookingModal.jsx`) and actually exist as columns on `public.users`
+  (migration `0037`, both `not null default false`).
+- Verified the `users_select_all` RLS policy (`auth.role() =
+  'authenticated'`, no column restriction) lets the recipient-list
+  queries in `NewBookingModal.jsx`/`EditBookingModal.jsx` actually read
+  other partners' `email`/`emails_enabled`/`receive_shared_sail_
+  notifications` — a stricter policy here would have silently emptied
+  the recipient list with no error.
+- Verified `trg_fn_enforce_users_field_gate` (0037) lets a partner freely
+  edit their own two preference columns (`auth.uid() = NEW.id` bypasses
+  the gate entirely) — self-service saving from `EditPartnerModal.jsx`
+  works as intended.
+
 ### Changed
 - **Dark mode extended app-wide.** The theme toggle (added 2026-09-01,
   sidebar only) previously left every page's content on hardcoded
