@@ -11,6 +11,7 @@ import {
   exportPartnerStatementToXlsx,
 } from '../lib/xlsxExport';
 import { formatCoinAmount } from '../lib/coinCalculator';
+import { formatDateOnlyHe, formatDateTimeHe } from '../lib/dateFormat';
 
 const TABS = [
   { key: 'past', label: 'דוח פעילות היסטורית', icon: History },
@@ -37,6 +38,7 @@ const STATEMENT_REASON_LABELS_HE = {
   participant_charge: 'חיוב השתתפות',
   participant_refund: 'זיכוי ביטול השתתפות',
   admin_adjustment: 'תנועה ידנית',
+  opening_balance: 'יתרת פתיחה',
 };
 
 // Every partner's real current-period balance across all 4 coin
@@ -452,22 +454,10 @@ function ActivityReportTab({ defaultFrom, defaultTo, reportLabel }) {
                       <td className="px-4 py-2 text-slate-600 whitespace-nowrap">{e.role}</td>
                       <td className="px-4 py-2 text-slate-800 font-medium whitespace-nowrap">{e.bookingTypeLabel}</td>
                       <td className="px-4 py-2 text-slate-600 whitespace-nowrap">
-                        {new Date(e.start_time).toLocaleString('he-IL', {
-                          day: 'numeric',
-                          month: 'numeric',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
+                        {formatDateTimeHe(e.start_time)}
                       </td>
                       <td className="px-4 py-2 text-slate-600 whitespace-nowrap">
-                        {new Date(e.end_time).toLocaleString('he-IL', {
-                          day: 'numeric',
-                          month: 'numeric',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
+                        {formatDateTimeHe(e.end_time)}
                       </td>
                       <td className="px-4 py-2 text-slate-600">{e.hours.toFixed(1)}</td>
                       <td className="px-4 py-2 text-emerald-700 font-medium whitespace-nowrap">
@@ -569,18 +559,35 @@ function PartnerStatementTab() {
     }
   }
 
-  // Chronological already (fn_partner_coin_statement's own order-by) —
-  // just carry each type's running balance forward across rows that
-  // belong to a different type.
+  // fn_partner_coin_statement (0055) returns two kinds of rows: up to 4
+  // "opening_balance" pseudo-rows (value_date null, one per coin type,
+  // only present at all when that partner has any transaction before
+  // fromDate) that together summarize everything before the range, and
+  // the real chronological transactions inside it. The 4 opening rows
+  // get merged into ONE displayed row up top instead of being shown
+  // per-type like a normal transaction row would.
+  const openingByType = {};
+  let hasOpening = false;
+  const transactionRows = [];
+  for (const r of rows) {
+    if (r.value_date === null) {
+      openingByType[r.coin_type] = r;
+      hasOpening = true;
+    } else {
+      transactionRows.push(r);
+    }
+  }
+
+  // Running balance carried forward per type, seeded from the opening
+  // row (0 if there wasn't one) — each transaction row only updates ITS
+  // OWN type's entry, the other 3 stay whatever they last were.
   const lastKnownBalance = {};
-  const displayRows = rows.map((r) => {
+  for (const t of STATEMENT_COIN_TYPES) {
+    lastKnownBalance[t.value] = openingByType[t.value]?.running_balance ?? 0;
+  }
+  const displayRows = transactionRows.map((r) => {
     lastKnownBalance[r.coin_type] = r.running_balance;
-    return {
-      ...r,
-      debit: r.delta < 0 ? Math.abs(r.delta) : null,
-      credit: r.delta > 0 ? r.delta : null,
-      balancesByType: { ...lastKnownBalance },
-    };
+    return { ...r, balancesByType: { ...lastKnownBalance } };
   });
 
   const partnerName = partners.find((p) => p.id === partnerId)?.full_name ?? partners.find((p) => p.id === partnerId)?.email;
@@ -590,7 +597,7 @@ function PartnerStatementTab() {
       partnerName,
       fromDate,
       toDate,
-      rows: displayRows.map((r) => ({
+      rows: rows.map((r) => ({
         ...r,
         coinTypeLabel: STATEMENT_COIN_TYPES.find((t) => t.value === r.coin_type)?.label ?? r.coin_type,
         reasonLabel: STATEMENT_REASON_LABELS_HE[r.reason] ?? r.reason,
@@ -648,7 +655,7 @@ function PartnerStatementTab() {
           <button
             type="button"
             onClick={handleExport}
-            disabled={displayRows.length === 0}
+            disabled={!hasOpening && displayRows.length === 0}
             className="flex items-center gap-1.5 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-semibold px-4 py-2 transition-colors"
           >
             <Download size={15} />
@@ -665,7 +672,7 @@ function PartnerStatementTab() {
         <p className="p-10 text-center text-sm text-slate-400">בחרו שותף וטווח תאריכים ולחצו "הפק דוח".</p>
       ) : isLoading ? (
         <p className="p-10 text-center text-sm text-slate-400">טוען...</p>
-      ) : displayRows.length === 0 ? (
+      ) : !hasOpening && displayRows.length === 0 ? (
         <p className="p-10 text-center text-sm text-slate-400">אין תנועות מטבעות בטווח התאריכים שנבחר.</p>
       ) : (
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
@@ -701,9 +708,34 @@ function PartnerStatementTab() {
                 </tr>
               </thead>
               <tbody>
+                {hasOpening && (
+                  <tr className="border-b border-slate-200 bg-slate-50 font-medium">
+                    <td className="px-4 py-3 text-slate-400 whitespace-nowrap">—</td>
+                    <td className="px-4 py-3 text-slate-800 whitespace-nowrap">
+                      {STATEMENT_REASON_LABELS_HE.opening_balance}
+                    </td>
+                    {STATEMENT_COIN_TYPES.map((t) => {
+                      const o = openingByType[t.value];
+                      return (
+                        <Fragment key={t.value}>
+                          <td className="px-3 py-3 border-s border-slate-100 text-rose-600 whitespace-nowrap">
+                            {o?.debit != null ? formatCoinAmount(o.debit) : '—'}
+                          </td>
+                          <td className="px-3 py-3 text-emerald-700 whitespace-nowrap">
+                            {o?.credit != null ? formatCoinAmount(o.credit) : '—'}
+                          </td>
+                          <td className="px-3 py-3 font-semibold text-slate-800 whitespace-nowrap">
+                            {formatCoinAmount(o?.running_balance ?? 0)}
+                          </td>
+                        </Fragment>
+                      );
+                    })}
+                    <td className="px-4 py-3 text-slate-500">—</td>
+                  </tr>
+                )}
                 {displayRows.map((r, idx) => (
                   <tr key={idx} className="border-b border-slate-50 last:border-0">
-                    <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{r.value_date}</td>
+                    <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{formatDateOnlyHe(r.value_date)}</td>
                     <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
                       {STATEMENT_REASON_LABELS_HE[r.reason] ?? r.reason}
                     </td>
@@ -712,10 +744,10 @@ function PartnerStatementTab() {
                       return (
                         <Fragment key={t.value}>
                           <td className="px-3 py-3 border-s border-slate-50 text-rose-600 whitespace-nowrap">
-                            {isThisType && r.debit !== null ? formatCoinAmount(r.debit) : '—'}
+                            {isThisType && r.debit != null ? formatCoinAmount(r.debit) : '—'}
                           </td>
                           <td className="px-3 py-3 text-emerald-700 whitespace-nowrap">
-                            {isThisType && r.credit !== null ? formatCoinAmount(r.credit) : '—'}
+                            {isThisType && r.credit != null ? formatCoinAmount(r.credit) : '—'}
                           </td>
                           <td className="px-3 py-3 font-semibold text-slate-800 whitespace-nowrap">
                             {r.balancesByType[t.value] !== undefined ? formatCoinAmount(r.balancesByType[t.value]) : '—'}

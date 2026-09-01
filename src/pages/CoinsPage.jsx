@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { isManager } from '../lib/permissions';
 import { bookingTypeLabelHe } from '../lib/bookingColors';
 import { formatCoinAmount as formatCoin } from '../lib/coinCalculator';
+import { formatDateHe, formatDateTimeHe } from '../lib/dateFormat';
 
 // Reference rate card — Michael's Method (§10/30/40,
 // 0021-0024_michael_method_*.sql): every hour costs exactly 1 coin of
@@ -197,13 +198,7 @@ export default function CoinsPage() {
                 {transactions.map((t) => (
                   <tr key={t.id} className="border-b border-slate-50 last:border-0">
                     <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
-                      {new Date(t.created_at).toLocaleString('he-IL', {
-                        day: 'numeric',
-                        month: 'numeric',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
+                      {formatDateTimeHe(t.created_at)}
                     </td>
                     {canViewAll && (
                       <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
@@ -215,13 +210,7 @@ export default function CoinsPage() {
                       {COIN_TYPE_SHORT_LABELS_HE[t.coin_type] ?? '—'}
                     </td>
                     <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
-                      {t.bookings?.start_time
-                        ? new Date(t.bookings.start_time).toLocaleDateString('he-IL', {
-                            day: 'numeric',
-                            month: 'numeric',
-                            year: 'numeric',
-                          })
-                        : '—'}
+                      {t.bookings?.start_time ? formatDateHe(t.bookings.start_time) : '—'}
                     </td>
                     <td className="px-4 py-3">
                       <span

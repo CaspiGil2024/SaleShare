@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { bookingTypeLabelHe } from '../lib/bookingColors';
 import { exportSailingLogToXlsx } from '../lib/xlsxExport';
 import { formatCoinAmount as formatCoin } from '../lib/coinCalculator';
+import { formatDateTimeHe } from '../lib/dateFormat';
 import CoinBalanceBadge from '../components/CoinBalanceBadge';
 
 const ACTION_LABELS_HE = {
@@ -265,13 +266,7 @@ export default function SailingLogPage() {
                 {rows.map((r) => (
                   <tr key={r.id} className="border-b border-slate-50 last:border-0">
                     <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
-                      {new Date(r.logged_at).toLocaleString('he-IL', {
-                        day: 'numeric',
-                        month: 'numeric',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
+                      {formatDateTimeHe(r.logged_at)}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <span
@@ -285,24 +280,10 @@ export default function SailingLogPage() {
                     <td className="px-4 py-3 font-medium text-slate-800 whitespace-nowrap">{r.partnerName}</td>
                     <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{r.bookingTypeLabel}</td>
                     <td className="px-4 py-3 text-slate-600 whitespace-nowrap">
-                      {r.start_time
-                        ? new Date(r.start_time).toLocaleString('he-IL', {
-                            day: 'numeric',
-                            month: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })
-                        : '—'}
+                      {r.start_time ? formatDateTimeHe(r.start_time) : '—'}
                     </td>
                     <td className="px-4 py-3 text-slate-600 whitespace-nowrap">
-                      {r.end_time
-                        ? new Date(r.end_time).toLocaleString('he-IL', {
-                            day: 'numeric',
-                            month: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })
-                        : '—'}
+                      {r.end_time ? formatDateTimeHe(r.end_time) : '—'}
                     </td>
                     <td className="px-4 py-3 text-slate-500">{r.reasonLabel ?? '—'}</td>
                     <td className="px-4 py-3 text-emerald-700 font-medium whitespace-nowrap">

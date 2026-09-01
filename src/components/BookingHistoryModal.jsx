@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabaseClient';
 import { bookingTypeLabelHe } from '../lib/bookingColors';
 import { exportPartnerHistoryToXlsx } from '../lib/xlsxExport';
 import { formatCoinAmount } from '../lib/coinCalculator';
+import { formatDateTimeHe } from '../lib/dateFormat';
 
 function statusLabelHe(status) {
   return status === 'Cancelled' ? 'בוטלה' : 'פעילה';
@@ -196,10 +197,10 @@ export default function BookingHistoryModal({ isOpen, onClose, partner }) {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-slate-600 whitespace-nowrap">
-                        {r.start_time ? new Date(r.start_time).toLocaleString('he-IL') : '—'}
+                        {r.start_time ? formatDateTimeHe(r.start_time) : '—'}
                       </td>
                       <td className="px-4 py-3 text-slate-600 whitespace-nowrap">
-                        {r.end_time ? new Date(r.end_time).toLocaleString('he-IL') : '—'}
+                        {r.end_time ? formatDateTimeHe(r.end_time) : '—'}
                       </td>
                       <td className="px-4 py-3 text-amber-700 font-semibold whitespace-nowrap">
                         {formatCoinAmount(r.coinsForThisPartner)}

@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import { formatDateOnlyHe, formatDateTimeHe } from './dateFormat';
 
 // xlsx (SheetJS) has two known high-severity advisories (prototype
 // pollution, ReDoS) with no fix available — both are only exploitable
@@ -27,8 +28,8 @@ export function exportDatabaseToXlsx({ partners, bookings }) {
     'שותף מזמין': b.organizerName,
     'סוג הזמנה': b.bookingTypeLabel,
     'סטטוס': b.status,
-    'תאריך התחלה': b.start_time ? new Date(b.start_time).toLocaleString('he-IL') : '',
-    'תאריך סיום': b.end_time ? new Date(b.end_time).toLocaleString('he-IL') : '',
+    'תאריך התחלה': formatDateTimeHe(b.start_time),
+    'תאריך סיום': formatDateTimeHe(b.end_time),
     'מספר אורחים': b.guests_count ?? 0,
     'שותפים משתתפים': b.participantNames,
     'מטבעות שולם ע"י המזמין': b.coins_charged ?? 0,
@@ -55,8 +56,8 @@ export function exportDetailedActivityReportToXlsx({ rows, fromDate, toDate, rep
       'שותף': r.name,
       'תפקיד': e.role,
       'סוג הפלגה': e.bookingTypeLabel,
-      'תאריך התחלה': e.start_time ? new Date(e.start_time).toLocaleString('he-IL') : '',
-      'תאריך סיום': e.end_time ? new Date(e.end_time).toLocaleString('he-IL') : '',
+      'תאריך התחלה': formatDateTimeHe(e.start_time),
+      'תאריך סיום': formatDateTimeHe(e.end_time),
       'שעות': Number(e.hours.toFixed(1)),
       'אמצ"ש יום': e.coinBreakdown?.midweekDay ?? 0,
       'אמצ"ש לילה': e.coinBreakdown?.midweekNight ?? 0,
@@ -114,7 +115,7 @@ export function exportCoinAdjustmentAuditToXlsx({ rows }) {
   const wb = XLSX.utils.book_new();
 
   const sheetRows = rows.map((r) => ({
-    'תאריך ושעה': r.created_at ? new Date(r.created_at).toLocaleString('he-IL') : '',
+    'תאריך ושעה': formatDateTimeHe(r.created_at),
     'בוצע ע"י': r.actor?.full_name ?? r.actor?.email ?? '',
     'שותף': r.partner?.full_name ?? r.partner?.email ?? '',
     'סוג מטבע': r.coinTypeLabel,
@@ -139,10 +140,10 @@ export function exportMaintenanceIssuesToXlsx({ rows }) {
     'תיאור הבעיה': r.description,
     'סטטוס': r.status === 'resolved' ? 'נפתרה' : 'פתוחה',
     'דווח ע"י': r.createdByName ?? '',
-    'תאריך דיווח': r.created_at ? new Date(r.created_at).toLocaleString('he-IL') : '',
+    'תאריך דיווח': formatDateTimeHe(r.created_at),
     'פתרון הבעיה': r.resolution_notes ?? '',
     'נפתרה ע"י': r.resolvedByName ?? '',
-    'תאריך פתרון': r.resolved_at ? new Date(r.resolved_at).toLocaleString('he-IL') : '',
+    'תאריך פתרון': formatDateTimeHe(r.resolved_at),
   }));
   const sheet = XLSX.utils.json_to_sheet(sheetRows);
   XLSX.utils.book_append_sheet(wb, sheet, 'תקלות תחזוקה');
@@ -157,12 +158,12 @@ export function exportSailingLogToXlsx({ rows, fromDate, toDate }) {
   const wb = XLSX.utils.book_new();
 
   const sheetRows = rows.map((r) => ({
-    'תאריך ושעה': r.logged_at ? new Date(r.logged_at).toLocaleString('he-IL') : '',
+    'תאריך ושעה': formatDateTimeHe(r.logged_at),
     'פעולה': r.actionLabel,
     'שותף': r.partnerName,
     'סוג הפלגה': r.bookingTypeLabel,
-    'התחלת הפלגה': r.start_time ? new Date(r.start_time).toLocaleString('he-IL') : '',
-    'סיום הפלגה': r.end_time ? new Date(r.end_time).toLocaleString('he-IL') : '',
+    'התחלת הפלגה': formatDateTimeHe(r.start_time),
+    'סיום הפלגה': formatDateTimeHe(r.end_time),
     'סיבה': r.reasonLabel ?? '',
     'אמצ"ש יום': r.coins?.midweekDay ?? 0,
     'אמצ"ש לילה': r.coins?.midweekNight ?? 0,
@@ -185,8 +186,8 @@ export function exportPartnerHistoryToXlsx({ partnerName, rows }) {
     'תפקיד בהפלגה': r.role,
     'סוג הזמנה': r.bookingTypeLabel,
     'סטטוס': r.statusLabel,
-    'תאריך התחלה': r.start_time ? new Date(r.start_time).toLocaleString('he-IL') : '',
-    'תאריך סיום': r.end_time ? new Date(r.end_time).toLocaleString('he-IL') : '',
+    'תאריך התחלה': formatDateTimeHe(r.start_time),
+    'תאריך סיום': formatDateTimeHe(r.end_time),
     'מספר אורחים': r.guests_count ?? 0,
     'מטבעות ששולמו': r.coinsForThisPartner ?? 0,
     'הערות': r.notes ?? '',
@@ -206,7 +207,7 @@ export function exportPartnerStatementToXlsx({ partnerName, fromDate, toDate, ro
   const wb = XLSX.utils.book_new();
 
   const sheetRows = rows.map((r) => ({
-    'תאריך ערך': r.value_date,
+    'תאריך ערך': formatDateOnlyHe(r.value_date),
     'סוג מטבע': r.coinTypeLabel,
     'סיבה': r.reasonLabel,
     'חובה': r.debit ?? 0,

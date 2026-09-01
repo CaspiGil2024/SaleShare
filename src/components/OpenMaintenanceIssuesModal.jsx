@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { X, Wrench } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
+import { formatDateHe } from '../lib/dateFormat';
 
 export default function OpenMaintenanceIssuesModal({ isOpen, onClose }) {
   const [rows, setRows] = useState([]);
@@ -76,7 +77,7 @@ export default function OpenMaintenanceIssuesModal({ isOpen, onClose }) {
                   <p className="text-sm text-slate-600 mt-0.5 line-clamp-2">{r.description}</p>
                   <p className="text-xs text-slate-400 mt-1">
                     דווח ע"י {r.creator?.full_name ?? r.creator?.email ?? 'שותף'} ·{' '}
-                    {new Date(r.created_at).toLocaleDateString('he-IL')}
+                    {formatDateHe(r.created_at)}
                   </p>
                 </li>
               ))}

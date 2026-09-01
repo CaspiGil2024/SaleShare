@@ -6,6 +6,7 @@ import { isManager, isAdminOrTreasurer } from '../lib/permissions';
 import { bookingTypeLabelHe } from '../lib/bookingColors';
 import { exportDatabaseToXlsx, exportCoinAdjustmentAuditToXlsx } from '../lib/xlsxExport';
 import { formatCoinAmount as formatCoin } from '../lib/coinCalculator';
+import { formatDateTimeHe } from '../lib/dateFormat';
 
 const COIN_TYPE_OPTIONS = [
   { value: 'midweek_day', label: 'אמצ"ש יום' },
@@ -124,7 +125,7 @@ function ManualCoinEntryForm({ onSaved }) {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium text-slate-700">שותף</label>
           <select
@@ -616,13 +617,7 @@ function AdjustmentAuditLog({ refreshToken }) {
               {rows.map((r) => (
                 <tr key={r.id} className="border-b border-slate-50 last:border-0">
                   <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
-                    {new Date(r.created_at).toLocaleString('he-IL', {
-                      day: 'numeric',
-                      month: 'numeric',
-                      year: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
+                    {formatDateTimeHe(r.created_at)}
                   </td>
                   <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
                     {r.actor?.full_name ?? r.actor?.email ?? '—'}

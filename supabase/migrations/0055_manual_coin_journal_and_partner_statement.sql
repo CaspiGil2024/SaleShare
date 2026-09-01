@@ -118,16 +118,22 @@ revoke all on function public.fn_admin_manual_coin_entry(uuid, text, numeric, te
 grant execute on function public.fn_admin_manual_coin_entry(uuid, text, numeric, text, date, text) to authenticated;
 
 
-create or replace function public.fn_partner_coin_statement(
+-- drop first: return TABLE shape changed (delta -> separate debit/
+-- credit columns, plus the opening-balance summary rows below) —
+-- CREATE OR REPLACE can't change an existing function's return type.
+drop function if exists public.fn_partner_coin_statement(uuid, date, date);
+
+create function public.fn_partner_coin_statement(
   p_user_id uuid,
   p_from date,
   p_to date
 )
 returns table (
-  value_date date,
+  value_date date,     -- null for the opening-balance row (no single date)
   coin_type text,
-  reason text,
-  delta numeric,
+  reason text,          -- 'opening_balance' for the opening row, else the usual coin_transactions.reason
+  debit numeric,        -- null when this row is a credit
+  credit numeric,       -- null when this row is a debit
   running_balance numeric,
   note text
 )
@@ -137,6 +143,7 @@ security definer set search_path = public
 as $$
 declare
   v_caller uuid := auth.uid();
+  v_has_opening boolean;
 begin
   if v_caller is null then
     raise exception 'יש להתחבר מחדש.' using errcode = 'P0001';
@@ -145,9 +152,18 @@ begin
     raise exception 'אין הרשאה לצפות בדוח זה.' using errcode = 'P0001';
   end if;
 
+  select exists (
+    select 1 from public.coin_transactions ct
+    where ct.user_id = p_user_id and ct.value_date < p_from
+  ) into v_has_opening;
+
   return query
   with opening as (
-    select ct.coin_type as ot_coin_type, coalesce(sum(ct.delta), 0) as opening_balance
+    select
+      ct.coin_type as ot_coin_type,
+      coalesce(sum(case when ct.delta < 0 then -ct.delta else 0 end), 0) as ot_debit,
+      coalesce(sum(case when ct.delta > 0 then ct.delta else 0 end), 0) as ot_credit,
+      coalesce(sum(ct.delta), 0) as ot_balance
     from public.coin_transactions ct
     where ct.user_id = p_user_id and ct.value_date < p_from
     group by ct.coin_type
@@ -157,24 +173,53 @@ begin
            ct.delta as tx_delta, ct.note as tx_note, ct.created_at as tx_created_at
     from public.coin_transactions ct
     where ct.user_id = p_user_id and ct.value_date >= p_from and ct.value_date <= p_to
+  ),
+  combined as (
+    -- Opening-balance summary — one row per coin type, accumulating
+    -- every debit/credit/balance from BEFORE p_from — only included at
+    -- all when at least one transaction exists before the range.
+    select
+      0 as sort_group,
+      null::date as out_value_date,
+      t.coin_type_value as out_coin_type,
+      'opening_balance'::text as out_reason,
+      case when coalesce(o.ot_debit, 0) > 0 then o.ot_debit else null end as out_debit,
+      case when coalesce(o.ot_credit, 0) > 0 then o.ot_credit else null end as out_credit,
+      coalesce(o.ot_balance, 0) as out_balance,
+      null::text as out_note,
+      null::timestamptz as out_created_at
+    from (values ('midweek_day'), ('midweek_night'), ('weekend_day'), ('weekend_night')) as t(coin_type_value)
+    left join opening o on o.ot_coin_type = t.coin_type_value
+    where v_has_opening
+
+    union all
+
+    -- Actual transactions inside the range, chronological, running
+    -- balance seeded from each type's real opening balance (0, if none).
+    select
+      1 as sort_group,
+      r.v_date as out_value_date,
+      r.tx_coin_type as out_coin_type,
+      r.tx_reason as out_reason,
+      case when r.tx_delta < 0 then -r.tx_delta else null end as out_debit,
+      case when r.tx_delta > 0 then r.tx_delta else null end as out_credit,
+      coalesce(o.ot_balance, 0) + sum(r.tx_delta) over (
+        partition by r.tx_coin_type order by r.v_date, r.tx_created_at
+        rows between unbounded preceding and current row
+      ) as out_balance,
+      r.tx_note as out_note,
+      r.tx_created_at as out_created_at
+    from in_range r
+    left join opening o on o.ot_coin_type = r.tx_coin_type
   )
-  select
-    r.v_date,
-    r.tx_coin_type,
-    r.tx_reason,
-    r.tx_delta,
-    coalesce(o.opening_balance, 0) + sum(r.tx_delta) over (
-      partition by r.tx_coin_type order by r.v_date, r.tx_created_at
-      rows between unbounded preceding and current row
-    ) as running_balance,
-    r.tx_note
-  from in_range r
-  left join opening o on o.ot_coin_type = r.tx_coin_type
-  -- Chronological (not grouped by type) — the frontend renders one
-  -- unified ledger where each row updates only its own coin type's
-  -- running-balance column and carries the other 3 forward, so it
-  -- needs true date order across all 4 types interleaved.
-  order by r.v_date, r.tx_created_at;
+  select out_value_date, out_coin_type, out_reason, out_debit, out_credit, out_balance, out_note
+  from combined
+  -- Opening rows (sort_group 0) always first; within each group,
+  -- chronological — the frontend renders one unified ledger where each
+  -- row updates only its own coin type's running-balance column and
+  -- carries the other 3 forward, so it needs true date order across
+  -- all 4 types interleaved.
+  order by sort_group, out_value_date, out_created_at, out_coin_type;
 end;
 $$;
 

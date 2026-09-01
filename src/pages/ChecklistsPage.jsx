@@ -3,6 +3,7 @@ import { CheckSquare, LogOut, Plus, Trash2, X, CheckCircle2 } from 'lucide-react
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../auth/AuthProvider';
 import { isManager } from '../lib/permissions';
+import { formatDateTimeHe } from '../lib/dateFormat';
 
 const CHECKLIST_TYPES = [
   { key: 'departure', label: "צ'קליסט יציאה להפלגה", icon: CheckSquare },
@@ -306,7 +307,7 @@ export default function ChecklistsPage() {
                 {lastSubmission && (
                   <p className="flex items-center gap-1.5 text-sm text-green-700 bg-green-50 border border-green-100 rounded-lg px-3 py-2">
                     <CheckCircle2 size={16} />
-                    נחתם בהצלחה על ידי {lastSubmission.name} ב-{lastSubmission.at.toLocaleString('he-IL')}
+                    נחתם בהצלחה על ידי {lastSubmission.name} ב-{formatDateTimeHe(lastSubmission.at)}
                   </p>
                 )}
               </div>

@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../auth/AuthProvider';
 import { isManager } from '../lib/permissions';
 import { exportMaintenanceIssuesToXlsx } from '../lib/xlsxExport';
+import { formatDateHe } from '../lib/dateFormat';
 
 const IMAGES_BUCKET = 'maintenance-images';
 
@@ -121,9 +122,9 @@ function NoticeCard({ notice, canManage, onChanged }) {
       )}
 
       <p className="text-xs text-slate-400">
-        {notice.created_by_name ?? 'שותף'} · {new Date(notice.created_at).toLocaleDateString('he-IL')}
+        {notice.created_by_name ?? 'שותף'} · {formatDateHe(notice.created_at)}
         {!notice.is_active && notice.closed_at && (
-          <> · נסגרה ע"י {notice.closed_by_name ?? 'שותף'} ב-{new Date(notice.closed_at).toLocaleDateString('he-IL')}</>
+          <> · נסגרה ע"י {notice.closed_by_name ?? 'שותף'} ב-{formatDateHe(notice.closed_at)}</>
         )}
       </p>
 
@@ -510,7 +511,7 @@ function IssueCard({ issue, canManage, onResolved }) {
       )}
 
       <p className="text-xs text-slate-400">
-        דווח ע"י {issue.createdByName ?? 'שותף'} · {new Date(issue.created_at).toLocaleDateString('he-IL')}
+        דווח ע"י {issue.createdByName ?? 'שותף'} · {formatDateHe(issue.created_at)}
       </p>
 
       {issue.status === 'resolved' && (
@@ -518,7 +519,7 @@ function IssueCard({ issue, canManage, onResolved }) {
           <p className="font-medium">פתרון:</p>
           <p className="whitespace-pre-wrap">{issue.resolution_notes}</p>
           <p className="text-xs text-green-600 mt-1">
-            ע"י {issue.resolvedByName ?? 'שותף'} · {new Date(issue.resolved_at).toLocaleDateString('he-IL')}
+            ע"י {issue.resolvedByName ?? 'שותף'} · {formatDateHe(issue.resolved_at)}
           </p>
         </div>
       )}
