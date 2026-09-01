@@ -9,6 +9,29 @@ developers.
 
 ## Unreleased
 
+### Fixed
+- **Editing another partner's roles/phone/status from `EditPartnerModal.jsx`
+  raised "שינוי שדות אלה עבור שותף אחר חייב לעבור דרך ניהול שותפים
+  (partner_roster)" — even though the save WAS going through
+  partner_roster, exactly as the message demanded.** Root cause:
+  `trg_fn_enforce_users_field_gate` (0033/0037/0043) unconditionally
+  blocks any non-self change to full_name/email/phone/role/is_active/
+  is_frozen/is_test_account on `public.users`. But the legitimate sync
+  that message points you toward — `trg_sync_roster_to_user` (0018)
+  calling `fn_apply_partner_roster` (0004+) whenever an admin saves a
+  `partner_roster` edit — writes exactly those same fields onto the
+  matching `users` row, and `auth.uid()` inside that `SECURITY DEFINER`
+  sync is still the admin who saved the edit, not the target partner —
+  so the gate blocked its own prescribed fix path for every admin edit
+  of *another* partner (the normal case; only editing your own row
+  ever worked). Fixed (migration `0059`) with the same transaction-local
+  GUC bypass pattern already used for `trg_fn_block_past_cancellation`'s
+  auto-cancel exemption (0044): `fn_apply_partner_roster` sets a flag
+  right before its own `UPDATE`, and the field gate exits immediately
+  when that flag is set — scoped to just this one function's own
+  statement, not a general bypass. No frontend changes needed —
+  `EditPartnerModal.jsx` was already doing the right thing.
+
 ### Added
 - **Critical maintenance / vessel-grounding notifications — both ends
   wired, both templates configured.** New `users.receive_critical_updates`
