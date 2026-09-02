@@ -9,6 +9,16 @@ import { formatDateOnlyHe, formatDateTimeHe } from './dateFormat';
 // exposure here is low — flagged in chat when this was added, not
 // silently installed.
 
+// Michael's Method's guest-weighted splits produce repeating decimals
+// (e.g. 43.333333333333336) — rounds a coin amount to cents as a real
+// NUMBER (not formatCoinAmount's string) so exported cells stay
+// numeric (sortable/filterable/summable in Excel) instead of leaking
+// the raw float, same rounding this file already applied to `hours`
+// via `.toFixed(1)` below.
+function roundCoin(n) {
+  return Number((n ?? 0).toFixed(2));
+}
+
 export function exportDatabaseToXlsx({ partners, bookings }) {
   const wb = XLSX.utils.book_new();
 
@@ -18,7 +28,7 @@ export function exportDatabaseToXlsx({ partners, bookings }) {
     'טלפון': p.phone ?? '',
     'תפקידים': (p.roles ?? []).join(', '),
     'פעיל': p.is_active ? 'כן' : 'לא',
-    'יתרת מטבעות (ראשונית)': p.balance ?? 0,
+    'יתרת מטבעות (ראשונית)': roundCoin(p.balance),
   }));
   const partnersSheet = XLSX.utils.json_to_sheet(partnerRows);
   XLSX.utils.book_append_sheet(wb, partnersSheet, 'פרטי שותפים');
@@ -32,9 +42,9 @@ export function exportDatabaseToXlsx({ partners, bookings }) {
     'תאריך סיום': formatDateTimeHe(b.end_time),
     'מספר אורחים': b.guests_count ?? 0,
     'שותפים משתתפים': b.participantNames,
-    'מטבעות שולם ע"י המזמין': b.coins_charged ?? 0,
-    'מטבעות שולמו ע"י שותפים': b.participantCoinsTotal,
-    'סה"כ מטבעות שנוצלו בהפלגה': b.totalCoinsCharged,
+    'מטבעות שולם ע"י המזמין': roundCoin(b.coins_charged),
+    'מטבעות שולמו ע"י שותפים': roundCoin(b.participantCoinsTotal),
+    'סה"כ מטבעות שנוצלו בהפלגה': roundCoin(b.totalCoinsCharged),
     'הערות': b.notes ?? '',
   }));
   const bookingsSheet = XLSX.utils.json_to_sheet(bookingRows);
@@ -59,11 +69,11 @@ export function exportDetailedActivityReportToXlsx({ rows, fromDate, toDate, rep
       'תאריך התחלה': formatDateTimeHe(e.start_time),
       'תאריך סיום': formatDateTimeHe(e.end_time),
       'שעות': Number(e.hours.toFixed(1)),
-      'אמצ"ש יום': e.coinBreakdown?.midweekDay ?? 0,
-      'אמצ"ש לילה': e.coinBreakdown?.midweekNight ?? 0,
-      'סופ"ש יום': e.coinBreakdown?.weekendDay ?? 0,
-      'סופ"ש לילה': e.coinBreakdown?.weekendNight ?? 0,
-      'סה"כ מטבעות': e.coins,
+      'אמצ"ש יום': roundCoin(e.coinBreakdown?.midweekDay),
+      'אמצ"ש לילה': roundCoin(e.coinBreakdown?.midweekNight),
+      'סופ"ש יום': roundCoin(e.coinBreakdown?.weekendDay),
+      'סופ"ש לילה': roundCoin(e.coinBreakdown?.weekendNight),
+      'סה"כ מטבעות': roundCoin(e.coins),
     }))
   );
   const sheet = XLSX.utils.json_to_sheet(sheetRows);
@@ -82,7 +92,7 @@ export function exportActivityReportToXlsx({ rows, fromDate, toDate, reportLabel
     'שותף': r.name,
     'מספר הפלגות': r.sailCount,
     'סה"כ שעות': Number(r.hours.toFixed(1)),
-    'סה"כ מטבעות': r.coins,
+    'סה"כ מטבעות': roundCoin(r.coins),
   }));
   const sheet = XLSX.utils.json_to_sheet(sheetRows);
   XLSX.utils.book_append_sheet(wb, sheet, 'דוח פעילות');
@@ -99,11 +109,11 @@ export function exportPartnerBalancesToXlsx({ rows }) {
 
   const sheetRows = rows.map((r) => ({
     'שותף': r.name,
-    'אמצ"ש יום': r.midweekDay,
-    'אמצ"ש לילה': r.midweekNight,
-    'סופ"ש יום': r.weekendDay,
-    'סופ"ש לילה': r.weekendNight,
-    'יתרה כוללת': r.total,
+    'אמצ"ש יום': roundCoin(r.midweekDay),
+    'אמצ"ש לילה': roundCoin(r.midweekNight),
+    'סופ"ש יום': roundCoin(r.weekendDay),
+    'סופ"ש לילה': roundCoin(r.weekendNight),
+    'יתרה כוללת': roundCoin(r.total),
   }));
   const sheet = XLSX.utils.json_to_sheet(sheetRows);
   XLSX.utils.book_append_sheet(wb, sheet, 'יתרות שותפים');
@@ -121,8 +131,8 @@ export function exportCoinAdjustmentAuditToXlsx({ rows }) {
     'בוצע ע"י': r.actor?.full_name ?? r.actor?.email ?? '',
     'שותף': r.partner?.full_name ?? r.partner?.email ?? '',
     'סוג מטבע': r.coinTypeLabel,
-    'יתרה קודמת': r.balance_before,
-    'יתרה חדשה': r.balance_after,
+    'יתרה קודמת': roundCoin(r.balance_before),
+    'יתרה חדשה': roundCoin(r.balance_after),
     'הערה': r.note ?? '',
   }));
   const sheet = XLSX.utils.json_to_sheet(sheetRows);
@@ -167,10 +177,10 @@ export function exportSailingLogToXlsx({ rows, fromDate, toDate }) {
     'התחלת הפלגה': formatDateTimeHe(r.start_time),
     'סיום הפלגה': formatDateTimeHe(r.end_time),
     'סיבה': r.reasonLabel ?? '',
-    'אמצ"ש יום': r.coins?.midweekDay ?? 0,
-    'אמצ"ש לילה': r.coins?.midweekNight ?? 0,
-    'סופ"ש יום': r.coins?.weekendDay ?? 0,
-    'סופ"ש לילה': r.coins?.weekendNight ?? 0,
+    'אמצ"ש יום': roundCoin(r.coins?.midweekDay),
+    'אמצ"ש לילה': roundCoin(r.coins?.midweekNight),
+    'סופ"ש יום': roundCoin(r.coins?.weekendDay),
+    'סופ"ש לילה': roundCoin(r.coins?.weekendNight),
   }));
   const sheet = XLSX.utils.json_to_sheet(sheetRows);
   XLSX.utils.book_append_sheet(wb, sheet, 'יומן הפלגות וסגירת סירה');
@@ -191,7 +201,7 @@ export function exportPartnerHistoryToXlsx({ partnerName, rows }) {
     'תאריך התחלה': formatDateTimeHe(r.start_time),
     'תאריך סיום': formatDateTimeHe(r.end_time),
     'מספר אורחים': r.guests_count ?? 0,
-    'מטבעות ששולמו': r.coinsForThisPartner ?? 0,
+    'מטבעות ששולמו': roundCoin(r.coinsForThisPartner),
     'הערות': r.notes ?? '',
   }));
   const sheet = XLSX.utils.json_to_sheet(sheetRows);
@@ -212,9 +222,9 @@ export function exportPartnerStatementToXlsx({ partnerName, fromDate, toDate, ro
     'תאריך ערך': formatDateOnlyHe(r.value_date),
     'סוג מטבע': r.coinTypeLabel,
     'סיבה': r.reasonLabel,
-    'חובה': r.debit ?? 0,
-    'זכות': r.credit ?? 0,
-    'יתרה מתגלגלת': r.running_balance,
+    'חובה': roundCoin(r.debit),
+    'זכות': roundCoin(r.credit),
+    'יתרה מתגלגלת': roundCoin(r.running_balance),
     'הערה': r.note ?? '',
   }));
   const sheet = XLSX.utils.json_to_sheet(sheetRows);

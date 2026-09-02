@@ -1,3 +1,5 @@
+import { formatCoinAmount } from '../lib/coinCalculator';
+
 const COIN_DEFS = [
   { key: 'coins_weekend_day', label: 'סופ"ש - יום', dotClass: 'bg-amber-500' },
   { key: 'coins_weekend_night', label: 'סופ"ש - לילה', dotClass: 'bg-violet-600' },
@@ -16,7 +18,7 @@ export default function CoinBalanceBar({ wallet }) {
           <span className={`w-2.5 h-10 rounded-full ${coin.dotClass}`} />
           <div>
             <p className="text-xs text-slate-500 dark:text-slate-400">{coin.label}</p>
-            <p className="text-2xl font-bold text-slate-800 dark:text-slate-100">{wallet?.[coin.key] ?? 0}</p>
+            <p className="text-2xl font-bold text-slate-800 dark:text-slate-100">{formatCoinAmount(wallet?.[coin.key])}</p>
           </div>
         </div>
       ))}

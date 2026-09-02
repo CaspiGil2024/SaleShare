@@ -10,6 +10,26 @@ developers.
 ## Unreleased
 
 ### Fixed
+- **Raw floating-point coin balances (e.g. `43.333333333333336`, a
+  guest-weighted split's repeating decimal) leaked into the UI
+  unrounded in two spots.** The admin balance-adjustment modal
+  (`MaintenanceDataPage.jsx`'s `EditBalanceModal`) seeded its editable
+  inputs with `String(rawBalance)` instead of a rounded value — fixed
+  to seed from `formatCoinAmount` (2dp) instead, with the "did this
+  field actually change" check updated to compare against that same
+  rounded baseline so merely opening and saving the modal untouched no
+  longer writes a spurious audited "change" caused only by rounding.
+  `CoinBalanceBar.jsx` (currently unused, but part of the shared coin-
+  display surface) rendered `wallet[key]` with no formatting at all —
+  now goes through `formatCoinAmount` like every other coin display in
+  the app. Every other on-screen coin display was already going through
+  `formatCoinAmount`/`formatCoinDisplay`, confirmed by an audit across
+  every component and page that touches `coins_*`/`balance`/`wallet`
+  fields. Also rounded every coin/balance number written into the xlsx
+  exports (`xlsxExport.js`) — those weren't a screen-display bug but
+  the same underlying float would have shown up just as ugly in a
+  downloaded spreadsheet; a new local `roundCoin()` helper mirrors the
+  `.toFixed(1)` rounding that file already applied to `hours`.
 - **The organizer of a Shared/Cyprus sailing had no way to leave it
   without cancelling the whole thing for every other partner still on
   it.** `fn_leave_shared_booking` (0044) explicitly refused the

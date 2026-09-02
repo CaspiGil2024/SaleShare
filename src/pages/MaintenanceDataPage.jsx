@@ -258,7 +258,14 @@ function EditBalanceModal({ partner, onClose, onSaved }) {
 
   useEffect(() => {
     if (!partner) return;
-    setValues(Object.fromEntries(COIN_TYPE_OPTIONS.map((opt) => [opt.value, String(partner.balances[opt.value] ?? 0)])));
+    // Seed from the ROUNDED balance (formatCoin, 2dp), not the raw
+    // stored float — Michael's Method's guest-weighted splits produce
+    // repeating decimals (e.g. 43.333333333333336), which used to leak
+    // straight into this editable field verbatim. changedTypes below
+    // compares against this same rounded baseline, not the raw value,
+    // so simply opening and saving without touching a field never
+    // writes a spurious "change" just because of the rounding.
+    setValues(Object.fromEntries(COIN_TYPE_OPTIONS.map((opt) => [opt.value, formatCoin(partner.balances[opt.value] ?? 0)])));
     setNote('');
     setErrorMessage(null);
     // Belt-and-suspenders alongside the finally block in handleSubmit
@@ -288,7 +295,9 @@ function EditBalanceModal({ partner, onClose, onSaved }) {
     // Only types whose value actually changed get written/audited —
     // re-submitting an untouched field as a no-op "change" would just
     // add noise to the audit log for nothing.
-    const changedTypes = COIN_TYPE_OPTIONS.filter((opt) => parsed[opt.value] !== (partner.balances[opt.value] ?? 0));
+    const changedTypes = COIN_TYPE_OPTIONS.filter(
+      (opt) => parsed[opt.value] !== Number(formatCoin(partner.balances[opt.value] ?? 0))
+    );
     if (changedTypes.length === 0) {
       onClose();
       return;
