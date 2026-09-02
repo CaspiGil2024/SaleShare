@@ -344,16 +344,26 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
       });
 
       if (isSharedType) {
-        // Broadcast to every OTHER partner who opted into shared-sail
-        // updates — at creation the organizer is always the sole
-        // participant (others join later, see EditBookingModal.jsx),
-        // so this is "a new shared sailing is open, come join" rather
-        // than a notice to already-attached crew.
+        // Broadcast to every OTHER active partner with emails enabled —
+        // at creation the organizer is always the sole participant
+        // (others join later, see EditBookingModal.jsx), so this is "a
+        // new shared sailing is open, come join" rather than a notice
+        // to already-attached crew. Was previously ALSO gated on the
+        // finer-grained receive_shared_sail_notifications toggle,
+        // which defaults to false — since almost nobody had opted into
+        // that second flag, this broadcast was silently reaching
+        // nobody but the organizer's own separate confirmation email
+        // (sendBookingConfirmationEmail, above) in practice. Dropped
+        // in favor of the single emails_enabled switch, matching how
+        // the "active partners with email notifications enabled"
+        // audience is actually described everywhere else; is_active
+        // added since this never excluded a deactivated account
+        // before either.
         supabase
           .from('users')
           .select('email, full_name')
           .eq('emails_enabled', true)
-          .eq('receive_shared_sail_notifications', true)
+          .eq('is_active', true)
           .neq('id', authUser.id)
           .then(({ data, error: recipientsError }) => {
             if (recipientsError) {

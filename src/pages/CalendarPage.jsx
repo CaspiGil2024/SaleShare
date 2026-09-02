@@ -33,6 +33,17 @@ export default function CalendarPage() {
     const { error: autoConvertError } = await supabase.rpc('fn_auto_convert_solo_shared_sailings_to_private');
     if (autoConvertError) console.error('Failed to sweep solo Shared sailings', autoConvertError);
 
+    // Same lazy-maintenance pattern, run last (after the two sweeps
+    // above) so a solo Cyprus sailing is already Cancelled — and thus
+    // skipped here — by the time this runs: settles every Shared/
+    // Cyprus sailing whose start_time has passed and hasn't been
+    // settled yet, applying the true guest-weighted proportional split
+    // once instead of the provisional full-price-per-joiner charge
+    // each participant carried until now — see 0061_deferred_shared_
+    // sail_coin_settlement.sql.
+    const { error: settleError } = await supabase.rpc('fn_settle_due_shared_bookings');
+    if (settleError) console.error('Failed to settle due shared sailings', settleError);
+
     const { data, error } = await supabase
       .from('bookings')
       .select('id, start_time, end_time, booking_type, guests_count, notes, user_id, booker:users(full_name, email)')

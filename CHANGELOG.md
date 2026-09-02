@@ -9,7 +9,73 @@ developers.
 
 ## Unreleased
 
+### Changed
+- **Shared/Cyprus sail coins now settle once, at sail time, instead of
+  re-splitting everyone's cost on every join/leave/guest-count change.**
+  Confirmed against two fully-worked scenarios with exact expected
+  balances at every step. Previously, `fn_recompute_shared_booking_
+  participants` ran on every single participant-list change — a new
+  partner joining would immediately refund and re-split every existing
+  participant's charge too, moving balances that partner never touched.
+  New model (migration `0061`): each participant is charged the sail's
+  full (unsplit) price independently the moment they join — guest
+  count is purely informational, capacity-checked but coin-neutral,
+  until a new one-time settlement (`fn_settle_shared_booking`, swept by
+  `fn_settle_due_shared_bookings` — called opportunistically from
+  `CalendarPage.jsx` right after the existing solo-Cyprus-cancel and
+  solo-Shared-to-Private sweeps) applies the TRUE guest-weighted
+  proportional split once `start_time` has passed, reusing the
+  existing `fn_recompute_shared_booking_participants` (0051) unchanged
+  for that one-time computation. New `bookings.coins_settled` flag
+  makes it idempotent; backfilled `true` for every already-past
+  Shared/Cyprus sailing so the sweep doesn't churn historical data.
+  `fn_join_shared_booking`/`fn_admin_add_shared_participant` now charge
+  just the joiner; `fn_leave_shared_booking`/`fn_admin_remove_shared_
+  participant` now just delete that one row (refunded by the existing
+  per-row trigger); `fn_update_my_shared_participation_guests` and the
+  organizer's own guest-count field in `fn_update_shared_booking` are
+  now plain coin-neutral updates; editing a sail's date/time/type still
+  reprices everyone at the new full price via a new `fn_reprice_all_
+  participants_full`, since the cost basis itself changed. A guest-
+  count increase that would exceed the 9-person cap now raises a
+  dedicated message ("עברת את כושר השיט - לא ניתן להוסיף אורחים"),
+  separate from the existing "can't add another partner" message for a
+  brand-new participant.
+  **Known gap**: `EditBookingModal.jsx`/`NewBookingModal.jsx` still
+  display an estimated *guest-weighted split* while editing, but the
+  actual pre-settlement charge is now the *full* price — that display
+  estimate is now misleading until settlement and wasn't touched here.
+- **`fn_organizer_leave_shared_booking` (0060) revised**: the departing
+  organizer now stays aboard as a full participant (own guest count and
+  charge untouched) — only `bookings.user_id` moves to a remaining
+  partner. Verified against a worked example where the ex-organizer's
+  own guest count is still reflected in the settlement split after they
+  step down.
+- Added `tests/sharedSailCoinEngine.test.js` (vitest + supabase-js) —
+  real integration tests encoding both scenarios end-to-end against the
+  actual RPCs (not a JS reimplementation of the coin math), including
+  the capacity error message and the organizer handover. Requires a
+  local Supabase stack (`supabase start`) to run — see
+  `.env.test.example`; never point at the production project.
+
 ### Fixed
+- **A new shared sail's "come join" broadcast email reached almost
+  nobody but the organizer's own confirmation email.** `NewBookingModal.jsx`
+  (and `EditBookingModal.jsx`'s matching cancellation broadcast) required
+  BOTH `users.emails_enabled` AND the finer-grained `receive_shared_sail_
+  notifications` toggle to be true before including a partner — the
+  second flag defaults to `false` and nothing was pushing partners to
+  opt into it separately, so in practice the broadcast list came back
+  empty and only the creator's always-sent personal confirmation email
+  went out, which read as "email only goes to the organizer." Both
+  broadcasts now require only `emails_enabled = true` (plus a newly
+  added `is_active = true`, which was never checked before either —
+  a deactivated account with emails enabled could previously still get
+  broadcasts). Note: `receive_shared_sail_notifications` is now
+  unused by these two broadcasts — its column, `AuthProvider.jsx` load,
+  and its checkbox in `EditPartnerModal.jsx` were left in place rather
+  than removed, since deleting a working toggle wasn't asked for; worth
+  a decision on whether to remove it or repurpose it later.
 - **Raw floating-point coin balances (e.g. `43.333333333333336`, a
   guest-weighted split's repeating decimal) leaked into the UI
   unrounded in two spots.** The admin balance-adjustment modal

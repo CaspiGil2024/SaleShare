@@ -150,8 +150,7 @@ export async function sendBookingConfirmationEmail({ toEmail, toName, bookingTyp
 // via Promise.allSettled so one failed address never blocks the rest.
 // Callers are responsible for filtering the recipient list down to
 // people who actually want mail — see NewBookingModal.jsx, which
-// queries emails_enabled (and, for the "everyone else" audience,
-// receive_shared_sail_notifications too).
+// queries every other active partner with emails_enabled.
 //
 // Template variables (VITE_EMAILJS_TEMPLATE_SHARED_SAIL_NOTIFICATION):
 //   to_email, to_name, organizer_name, booking_type_label,
@@ -193,12 +192,12 @@ export async function sendSharedSailNotificationEmails({ recipients, organizerNa
   }
 }
 
-// Same opted-in broadcast audience and shape as sendSharedSailNotification
-// Emails above ("a shared sailing exists"), just the mirror-image event
+// Same broadcast audience and shape as sendSharedSailNotificationEmails
+// above ("a shared sailing exists"), just the mirror-image event
 // ("...and it no longer does") — see EditBookingModal.jsx's
 // handleCancelSail, which fetches the recipient list the same way
-// NewBookingModal.jsx does (emails_enabled + receive_shared_sail_
-// notifications, excluding whoever triggered the cancellation).
+// NewBookingModal.jsx does (every other active partner with
+// emails_enabled, excluding whoever triggered the cancellation).
 //
 // Template variables (VITE_EMAILJS_TEMPLATE_CANCEL_SHARED_SAIL):
 //   to_email, to_name, organizer_name, booking_type_label,

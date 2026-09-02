@@ -462,21 +462,22 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
         }
       }
 
-      // Fire-and-forget, same opted-in broadcast audience as the
-      // creation notification (NewBookingModal.jsx) — sendCancelShared
-      // SailNotificationEmails already no-ops softly if EmailJS isn't
-      // configured, so this never risks the cancellation that already
-      // succeeded above. Only for Shared/Cyprus — a Private/Dockside/
-      // Maintenance cancellation has no "shared sail" audience to tell.
-      // Skipped when the organizer merely stepped down and the sail is
-      // still happening (wasCancelled === false) — a "cancelled" email
-      // would be wrong.
+      // Fire-and-forget, same broadcast audience as the creation
+      // notification (NewBookingModal.jsx: every OTHER active partner
+      // with emails_enabled, no separate per-category opt-in — see its
+      // comment) — sendCancelSharedSailNotificationEmails already
+      // no-ops softly if EmailJS isn't configured, so this never risks
+      // the cancellation that already succeeded above. Only for
+      // Shared/Cyprus — a Private/Dockside/Maintenance cancellation
+      // has no "shared sail" audience to tell. Skipped when the
+      // organizer merely stepped down and the sail is still happening
+      // (wasCancelled === false) — a "cancelled" email would be wrong.
       if (isSharedBookingType && wasCancelled) {
         supabase
           .from('users')
           .select('email, full_name')
           .eq('emails_enabled', true)
-          .eq('receive_shared_sail_notifications', true)
+          .eq('is_active', true)
           .neq('id', currentUser.id)
           .then(({ data: recipientRows, error: recipientsError }) => {
             if (recipientsError) {

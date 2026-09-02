@@ -1,7 +1,7 @@
 -- =====================================================================
--- SailShare — organizer of a Shared/Cyprus sailing can now leave
+-- SailShare — organizer of a Shared/Cyprus sailing can now step down
 -- without cancelling, handing the "organizer" role to a remaining
--- partner instead
+-- partner instead — they stay aboard as a regular participant
 -- =====================================================================
 -- Bug: fn_leave_shared_booking (0044) explicitly refused to let the
 -- organizer leave ("המארגן/ת לא יכול/ה לעזוב... ניתן לבטל אותה") and
@@ -14,38 +14,29 @@
 --
 -- Fix: fn_organizer_leave_shared_booking(p_booking_id) — a new,
 -- organizer-only entry point:
---   - No other active participants left: behaves exactly like today's
+--   - No other active participants: behaves exactly like today's
 --     cancel (nothing to hand the sail to — "leaving" IS cancelling
 --     when you're the only one aboard). Returns 'cancelled'.
---   - One or more other active participants: the organizer's own
---     participant row is dropped and public.bookings.user_id is
---     reassigned to a remaining participant (the longest-standing one
---     by booking_participants.created_at — see caveat below), THEN
---     fn_recompute_shared_booking_participants runs across whoever's
---     left. That helper already does the right thing for coins here,
---     unchanged: it refunds every remaining participant's stored
---     charge in full (trg_fn_refund_participant_coins, fired by its
---     own `delete from booking_participants`) and recharges everyone
---     from scratch against the NEW total shares — which correctly
---     grows now that the ex-organizer's share is gone, exactly the
---     same "leaving recalculates everyone else's split" behavior
---     fn_leave_shared_booking already gives a non-organizer's
---     departure. No new charge/refund logic needed here, only who
---     ends up in the participant set the helper is called with. The
---     sail keeps its id, dates, and notes — nothing else changes.
---     Returns 'reassigned'.
+--   - One or more other active participants: ONLY public.bookings.
+--     user_id is reassigned to a remaining participant (the longest-
+--     standing one by booking_participants.created_at — see caveat
+--     below). The departing organizer's own participant row, guest
+--     count, and already-charged coins are left completely untouched
+--     — they step down from the organizer TITLE but remain a full
+--     participant on the sail, still on the hook at settlement like
+--     anyone else (confirmed against a worked example: the ex-
+--     organizer's coin deduction at sail-time settlement must still
+--     reflect their own guest count). No coin_delta of any kind
+--     happens here — this action is purely a change of who
+--     bookings.user_id points at. Returns 'reassigned'.
 --
 -- Caveat (accepted, not fixed here): booking_participants.created_at
--- is NOT a reliable join-order history — fn_recompute_shared_booking_
--- participants deletes and reinserts EVERY participant row on every
--- single change (a join, a leave, even one partner editing their own
--- guest count), which resets every remaining row's created_at to that
--- moment. So "earliest created_at among the survivors" really means
--- "first in the participant list as of the most recent recompute", not
--- literally who has been aboard longest historically. It's still a
--- fully deterministic tiebreak (no schema for true join history exists
--- to do better), just not a strict seniority guarantee across multiple
--- edits.
+-- is not a perfect join-order history in every edge case (e.g. a row
+-- touched by fn_reprice_all_participants_full — see the deferred-
+-- settlement migration — keeps its original row and created_at, so
+-- this is actually fine in the common case; it would only drift if
+-- some future change starts deleting+reinserting participant rows on
+-- every edit again). Still a fully deterministic tiebreak.
 -- =====================================================================
 
 create or replace function public.fn_organizer_leave_shared_booking(p_booking_id integer)
@@ -56,7 +47,6 @@ as $$
 declare
   v_caller uuid := auth.uid();
   v_booking record;
-  v_participants jsonb;
   v_new_organizer uuid;
   v_remaining_count int;
 begin
@@ -97,13 +87,8 @@ begin
     limit 1;
 
   update public.bookings set user_id = v_new_organizer where id = p_booking_id;
-
-  select coalesce(jsonb_agg(jsonb_build_object('user_id', user_id, 'guest_count', guest_count)), '[]'::jsonb)
-    into v_participants
-    from public.booking_participants
-    where booking_id = p_booking_id and user_id <> v_caller;
-
-  perform public.fn_recompute_shared_booking_participants(p_booking_id, v_participants);
+  -- Deliberately nothing else: the ex-organizer's own row (guest_count,
+  -- coins_charged_*) is untouched — see header.
 
   return 'reassigned';
 end;
