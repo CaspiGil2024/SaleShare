@@ -423,21 +423,43 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
     }
   }
 
+  // Organizer of a Shared/Cyprus sail with other active partners no
+  // longer cancels the whole sail to step down — fn_organizer_leave_
+  // shared_booking (0060) hands the "organizer" role to a remaining
+  // partner instead and keeps the sail alive, only falling back to a
+  // real cancellation when the organizer is the last one aboard (see
+  // that migration's header). Non-organizer cancellers (managers) and
+  // non-Shared/Cyprus types are unaffected — always a real cancel.
+  const willReassignOrganizer = isSharedBookingType && isOrganizer && otherParticipants.length > 0;
+
   async function handleCancelSail() {
     if (isPastSailing) return;
-    if (!window.confirm('לבטל את ההפלגה הזו?')) return;
+    const confirmMessage = willReassignOrganizer
+      ? 'תעזבו את ההפלגה ותפקיד המארגן/ת יעבור לשותף אחר שכבר בהפלגה. ההפלגה עצמה תמשיך כרגיל ולא תבוטל. להמשיך?'
+      : 'לבטל את ההפלגה הזו?';
+    if (!window.confirm(confirmMessage)) return;
     setErrorMessage(null);
     setSubmitting(true);
     try {
-      const { data, error } = await supabase
-        .from('bookings')
-        .update({ status: 'Cancelled' })
-        .eq('id', booking.id)
-        .select();
+      let wasCancelled = true;
 
-      if (error) throw error;
-      if (!data || data.length === 0) {
-        throw new Error('הביטול לא בוצע בפועל — ייתכן שאין לכם הרשאה לבטל הזמנה זו.');
+      if (isOrganizer && isSharedBookingType) {
+        const { data, error } = await supabase.rpc('fn_organizer_leave_shared_booking', {
+          p_booking_id: booking.id,
+        });
+        if (error) throw error;
+        wasCancelled = data === 'cancelled';
+      } else {
+        const { data, error } = await supabase
+          .from('bookings')
+          .update({ status: 'Cancelled' })
+          .eq('id', booking.id)
+          .select();
+
+        if (error) throw error;
+        if (!data || data.length === 0) {
+          throw new Error('הביטול לא בוצע בפועל — ייתכן שאין לכם הרשאה לבטל הזמנה זו.');
+        }
       }
 
       // Fire-and-forget, same opted-in broadcast audience as the
@@ -446,7 +468,10 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
       // configured, so this never risks the cancellation that already
       // succeeded above. Only for Shared/Cyprus — a Private/Dockside/
       // Maintenance cancellation has no "shared sail" audience to tell.
-      if (isSharedBookingType) {
+      // Skipped when the organizer merely stepped down and the sail is
+      // still happening (wasCancelled === false) — a "cancelled" email
+      // would be wrong.
+      if (isSharedBookingType && wasCancelled) {
         supabase
           .from('users')
           .select('email, full_name')
@@ -1140,7 +1165,7 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
               title={isPastSailing ? 'לא ניתן לבטל הפלגה שכבר החלה או הסתיימה.' : undefined}
               className="rounded-lg border border-rose-200 dark:border-rose-800 text-rose-600 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-900 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-semibold py-2.5 transition-colors"
             >
-              ביטול ההפלגה
+              {willReassignOrganizer ? 'עזיבת ההפלגה (העברת ניהול לשותף אחר)' : 'ביטול ההפלגה'}
             </button>
             {isPastSailing && (
               <p className="text-xs text-slate-400 dark:text-slate-500 text-center -mt-1">לא ניתן לבטל הפלגה שכבר החלה או הסתיימה.</p>

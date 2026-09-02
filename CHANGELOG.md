@@ -10,6 +10,25 @@ developers.
 ## Unreleased
 
 ### Fixed
+- **The organizer of a Shared/Cyprus sailing had no way to leave it
+  without cancelling the whole thing for every other partner still on
+  it.** `fn_leave_shared_booking` (0044) explicitly refused the
+  organizer ("המארגן/ת לא יכול/ה לעזוב... ניתן לבטל אותה"), and
+  `EditBookingModal.jsx`'s only organizer-facing exit was "ביטול
+  ההפלגה" — a full cancellation that refunds and removes every
+  remaining partner, even when they were actively participating and
+  had no wish to lose the sailing. Fixed with a new organizer-only RPC,
+  `fn_organizer_leave_shared_booking` (migration `0060`): if no other
+  partner is on the sail, leaving still cancels it exactly as before
+  (nothing to hand it to); otherwise the organizer's own participant
+  row is dropped, `bookings.user_id` is reassigned to a remaining
+  partner, and the existing `fn_recompute_shared_booking_participants`
+  engine reruns across whoever's left — refunding and recharging
+  everyone from scratch against the new (larger) total shares, the
+  same correct redistribution a non-organizer's departure already
+  triggers. `EditBookingModal.jsx`'s cancel button now reads "עזיבת
+  ההפלגה (העברת ניהול לשותף אחר)" and skips the cancellation email
+  whenever the sail is actually still happening.
 - **Editing another partner's roles/phone/status from `EditPartnerModal.jsx`
   raised "שינוי שדות אלה עבור שותף אחר חייב לעבור דרך ניהול שותפים
   (partner_roster)" — even though the save WAS going through
