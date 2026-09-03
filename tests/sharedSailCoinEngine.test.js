@@ -373,3 +373,99 @@ describe('Scenario B — weekend-night sail, capacity limits & organizer handove
     expect(formatCoinAmount(g.coins_weekend_night)).toBe('38.86'); // 40 - 8/7
   });
 });
+
+// =====================================================================
+// Scenario C — reported-bug regressions:
+//   #1 exact guest-weighted settlement split for Uri(+0) / Michael-
+//      organizer(+1) on a 3-coin midweek-day sail  -> 2 : 1
+//   #2/#3 a "deleted" sail stays deleted: after the organizer hands off,
+//      the new organizer's fn_cancel_shared_booking really cancels
+//      (no reassign-back "resurrection"), and a partner who stepped down
+//      can no longer cancel it.
+// =====================================================================
+describe('Scenario C — settlement split & cancellation after handoff (bugs #1/#2/#3)', () => {
+  let michael, uri, periodId, bookingId;
+  const start = nextJerusalemSlot(3, 11, 2); // Wednesday 11:00 local, +3h => 3 midweek-day hours
+  const end = new Date(start.getTime() + 3 * 3600000);
+
+  beforeAll(async () => {
+    michael = await createTestPartner('scenario-c-michael');
+    uri = await createTestPartner('scenario-c-uri');
+    periodId = await setWallet(michael.userId, 40);
+    await setWallet(uri.userId, 40);
+  });
+
+  afterAll(cleanupAll);
+
+  it('#1 — settlement splits 3 coins as 2 (Michael, +1 guest) : 1 (Uri, +0 guests)', async () => {
+    const { data, error } = await michael.client.rpc('fn_create_shared_booking', {
+      p_booking_type: 'Shared',
+      p_start: start.toISOString(),
+      p_end: end.toISOString(),
+      p_notes: null,
+      p_participants: [{ user_id: michael.userId, guest_count: 1 }],
+    });
+    expect(error).toBeNull();
+    bookingId = data;
+    createdBookingIds.push(bookingId);
+
+    const { error: joinError } = await uri.client.rpc('fn_join_shared_booking', {
+      p_booking_id: bookingId,
+      p_guest_count: 0,
+    });
+    expect(joinError).toBeNull();
+
+    // Pre-settlement: each charged the full 3 independently.
+    let [m, u] = await Promise.all([getWallet(michael.userId, periodId), getWallet(uri.userId, periodId)]);
+    expect(formatCoinAmount(m.coins_midweek_day)).toBe('37.00');
+    expect(formatCoinAmount(u.coins_midweek_day)).toBe('37.00');
+
+    await shiftBookingOneWeekIntoThePast(bookingId, start, end);
+    const { error: settleError } = await michael.client.rpc('fn_settle_due_shared_bookings');
+    expect(settleError).toBeNull();
+
+    [m, u] = await Promise.all([getWallet(michael.userId, periodId), getWallet(uri.userId, periodId)]);
+    // total_shares = (1+1) + (1+0) = 3; 3 coins split 2/3 : 1/3
+    expect(formatCoinAmount(m.coins_midweek_day)).toBe('38.00'); // 40 - 2
+    expect(formatCoinAmount(u.coins_midweek_day)).toBe('39.00'); // 40 - 1
+  });
+
+  it('#2/#3 — after Michael hands off, Uri can cancel for good and the ex-organizer cannot', async () => {
+    const { data: freshId, error } = await michael.client.rpc('fn_create_shared_booking', {
+      p_booking_type: 'Shared',
+      p_start: start.toISOString(),
+      p_end: end.toISOString(),
+      p_notes: null,
+      p_participants: [{ user_id: michael.userId, guest_count: 1 }],
+    });
+    expect(error).toBeNull();
+    createdBookingIds.push(freshId);
+
+    await uri.client.rpc('fn_join_shared_booking', { p_booking_id: freshId, p_guest_count: 0 });
+
+    const { data: handoff, error: handoffError } = await michael.client.rpc('fn_organizer_leave_shared_booking', {
+      p_booking_id: freshId,
+    });
+    expect(handoffError).toBeNull();
+    expect(handoff).toBe('reassigned');
+
+    // Ex-organizer Michael is blocked from cancelling.
+    const { error: deniedError } = await michael.client.rpc('fn_cancel_shared_booking', { p_booking_id: freshId });
+    expect(deniedError).not.toBeNull();
+
+    // Current organizer Uri really cancels — no reassignment back to Michael.
+    const { error: cancelError } = await uri.client.rpc('fn_cancel_shared_booking', { p_booking_id: freshId });
+    expect(cancelError).toBeNull();
+
+    const { data: row } = await admin.from('bookings').select('status, user_id').eq('id', freshId).single();
+    expect(row.status).toBe('Cancelled');
+    expect(row.user_id).toBe(uri.userId); // stayed with Uri, did not resurrect to Michael
+
+    // Settlement sweep leaves a cancelled sail alone.
+    await shiftBookingOneWeekIntoThePast(freshId, start, end);
+    const { error: settleError } = await uri.client.rpc('fn_settle_due_shared_bookings');
+    expect(settleError).toBeNull();
+    const { data: after } = await admin.from('bookings').select('status').eq('id', freshId).single();
+    expect(after.status).toBe('Cancelled');
+  });
+});

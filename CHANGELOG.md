@@ -59,6 +59,43 @@ developers.
   `.env.test.example`; never point at the production project.
 
 ### Fixed
+- **A "deleted" shared sail could resurrect itself, and a partner who
+  had stepped down as organizer could still cancel it.** With other
+  partners aboard, `EditBookingModal.jsx`'s single destructive button
+  routed the organizer through `fn_organizer_leave_shared_booking`
+  (0060), which only ever *hands off* `bookings.user_id` to the
+  earliest-joined remaining partner — it never actually cancels. So the
+  new organizer pressing "delete" just bounced the organizer role back
+  to whoever it came from, and the sail reappeared in its original
+  shape. Migration `0062` adds `fn_cancel_shared_booking(p_booking_id)`
+  — a real, permanent cancellation (`status = 'Cancelled'`, existing
+  refund trigger pays everyone back) gated to the **current**
+  `bookings.user_id` or a manager — and the edit modal now shows it as
+  its own "ביטול ההפלגה עבור כל המשתתפים" action, separate from the
+  "עזיבת תפקיד המארגן/ת" hand-off (only offered when there is someone to
+  hand off to). `fn_organizer_leave_shared_booking` now flags the
+  departing organizer's row (`booking_participants.stepped_down`) and
+  picks the replacement `order by stepped_down asc, created_at asc`, so
+  the role can't ping-pong back to someone who already left it. The
+  modal also re-reads `bookings.user_id` fresh on open (the calendar's
+  cached value went stale after a hand-off, briefly showing a former
+  organizer the organizer-only controls).
+- **The shared-sail edit modal showed two "מספר האורחים שלכם" guest
+  selectors to a non-organizer with edit rights** (e.g. a manager who
+  had joined): the main form's field — which actually submits the
+  *organizer's* guest count — plus the self-service one inside the
+  participants section. The main-form selector is now hidden for a
+  non-organizer on a Shared/Cyprus sail; they use the participants-
+  section control, which is genuinely their own.
+- **The edit modal's "your share of the cost" estimate flashed a wrong
+  number before the participant roster loaded** (e.g. ~1.5 instead of
+  2.0 on a 3-coin sail where the organizer brings one guest), because it
+  rendered against `guestsCount = 0` for a beat. Both the organizer and
+  the joiner/participant estimate lines now wait for
+  `participantsLoading` to clear. The server-side settlement split
+  (`fn_recompute_shared_booking_participants`, unchanged) was always
+  correct — `(1 + own guests) / Σ(1 + guests)` — and now has an explicit
+  regression test for the reported case.
 - **A new shared sail's "come join" broadcast email reached almost
   nobody but the organizer's own confirmation email.** `NewBookingModal.jsx`
   (and `EditBookingModal.jsx`'s matching cancellation broadcast) required

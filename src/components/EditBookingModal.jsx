@@ -54,7 +54,19 @@ function buildDateTime(baseDate, hour) {
 }
 
 export default function EditBookingModal({ isOpen, onClose, booking, currentUser, onBookingUpdated }) {
-  const canEdit = Boolean(booking && currentUser && (booking.user_id === currentUser.id || isManager(currentUser)));
+  // The `booking` prop's user_id comes from the calendar's last load and
+  // can be stale after an organizer handoff (fn_organizer_leave_shared_
+  // booking, 0060) — trusting it blindly would let a partner who already
+  // stepped down still see the organizer-only edit/cancel controls.
+  // refetchParticipants() re-reads bookings.user_id fresh; until it
+  // resolves we fall back to the prop. All "is this person the
+  // organizer" checks below go through effectiveOrganizerId, never
+  // booking.user_id directly.
+  const [liveOrganizerId, setLiveOrganizerId] = useState(null);
+  const effectiveOrganizerId = liveOrganizerId ?? booking?.user_id ?? null;
+  const canEdit = Boolean(
+    booking && currentUser && (effectiveOrganizerId === currentUser.id || isManager(currentUser))
+  );
 
   const [startHour, setStartHour] = useState(9);
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -98,16 +110,25 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
   // Safe with booking possibly still null (computed before this
   // component's early `if (!isOpen || !booking) return null`, so it
   // can be used by the hooks below without violating hook-order rules).
-  const isOrganizer = booking?.user_id === currentUser?.id;
+  const isOrganizer = effectiveOrganizerId != null && effectiveOrganizerId === currentUser?.id;
   const canManageParticipants = isSharedBookingType && (isOrganizer || isAdminRole(currentUser));
 
   async function refetchParticipants() {
     if (!booking || !isSharedBookingType) return;
     setParticipantsLoading(true);
-    const { data, error } = await supabase
-      .from('booking_participants')
-      .select('user_id, guest_count, users(full_name, email)')
-      .eq('booking_id', booking.id);
+
+    // Re-read bookings.user_id fresh alongside the roster — see the
+    // effectiveOrganizerId comment at the top of this component.
+    const [{ data: bookingRow }, { data, error }] = await Promise.all([
+      supabase.from('bookings').select('user_id').eq('id', booking.id).maybeSingle(),
+      supabase
+        .from('booking_participants')
+        .select('user_id, guest_count, users(full_name, email)')
+        .eq('booking_id', booking.id),
+    ]);
+
+    const organizerId = bookingRow?.user_id ?? booking.user_id;
+    setLiveOrganizerId(organizerId);
 
     if (error) {
       console.error('Failed to load booking participants', error);
@@ -122,10 +143,10 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
     }));
     setParticipants(rows);
 
-    const organizerRow = rows.find((r) => r.user_id === booking.user_id);
+    const organizerRow = rows.find((r) => r.user_id === organizerId);
     if (organizerRow) setGuestsCount(organizerRow.guest_count);
 
-    if (currentUser?.id && currentUser.id !== booking.user_id) {
+    if (currentUser?.id && currentUser.id !== organizerId) {
       const myRow = rows.find((r) => r.user_id === currentUser.id);
       if (myRow) setMyGuestCountEdit(myRow.guest_count);
     }
@@ -149,6 +170,7 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
     setJoinGuestCount(0);
     setMyGuestCountEdit(0);
     setParticipants([]);
+    setLiveOrganizerId(null);
     setSelectedAddPartnerId('');
     setAddPartnerGuestCount(0);
 
@@ -194,7 +216,7 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
         }
         const participantIds = new Set(participants.map((p) => p.user_id));
         setAddPartnerCandidates(
-          (data ?? []).filter((u) => u.id !== booking?.user_id && !participantIds.has(u.id))
+          (data ?? []).filter((u) => u.id !== effectiveOrganizerId && !participantIds.has(u.id))
         );
       });
     return () => {
@@ -245,7 +267,7 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
   // is except for the organizer's own guest count — see handleSave),
   // but no longer literally "require" other partners.
   const isSharedType = bookingType === 'Shared' || isCyprusType;
-  const otherParticipants = participants.filter((p) => p.user_id !== booking?.user_id);
+  const otherParticipants = participants.filter((p) => p.user_id !== effectiveOrganizerId);
   // Headcount toward the 9-person cap = organizer + everyone joined +
   // everyone's guests (unrelated to how cost is split — see totalShares
   // below).
@@ -374,7 +396,7 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
         // here can change) — submitting just the organizer would
         // silently kick out anyone who'd joined.
         const p_participants = [
-          { user_id: booking.user_id, guest_count: guestsCount },
+          { user_id: effectiveOrganizerId, guest_count: guestsCount },
           ...otherParticipants.map((p) => ({ user_id: p.user_id, guest_count: p.guest_count })),
         ];
         const { error } = await supabase.rpc('fn_update_shared_booking', {
@@ -423,32 +445,48 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
     }
   }
 
-  // Organizer of a Shared/Cyprus sail with other active partners no
-  // longer cancels the whole sail to step down — fn_organizer_leave_
-  // shared_booking (0060) hands the "organizer" role to a remaining
-  // partner instead and keeps the sail alive, only falling back to a
-  // real cancellation when the organizer is the last one aboard (see
-  // that migration's header). Non-organizer cancellers (managers) and
-  // non-Shared/Cyprus types are unaffected — always a real cancel.
-  const willReassignOrganizer = isSharedBookingType && isOrganizer && otherParticipants.length > 0;
+  // A Shared/Cyprus organizer with other partners aboard gets TWO
+  // distinct actions instead of one overloaded button:
+  //   - "step down"  -> fn_organizer_leave_shared_booking (0060): hands
+  //     the organizer role to a remaining partner, sail continues, the
+  //     ex-organizer stays aboard as a paying participant. Only offered
+  //     when there IS someone to hand off to.
+  //   - "cancel"     -> fn_cancel_shared_booking (0062): really cancels
+  //     the whole sail for everyone, permanently, refunding all. Also
+  //     the path when the organizer is alone, or a manager is cancelling
+  //     someone else's sail.
+  // Merging them (the old single button) meant an organizer with co-
+  // participants could never actually cancel — "delete" silently became
+  // a handoff that bounced the role to the earliest-joined partner (even
+  // one who had themselves already stepped down), so a "deleted" sail
+  // reappeared. See 0062's header.
+  const canStepDown = isSharedBookingType && isOrganizer && otherParticipants.length > 0;
 
-  async function handleCancelSail() {
+  async function handleCancelSail(mode) {
+    // mode: 'stepdown' -> hand off the organizer role, sail continues
+    //       'cancel'   -> cancel the whole sail for everyone
     if (isPastSailing) return;
-    const confirmMessage = willReassignOrganizer
-      ? 'תעזבו את ההפלגה ותפקיד המארגן/ת יעבור לשותף אחר שכבר בהפלגה. ההפלגה עצמה תמשיך כרגיל ולא תבוטל. להמשיך?'
-      : 'לבטל את ההפלגה הזו?';
+    const confirmMessage =
+      mode === 'stepdown'
+        ? 'תעבירו את תפקיד המארגן/ת לשותף אחר שכבר בהפלגה. ההפלגה תמשיך כרגיל, ותישארו רשומים כמשתתפים רגילים — כולל חיוב על חלקכם בעלות בעת ההתחשבנות. להמשיך?'
+        : isSharedBookingType
+          ? 'לבטל את ההפלגה עבור כל המשתתפים? המטבעות יוחזרו לכולם, והפעולה אינה הפיכה.'
+          : 'לבטל את ההפלגה הזו?';
     if (!window.confirm(confirmMessage)) return;
     setErrorMessage(null);
     setSubmitting(true);
     try {
       let wasCancelled = true;
 
-      if (isOrganizer && isSharedBookingType) {
+      if (mode === 'stepdown') {
         const { data, error } = await supabase.rpc('fn_organizer_leave_shared_booking', {
           p_booking_id: booking.id,
         });
         if (error) throw error;
         wasCancelled = data === 'cancelled';
+      } else if (isSharedBookingType) {
+        const { error } = await supabase.rpc('fn_cancel_shared_booking', { p_booking_id: booking.id });
+        if (error) throw error;
       } else {
         const { data, error } = await supabase
           .from('bookings')
@@ -655,7 +693,7 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
           <ul className="flex flex-wrap gap-1.5">
             {participants.map((p) => {
               const canRemove =
-                canManageParticipants && !isModificationWindowClosed && p.user_id !== booking.user_id;
+                canManageParticipants && !isModificationWindowClosed && p.user_id !== effectiveOrganizerId;
               return (
                 <li
                   key={p.user_id}
@@ -663,7 +701,7 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
                 >
                   <span>
                     {p.full_name}
-                    {p.user_id === booking.user_id ? ' (מארגן/ת)' : ''}
+                    {p.user_id === effectiveOrganizerId ? ' (מארגן/ת)' : ''}
                     {p.guest_count > 0 ? ` +${p.guest_count} אורחים` : ''}
                   </span>
                   {canRemove && (
@@ -797,7 +835,11 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
           </div>
         )}
 
-        {!isOrganizer && !isModificationWindowClosed && (
+        {/* Gated on !participantsLoading: before the roster resolves,
+            otherParticipants is [] and the organizer's guest count is
+            still stale, which made this line quote a wrong share (e.g.
+            1.5 rather than 1.0 on a 3-coin sail) for a beat. */}
+        {!isOrganizer && !isModificationWindowClosed && !participantsLoading && (
           <p className="text-xs text-slate-400 dark:text-slate-500">
             {isCurrentUserParticipant
               ? (() => {
@@ -1044,6 +1086,14 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
                 אורחים מוזמנים בשמחה! כל עוד סך האנשים על הסירה (שותף + אורחים)
                 אינו עולה על 8 — עד למגבלת הקיבולת המקסימלית של הסירה, 9 אנשים בסך הכל.
               </div>
+            ) : isSharedType && !isOrganizer ? (
+              // Shared/Cyprus: this top selector is the ORGANIZER's own
+              // guest count (handleSave submits it as the organizer's
+              // entry). A non-organizer viewer (e.g. a manager) manages
+              // THEIR own guests through the "מספר האורחים שלכם" control
+              // inside the participants section below instead — showing
+              // both here was the reported duplicate guest-selector.
+              null
             ) : (
               // For Shared/Cyprus, guests increase your proportional
               // share of the cost (1 + guest count, out of the sail's
@@ -1098,7 +1148,12 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
               ) : (
                 <p className="text-xs text-slate-500 dark:text-slate-400">תחזוקה אינה מחייבת מטבעות.</p>
               )}
-              {isSharedType && otherParticipants.length > 0 && coinBreakdown && (
+              {/* Held back until the participant roster (and with it the
+                  organizer's own guest count) has actually loaded —
+                  rendering it against the pre-fetch guestsCount=0 showed
+                  a wrong share, e.g. 1.5 instead of 2.0 for a 3-coin sail
+                  with the organizer bringing 1 guest. */}
+              {isSharedType && !participantsLoading && otherParticipants.length > 0 && coinBreakdown && (
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
                   חלקכם כמארגנים: כ-{formatCoinAmount((coinBreakdown.total * (1 + guestsCount)) / totalShares)}{' '}
                   מטבעות (חלק {1 + guestsCount} מתוך {totalShares} — לפי 1 + מספר האורחים של כל שותף).
@@ -1159,14 +1214,25 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
               </button>
             </div>
 
+            {canStepDown && (
+              <button
+                type="button"
+                onClick={() => handleCancelSail('stepdown')}
+                disabled={submitting || isPastSailing}
+                title={isPastSailing ? 'לא ניתן לעזוב הפלגה שכבר החלה או הסתיימה.' : undefined}
+                className="rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-semibold py-2.5 transition-colors"
+              >
+                עזיבת תפקיד המארגן/ת (העברת ניהול לשותף אחר)
+              </button>
+            )}
             <button
               type="button"
-              onClick={handleCancelSail}
+              onClick={() => handleCancelSail('cancel')}
               disabled={submitting || isPastSailing}
               title={isPastSailing ? 'לא ניתן לבטל הפלגה שכבר החלה או הסתיימה.' : undefined}
               className="rounded-lg border border-rose-200 dark:border-rose-800 text-rose-600 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-900 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-semibold py-2.5 transition-colors"
             >
-              {willReassignOrganizer ? 'עזיבת ההפלגה (העברת ניהול לשותף אחר)' : 'ביטול ההפלגה'}
+              {isSharedBookingType && otherParticipants.length > 0 ? 'ביטול ההפלגה עבור כל המשתתפים' : 'ביטול ההפלגה'}
             </button>
             {isPastSailing && (
               <p className="text-xs text-slate-400 dark:text-slate-500 text-center -mt-1">לא ניתן לבטל הפלגה שכבר החלה או הסתיימה.</p>
