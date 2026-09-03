@@ -22,6 +22,20 @@
 // rather than throwing, so a booking still works with email
 // notifications simply not configured yet.
 //
+// ⚠️ RECIPIENT IS SET BY THE EMAILJS TEMPLATE, NOT (only) BY THIS CODE.
+// Each EmailJS template has a "To Email" field in the dashboard. It MUST
+// be `{{to_email}}` (the merge tag every send below fills with the real
+// per-recipient address). If that field is left blank, or set to a
+// literal address, or references a tag this code doesn't send (EmailJS
+// starter templates default it to `{{email}}`), EmailJS delivers EVERY
+// message to the template's own fallback — the connected account's
+// address — no matter what these params say. That is the classic cause
+// of "all notification mail goes to one inbox". As belt-and-braces, each
+// send below passes the recipient under BOTH `to_email` and `email` (and
+// `to_name`/`name`) so a template wired to either tag still addresses
+// the right person; the dashboard field still has to point at one of
+// them. There is NO hardcoded fallback address anywhere in this file.
+//
 // EmailJS's free tier caps outgoing mail at 200/month — sending one
 // shared-sail notification per opted-in partner on every shared
 // booking can add up fast with ~21 partners; worth knowing before
@@ -93,6 +107,33 @@ export function buildIcsContent({ title, description, startTime, endTime }) {
   ].join('\r\n');
 }
 
+// Every send addresses its recipient through several tag names at once —
+// see the module header on why (template "To Email" field may reference
+// any of these). `address` is the real, per-recipient email; `name` is
+// their display name. Never a constant.
+function recipientTags(address, name) {
+  return {
+    to_email: address,
+    email: address,
+    recipient: address,
+    to_name: name ?? address,
+    name: name ?? address,
+  };
+}
+
+// Drop anyone without a usable address BEFORE handing the list to
+// EmailJS — a row with a null/empty email would otherwise send with an
+// empty `to_email`, which makes EmailJS fall back to the template's own
+// default recipient (see module header).
+function withValidEmail(recipients, context) {
+  const valid = (recipients ?? []).filter((r) => typeof r?.email === 'string' && r.email.includes('@'));
+  const dropped = (recipients ?? []).length - valid.length;
+  if (dropped > 0) {
+    console.warn(`${context}: skipped ${dropped} recipient(s) with a missing/invalid email address.`);
+  }
+  return valid;
+}
+
 function formatHebrewDateTime(iso) {
   return new Date(iso).toLocaleString('he-IL', {
     weekday: 'long',
@@ -114,7 +155,7 @@ function formatHebrewDateTime(iso) {
 //   to_email, to_name, booking_type_label, start_time_he, end_time_he,
 //   duration_hours, google_calendar_link
 export async function sendBookingConfirmationEmail({ toEmail, toName, bookingType, startTime, endTime, emailsEnabled }) {
-  if (!emailsEnabled || !toEmail) return;
+  if (!emailsEnabled || !toEmail || !String(toEmail).includes('@')) return;
   if (!isConfigured() || !TEMPLATE_BOOKING_CONFIRMATION) return;
 
   const durationHours = Math.round((new Date(endTime).getTime() - new Date(startTime).getTime()) / 3_600_000);
@@ -125,8 +166,7 @@ export async function sendBookingConfirmationEmail({ toEmail, toName, bookingTyp
       SERVICE_ID,
       TEMPLATE_BOOKING_CONFIRMATION,
       {
-        to_email: toEmail,
-        to_name: toName ?? toEmail,
+        ...recipientTags(toEmail, toName),
         booking_type_label: bookingTypeLabel,
         start_time_he: formatHebrewDateTime(startTime),
         end_time_he: formatHebrewDateTime(endTime),
@@ -156,7 +196,8 @@ export async function sendBookingConfirmationEmail({ toEmail, toName, bookingTyp
 //   to_email, to_name, organizer_name, booking_type_label,
 //   start_time_he, end_time_he, google_calendar_link
 export async function sendSharedSailNotificationEmails({ recipients, organizerName, bookingType, startTime, endTime }) {
-  if (!recipients?.length) return;
+  const list = withValidEmail(recipients, 'sendSharedSailNotificationEmails');
+  if (!list.length) return;
   if (!isConfigured() || !TEMPLATE_SHARED_SAIL_NOTIFICATION) return;
 
   const bookingTypeLabel = bookingTypeLabelHe(bookingType);
@@ -168,13 +209,12 @@ export async function sendSharedSailNotificationEmails({ recipients, organizerNa
   });
 
   const results = await Promise.allSettled(
-    recipients.map((r) =>
+    list.map((r) =>
       emailjs.send(
         SERVICE_ID,
         TEMPLATE_SHARED_SAIL_NOTIFICATION,
         {
-          to_email: r.email,
-          to_name: r.name ?? r.email,
+          ...recipientTags(r.email, r.name),
           organizer_name: organizerName,
           booking_type_label: bookingTypeLabel,
           start_time_he: formatHebrewDateTime(startTime),
@@ -188,7 +228,7 @@ export async function sendSharedSailNotificationEmails({ recipients, organizerNa
 
   const failures = results.filter((r) => r.status === 'rejected');
   if (failures.length > 0) {
-    console.error(`Failed to send ${failures.length}/${recipients.length} shared-sail notification emails`, failures);
+    console.error(`Failed to send ${failures.length}/${list.length} shared-sail notification emails`, failures);
   }
 }
 
@@ -204,19 +244,19 @@ export async function sendSharedSailNotificationEmails({ recipients, organizerNa
 //   start_time_he, end_time_he — no google_calendar_link here, there's
 //   nothing left to add to a calendar for a cancelled sailing.
 export async function sendCancelSharedSailNotificationEmails({ recipients, organizerName, bookingType, startTime, endTime }) {
-  if (!recipients?.length) return;
+  const list = withValidEmail(recipients, 'sendCancelSharedSailNotificationEmails');
+  if (!list.length) return;
   if (!isConfigured() || !TEMPLATE_CANCEL_SHARED_SAIL) return;
 
   const bookingTypeLabel = bookingTypeLabelHe(bookingType);
 
   const results = await Promise.allSettled(
-    recipients.map((r) =>
+    list.map((r) =>
       emailjs.send(
         SERVICE_ID,
         TEMPLATE_CANCEL_SHARED_SAIL,
         {
-          to_email: r.email,
-          to_name: r.name ?? r.email,
+          ...recipientTags(r.email, r.name),
           organizer_name: organizerName,
           booking_type_label: bookingTypeLabel,
           start_time_he: formatHebrewDateTime(startTime),
@@ -229,7 +269,7 @@ export async function sendCancelSharedSailNotificationEmails({ recipients, organ
 
   const failures = results.filter((r) => r.status === 'rejected');
   if (failures.length > 0) {
-    console.error(`Failed to send ${failures.length}/${recipients.length} shared-sail cancellation emails`, failures);
+    console.error(`Failed to send ${failures.length}/${list.length} shared-sail cancellation emails`, failures);
   }
 }
 
@@ -247,17 +287,17 @@ export async function sendCancelSharedSailNotificationEmails({ recipients, organ
 // Template variables (VITE_EMAILJS_TEMPLATE_MAINTENANCE_RESOLVED):
 //   to_email, to_name, status_message, summary, resolution_notes
 export async function sendMaintenanceResolvedNotificationEmails({ recipients, summary, resolutionNotes }) {
-  if (!recipients?.length) return;
+  const list = withValidEmail(recipients, 'sendMaintenanceResolvedNotificationEmails');
+  if (!list.length) return;
   if (!isConfigured() || !TEMPLATE_MAINTENANCE_RESOLVED) return;
 
   const results = await Promise.allSettled(
-    recipients.map((r) =>
+    list.map((r) =>
       emailjs.send(
         SERVICE_ID,
         TEMPLATE_MAINTENANCE_RESOLVED,
         {
-          to_email: r.email,
-          to_name: r.name ?? r.email,
+          ...recipientTags(r.email, r.name),
           status_message: 'התקלה נפתרה והיאכטה מוכנה לשימוש',
           summary,
           resolution_notes: resolutionNotes ?? '',
@@ -269,7 +309,7 @@ export async function sendMaintenanceResolvedNotificationEmails({ recipients, su
 
   const failures = results.filter((r) => r.status === 'rejected');
   if (failures.length > 0) {
-    console.error(`Failed to send ${failures.length}/${recipients.length} maintenance-resolved emails`, failures);
+    console.error(`Failed to send ${failures.length}/${list.length} maintenance-resolved emails`, failures);
   }
 }
 
@@ -281,17 +321,17 @@ export async function sendMaintenanceResolvedNotificationEmails({ recipients, su
 // Template variables (VITE_EMAILJS_TEMPLATE_VESSEL_GROUNDING):
 //   to_email, to_name, status_message, summary, description
 export async function sendVesselGroundingAlertEmails({ recipients, summary, description }) {
-  if (!recipients?.length) return;
+  const list = withValidEmail(recipients, 'sendVesselGroundingAlertEmails');
+  if (!list.length) return;
   if (!isConfigured() || !TEMPLATE_VESSEL_GROUNDING) return;
 
   const results = await Promise.allSettled(
-    recipients.map((r) =>
+    list.map((r) =>
       emailjs.send(
         SERVICE_ID,
         TEMPLATE_VESSEL_GROUNDING,
         {
-          to_email: r.email,
-          to_name: r.name ?? r.email,
+          ...recipientTags(r.email, r.name),
           status_message: 'היאכטה הושבתה עקב תקלה ואינה כשירה לשייט',
           summary,
           description: description ?? '',
@@ -303,6 +343,6 @@ export async function sendVesselGroundingAlertEmails({ recipients, summary, desc
 
   const failures = results.filter((r) => r.status === 'rejected');
   if (failures.length > 0) {
-    console.error(`Failed to send ${failures.length}/${recipients.length} vessel-grounding alert emails`, failures);
+    console.error(`Failed to send ${failures.length}/${list.length} vessel-grounding alert emails`, failures);
   }
 }

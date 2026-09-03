@@ -59,6 +59,26 @@ developers.
   `.env.test.example`; never point at the production project.
 
 ### Fixed
+- **Hardened notification-email addressing against a misconfigured
+  EmailJS template.** Audit result: `emailNotifications.js` has no
+  hardcoded recipient and never did — every send already passed the real
+  per-partner address as `to_email`, and the recipient queries
+  (`NewBookingModal`, `EditBookingModal`, `MessagesPage`) correctly
+  select `emails_enabled = true` partners. The failure mode where every
+  message lands in one inbox comes from the EmailJS **template** "To
+  Email" field being blank / a literal address / a tag the app doesn't
+  send (EmailJS starter templates default it to `{{email}}`, the app
+  sent `{{to_email}}`). Each send now supplies the recipient under
+  `to_email`, `email`, and `recipient` at once (via a new
+  `recipientTags()` helper) so a template wired to any of them addresses
+  the right person; a new `withValidEmail()` guard drops rows with a
+  missing/invalid address before they reach EmailJS (an empty `to_email`
+  is what makes EmailJS fall back to the account's own address). Grounding
+  alert / resolution queries now also require `is_active = true`, and all
+  recipient queries exclude null emails. The `.env.example` block spells
+  out the required dashboard setting. **Still requires a one-time check
+  on the EmailJS dashboard: every template's "To Email" must be
+  `{{to_email}}`.**
 - **A "deleted" shared sail could resurrect itself, and a partner who
   had stepped down as organizer could still cancel it.** With other
   partners aboard, `EditBookingModal.jsx`'s single destructive button

@@ -365,6 +365,7 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
           .eq('emails_enabled', true)
           .eq('is_active', true)
           .neq('id', authUser.id)
+          .not('email', 'is', null)
           .then(({ data, error: recipientsError }) => {
             if (recipientsError) {
               console.error('Failed to load shared-sail notification recipients', recipientsError);

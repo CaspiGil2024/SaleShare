@@ -356,6 +356,8 @@ function NewIssueForm({ onCreated }) {
           .select('email, full_name')
           .eq('emails_enabled', true)
           .eq('receive_critical_updates', true)
+          .eq('is_active', true)
+          .not('email', 'is', null)
           .then(({ data: recipientRows, error: recipientsError }) => {
             if (recipientsError) {
               console.error('Failed to load critical-update recipients', recipientsError);
@@ -524,6 +526,8 @@ function IssueCard({ issue, canManage, onResolved }) {
           .select('email, full_name')
           .eq('emails_enabled', true)
           .eq('receive_critical_updates', true)
+          .eq('is_active', true)
+          .not('email', 'is', null)
           .then(({ data: recipientRows, error: recipientsError }) => {
             if (recipientsError) {
               console.error('Failed to load critical-update recipients', recipientsError);

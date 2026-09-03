@@ -517,6 +517,7 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
           .eq('emails_enabled', true)
           .eq('is_active', true)
           .neq('id', currentUser.id)
+          .not('email', 'is', null)
           .then(({ data: recipientRows, error: recipientsError }) => {
             if (recipientsError) {
               console.error('Failed to load shared-sail cancellation recipients', recipientsError);
