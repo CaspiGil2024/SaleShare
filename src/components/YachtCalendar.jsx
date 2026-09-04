@@ -113,7 +113,15 @@ const FULLCALENDAR_TO_VIEW_PREFERENCE = {
   dayGridMonth: 'month',
 };
 
-export default function YachtCalendar({ bookings, onSelectRange, onEventClick, initialView = 'timeGridWeek', onViewChange }) {
+export default function YachtCalendar({
+  bookings,
+  onSelectRange,
+  onEventClick,
+  initialView = 'timeGridWeek',
+  onViewChange,
+  onRefresh,
+  isRefreshing = false,
+}) {
   const calendarRef = useRef(null);
   const fetchTokenRef = useRef(0);
   const lastViewTypeRef = useRef(initialView);
@@ -136,6 +144,38 @@ export default function YachtCalendar({ bookings, onSelectRange, onEventClick, i
       : false;
 
   const holidayEvents = useMemo(() => holidayMapToBackgroundEvents(holidayMap), [holidayMap]);
+
+  // "רענן יומן" — a custom entry in FullCalendar's own headerToolbar
+  // (so it sits inline with today/prev/next and the view switcher,
+  // inheriting the shared .fc-button styling) that re-runs the parent's
+  // bookings/sail fetch straight from Supabase, no browser reload. The
+  // leading ⟳ glyph plus the swap to "מרענן…" is the in-progress cue —
+  // FullCalendar renders customButton text as plain text, so the label
+  // change is the feedback channel. Only wired when onRefresh is passed.
+  const headerToolbar = useMemo(
+    () => ({
+      start: 'title',
+      center: '',
+      end: `${onRefresh ? 'refreshCalendar ' : ''}today prev,next dayGridMonth,timeGridWeek,timeGridDay`,
+    }),
+    [onRefresh]
+  );
+
+  const customButtons = useMemo(
+    () =>
+      onRefresh
+        ? {
+            refreshCalendar: {
+              text: isRefreshing ? '⟳ מרענן…' : '⟳ רענן יומן',
+              hint: 'רענן יומן',
+              click: () => {
+                if (!isRefreshing) onRefresh();
+              },
+            },
+          }
+        : undefined,
+    [onRefresh, isRefreshing]
+  );
 
   const events = useMemo(
     () => [
@@ -189,7 +229,8 @@ export default function YachtCalendar({ bookings, onSelectRange, onEventClick, i
         locale={heLocale}
         direction="rtl"
         firstDay={0}
-        headerToolbar={{ start: 'title', center: '', end: 'today prev,next dayGridMonth,timeGridWeek,timeGridDay' }}
+        headerToolbar={headerToolbar}
+        customButtons={customButtons}
         buttonText={{ month: 'חודשית', week: 'שבועית', day: 'יומית', today: 'היום' }}
         height="100%"
         expandRows

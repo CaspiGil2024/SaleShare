@@ -10,6 +10,30 @@ developers.
 ## Unreleased
 
 ### Changed
+- **Private sail (`הפלגה פרטית`) same-day cancellation is now refunded
+  proportionally, not in full (migration `0064`, §100).** Cancelling a
+  Private sail on an *earlier* calendar day than its start still gets a
+  full refund (unchanged since `0022`). Cancelling it **on the same
+  calendar day** (Asia/Jerusalem — the timezone every other
+  classification rule in the project uses: `fn_classify_hours`,
+  `coinCalculator.js`) now refunds only
+  `full_charge × floor(remaining_hours) / 24` — e.g. 4 whole hours left
+  → 4/24 of the charge back, the other 20/24 stays spent — applied
+  per coin type against the stored `coins_charged_*` breakdown so a
+  sail spanning more than one type is prorated at the same ratio.
+  Scope is `booking_type = 'Private'` only (`is_anchor` Private sails
+  included); Dockside/Maintenance keep their full refund, and the
+  Shared/Cyprus wallet treatment on a whole-sail cancel
+  (`trg_fn_refund_participants_on_cancel`) and on a withdrawal (§H,
+  `0063`) is untouched. Enforced by a straight `CREATE OR REPLACE` of
+  `trg_fn_charge_booking_coins` (last defined in `0022`) — the trigger
+  binding is unchanged and only the cancel-transition branch differs;
+  a past-start cancel is still blocked outright by
+  `trg_fn_block_past_cancellation` (`0041`), so `remaining_hours` is
+  always > 0 in practice and the `greatest(0, …)` clamp is defensive.
+  `EditBookingModal.jsx` now surfaces the proportional-refund warning
+  both in the cancel-confirm dialog and as inline amber text on the
+  form whenever a same-day Private cancellation is detected.
 - **§H, the <24h withdrawal rule, is now enforced (migration `0063`).**
   Locking in the definitive Shared Sails ("הפלגת שותפים") spec: a
   participant leaving — or being removed by the organizer/an admin —
@@ -228,6 +252,21 @@ developers.
   `EditPartnerModal.jsx` was already doing the right thing.
 
 ### Added
+- **"רענן יומן" (Refresh Calendar) button in the calendar header.** A
+  custom entry in FullCalendar's own `headerToolbar` (inline with
+  today / prev / next and the view switcher, inheriting the shared
+  `.fc-button` styling) that re-runs `CalendarPage.jsx`'s `fetchBookings`
+  — the same Supabase reload (the opportunistic solo-Cyprus-cancel /
+  solo-Shared-to-Private / due-settlement sweeps, then the `bookings`
+  query) the page already runs on mount and after every
+  create/edit/cancel — so a partner can pull the freshest DB state
+  without a full browser reload. The label swaps to `⟳ מרענן…` while the
+  fetch is in flight (FullCalendar renders custom-button text as plain
+  text, so the label change is the progress cue); a `useRef` guard in
+  `CalendarPage.jsx` drops a second click while one run is still
+  outstanding, and `isRefreshing` state drives the label. Wired through
+  two new optional `YachtCalendar` props (`onRefresh`, `isRefreshing`) —
+  when `onRefresh` is absent the toolbar renders exactly as before.
 - **Critical maintenance / vessel-grounding notifications — both ends
   wired, both templates configured.** New `users.receive_critical_updates`
   preference (migration `0058`, same self/admin field-gate shape as

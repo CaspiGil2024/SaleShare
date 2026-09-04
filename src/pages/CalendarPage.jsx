@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import YachtCalendar, { VIEW_PREFERENCE_TO_FULLCALENDAR } from '../components/YachtCalendar';
 import NewBookingModal from '../components/NewBookingModal';
 import EditBookingModal from '../components/EditBookingModal';
@@ -16,6 +16,11 @@ export default function CalendarPage() {
   // own wallet fetch independently — knows to refetch too, instead of
   // only updating the next time this page happens to remount.
   const [walletRefreshToken, setWalletRefreshToken] = useState(0);
+  // Drives the "רענן יומן" button's in-progress label; the ref guards
+  // against a second fetch being kicked off while one is still in flight
+  // (state alone lags a rapid double-click).
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const refreshingRef = useRef(false);
 
   const fetchBookings = useCallback(async () => {
     // Opportunistic sweep, same lazy-maintenance pattern as
@@ -74,6 +79,22 @@ export default function CalendarPage() {
     fetchBookings();
   }, [fetchBookings]);
 
+  // Manual "רענן יומן" trigger — re-runs the exact same fetch (sweeps +
+  // bookings reload straight from Supabase) the page runs on mount and
+  // after any create/edit/cancel, so the calendar shows the freshest DB
+  // state without a full browser reload.
+  const handleRefresh = useCallback(async () => {
+    if (refreshingRef.current) return;
+    refreshingRef.current = true;
+    setIsRefreshing(true);
+    try {
+      await fetchBookings();
+    } finally {
+      refreshingRef.current = false;
+      setIsRefreshing(false);
+    }
+  }, [fetchBookings]);
+
   function handleSelectRange(start, end) {
     setSelectedRange({ start, end });
   }
@@ -127,6 +148,8 @@ export default function CalendarPage() {
           onEventClick={handleEventClick}
           initialView={VIEW_PREFERENCE_TO_FULLCALENDAR[currentUser?.default_calendar_view] ?? 'timeGridDay'}
           onViewChange={updateDefaultCalendarView}
+          onRefresh={handleRefresh}
+          isRefreshing={isRefreshing}
         />
       )}
 
