@@ -365,6 +365,23 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
     !isPastSailing &&
     Date.now() >= new Date(booking.start_time).getTime() - TWENTY_FOUR_HOURS_MS;
 
+  // §100: cancelling a Private sail ON THE SAME CALENDAR DAY (Asia/
+  // Jerusalem) as its start refunds only floor(hours-until-start) / 24
+  // of the original charge — see 0064_private_sail_same_day_
+  // cancellation_refund.sql, the actual enforcement (trg_fn_charge_
+  // booking_coins). This just drives the matching cancel-confirm
+  // warning below; Dockside/Maintenance and earlier-day cancellations
+  // are still refunded in full.
+  const jerusalemDate = (d) =>
+    new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(d);
+  const isPrivateSameDayCancellation =
+    booking.booking_type === 'Private' &&
+    !isPastSailing &&
+    jerusalemDate(new Date()) === jerusalemDate(new Date(booking.start_time));
+  const privateSameDayRefundHours = isPrivateSameDayCancellation
+    ? Math.max(0, Math.floor((new Date(booking.start_time).getTime() - Date.now()) / (60 * 60 * 1000)))
+    : 0;
+
   async function handleSave(e) {
     e.preventDefault();
     setErrorMessage(null);
@@ -482,7 +499,9 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
         ? 'תעבירו את תפקיד המארגן/ת לשותף אחר שכבר בהפלגה. ההפלגה תמשיך כרגיל, ותישארו רשומים כמשתתפים רגילים — כולל חיוב על חלקכם בעלות בעת ההתחשבנות. להמשיך?'
         : isSharedBookingType
           ? 'לבטל את ההפלגה עבור כל המשתתפים? המטבעות יוחזרו לכולם, והפעולה אינה הפיכה.'
-          : 'לבטל את ההפלגה הזו?';
+          : isPrivateSameDayCancellation
+            ? `ביטול ביום ההפלגה עצמו: יוחזר רק חלק יחסי מהמטבעות — ${privateSameDayRefundHours}/24 מהחיוב, לפי ${privateSameDayRefundHours} שעות שלמות שנותרו עד תחילת ההפלגה. לבטל בכל זאת?`
+            : 'לבטל את ההפלגה הזו?';
     if (!window.confirm(confirmMessage)) return;
     setErrorMessage(null);
     setSubmitting(true);
@@ -1260,6 +1279,11 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
             </button>
             {isPastSailing && (
               <p className="text-xs text-slate-400 dark:text-slate-500 text-center -mt-1">לא ניתן לבטל הפלגה שכבר החלה או הסתיימה.</p>
+            )}
+            {isPrivateSameDayCancellation && (
+              <p className="text-xs text-amber-600 dark:text-amber-400 text-center -mt-1">
+                ביטול ביום ההפלגה עצמו מזכה בהחזר יחסי בלבד — {privateSameDayRefundHours}/24 מהחיוב, לפי {privateSameDayRefundHours} שעות שלמות שנותרו עד תחילת ההפלגה.
+              </p>
             )}
           </form>
         )}
