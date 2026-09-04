@@ -354,6 +354,17 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
   const isModificationWindowClosed =
     isSharedBookingType && Date.now() > new Date(booking.start_time).getTime() + SEVEN_DAYS_MS;
 
+  // §H: within 24h of (and still before) the sail, a withdrawal is
+  // settled at the leaver's guest-weighted share instead of being fully
+  // refunded — see 0063_shared_sail_within_24h_departure_settlement.sql,
+  // the actual enforcement (fn_leave_shared_booking / fn_admin_remove_
+  // shared_participant). This just drives the matching warnings below.
+  const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+  const isWithin24hOfStart =
+    isSharedBookingType &&
+    !isPastSailing &&
+    Date.now() >= new Date(booking.start_time).getTime() - TWENTY_FOUR_HOURS_MS;
+
   async function handleSave(e) {
     e.preventDefault();
     setErrorMessage(null);
@@ -573,7 +584,10 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
   }
 
   async function handleLeave() {
-    if (!window.confirm('לעזוב את ההפלגה הזו?')) return;
+    const leaveConfirmMessage = isWithin24hOfStart
+      ? 'נותרו פחות מ-24 שעות למועד ההפלגה — עזיבה עכשיו כמוה כהתחשבנות: תחויבו בחלקכם היחסי בעלות (לפי 1 + מספר האורחים שלכם, מתוך סך המשתתפים כרגע) ולא תקבלו החזר מלא. לעזוב בכל זאת?'
+      : 'לעזוב את ההפלגה הזו? המטבעות שחויבתם יוחזרו במלואם.';
+    if (!window.confirm(leaveConfirmMessage)) return;
     setJoinLeaveError(null);
     setJoinLeaveSubmitting(true);
     try {
@@ -648,7 +662,10 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
   }
 
   async function handleAdminRemove(userId) {
-    if (!window.confirm('להסיר שותף זה מההפלגה?')) return;
+    const removeConfirmMessage = isWithin24hOfStart
+      ? 'נותרו פחות מ-24 שעות למועד ההפלגה — הסרת שותף עכשיו תחייב אותו בחלקו היחסי בעלות (לפי 1 + מספר האורחים שלו, מתוך סך המשתתפים כרגע) ולא תזכה אותו בהחזר מלא. להסיר?'
+      : 'להסיר שותף זה מההפלגה? המטבעות שחויב יוחזרו לו במלואם.';
+    if (!window.confirm(removeConfirmMessage)) return;
     setJoinLeaveError(null);
     setJoinLeaveSubmitting(true);
     try {
@@ -824,6 +841,12 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
                 {updatingMyGuests ? 'מעדכן...' : 'עדכון אורחים'}
               </button>
             </div>
+            {isWithin24hOfStart && (
+              <p className="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950 border border-amber-100 dark:border-amber-900 rounded-lg px-3 py-2">
+                נותרו פחות מ-24 שעות למועד ההפלגה — עזיבה עכשיו תחייב אתכם בחלקכם היחסי בעלות (לפי 1 + מספר האורחים
+                שלכם, מתוך סך המשתתפים כרגע) ולא תזכה בהחזר מלא.
+              </p>
+            )}
             <button
               type="button"
               onClick={handleLeave}

@@ -160,6 +160,19 @@ async function shiftBookingOneWeekIntoThePast(bookingId, start, end) {
   if (error) throw error;
 }
 
+// Force a booking's start/end to an absolute instant (used to place a
+// sail inside the 24h §H window without waiting in real time).
+async function setBookingWindow(bookingId, startMs, durationHours) {
+  const { error } = await admin
+    .from('bookings')
+    .update({
+      start_time: new Date(startMs).toISOString(),
+      end_time: new Date(startMs + durationHours * 3600000).toISOString(),
+    })
+    .eq('id', bookingId);
+  if (error) throw error;
+}
+
 async function cleanupAll() {
   for (const id of createdBookingIds) {
     await admin.from('bookings').delete().eq('id', id);
@@ -467,5 +480,92 @@ describe('Scenario C — settlement split & cancellation after handoff (bugs #1/
     expect(settleError).toBeNull();
     const { data: after } = await admin.from('bookings').select('status').eq('id', freshId).single();
     expect(after.status).toBe('Cancelled');
+  });
+});
+
+// =====================================================================
+// Scenario D — §H withdrawal rules (0063):
+//   * MORE than 24h before start_time: leaving is a full refund of the
+//     provisional flat charge, remaining partners untouched.
+//   * LESS than 24h before start_time: the leaver is settled at their
+//     guest-weighted share of the sail as it stood with them still on
+//     it, then removed; remaining partners are NOT re-settled early —
+//     they settle normally at sail time over the smaller roster.
+// 3 straight midweek-day hours (only coins_midweek_day moves).
+// =====================================================================
+describe('Scenario D — §H: >24h leave = full refund, <24h leave = settled share', () => {
+  let michael, uri, periodId, bookingId;
+  const start = nextJerusalemSlot(4, 10, 3); // Thursday 10:00 local, +3h => 3 midweek-day hours
+  const end = new Date(start.getTime() + 3 * 3600000);
+
+  beforeAll(async () => {
+    michael = await createTestPartner('scenario-d-michael');
+    uri = await createTestPartner('scenario-d-uri');
+    periodId = await setWallet(michael.userId, 40);
+    await setWallet(uri.userId, 40);
+  });
+
+  afterAll(cleanupAll);
+
+  it('Michael creates (+1 guest), Uri joins (+0) — each charged the full 3 independently', async () => {
+    const { data, error } = await michael.client.rpc('fn_create_shared_booking', {
+      p_booking_type: 'Shared',
+      p_start: start.toISOString(),
+      p_end: end.toISOString(),
+      p_notes: null,
+      p_participants: [{ user_id: michael.userId, guest_count: 1 }],
+    });
+    expect(error).toBeNull();
+    bookingId = data;
+    createdBookingIds.push(bookingId);
+
+    const { error: joinError } = await uri.client.rpc('fn_join_shared_booking', { p_booking_id: bookingId, p_guest_count: 0 });
+    expect(joinError).toBeNull();
+
+    const [m, u] = await Promise.all([getWallet(michael.userId, periodId), getWallet(uri.userId, periodId)]);
+    expect(formatCoinAmount(m.coins_midweek_day)).toBe('37.00');
+    expect(formatCoinAmount(u.coins_midweek_day)).toBe('37.00');
+  });
+
+  it('>24h out — Uri leaves: fully refunded, Michael untouched', async () => {
+    // start_time is still days away.
+    const { error } = await uri.client.rpc('fn_leave_shared_booking', { p_booking_id: bookingId });
+    expect(error).toBeNull();
+
+    const [m, u] = await Promise.all([getWallet(michael.userId, periodId), getWallet(uri.userId, periodId)]);
+    expect(formatCoinAmount(u.coins_midweek_day)).toBe('40.00'); // full refund
+    expect(formatCoinAmount(m.coins_midweek_day)).toBe('37.00'); // remaining partner untouched
+  });
+
+  it('<24h out — Uri re-joins then leaves: charged their 1/3 share, Michael untouched', async () => {
+    const { error: rejoinError } = await uri.client.rpc('fn_join_shared_booking', { p_booking_id: bookingId, p_guest_count: 0 });
+    expect(rejoinError).toBeNull();
+
+    let [m, u] = await Promise.all([getWallet(michael.userId, periodId), getWallet(uri.userId, periodId)]);
+    expect(formatCoinAmount(u.coins_midweek_day)).toBe('37.00'); // provisional full charge again
+
+    // Slide the sail to ~2h from now — inside the 24h §H window, still future.
+    await setBookingWindow(bookingId, Date.now() + 2 * 3600000, 3);
+
+    const { error: leaveError } = await uri.client.rpc('fn_leave_shared_booking', { p_booking_id: bookingId });
+    expect(leaveError).toBeNull();
+
+    [m, u] = await Promise.all([getWallet(michael.userId, periodId), getWallet(uri.userId, periodId)]);
+    // total_shares = (1+1) + (1+0) = 3; Uri's share = 1/3 of 3 coins = 1.
+    // Uri: 37 -> +3 (delete-trigger refund) -> 40 -> -1 (share) => 39.
+    expect(formatCoinAmount(u.coins_midweek_day)).toBe('39.00');
+    // Michael is NOT re-settled early.
+    expect(formatCoinAmount(m.coins_midweek_day)).toBe('37.00');
+  });
+
+  it('sail time passes — Michael settles solo (full 3), Uri already gone and untouched', async () => {
+    await setBookingWindow(bookingId, Date.now() - 4 * 3600000, 3);
+    const { error } = await michael.client.rpc('fn_settle_due_shared_bookings');
+    expect(error).toBeNull();
+
+    const [m, u] = await Promise.all([getWallet(michael.userId, periodId), getWallet(uri.userId, periodId)]);
+    // Only Michael remains: share = (1+1)/(1+1) = 1 => full 3 coins.
+    expect(formatCoinAmount(m.coins_midweek_day)).toBe('37.00'); // 40 - 3
+    expect(formatCoinAmount(u.coins_midweek_day)).toBe('39.00'); // untouched by the sweep
   });
 });

@@ -10,6 +10,39 @@ developers.
 ## Unreleased
 
 ### Changed
+- **§H, the <24h withdrawal rule, is now enforced (migration `0063`).**
+  Locking in the definitive Shared Sails ("הפלגת שותפים") spec: a
+  participant leaving — or being removed by the organizer/an admin —
+  **more than 24h** before `start_time` still gets a full refund of
+  their provisional flat charge (unchanged). A withdrawal **less than
+  24h** before `start_time` is now "treated as if sail time arrived":
+  the leaver is settled immediately at the same guest-weighted
+  proportional share `fn_recompute_shared_booking_participants` (0051)
+  applies at normal settlement — `hours × (1 + their guests) / Σ(1 +
+  guests)` over the roster **with them still counted** — then removed.
+  The partners who remain are **not** re-settled early; they settle
+  normally once `start_time` passes, over the smaller roster (so total
+  coins collected for the sail need not sum to exactly `hours` — the
+  intended consequence of settling the leaver at the state just before
+  they left). New internal helper `fn_settle_departing_participant`;
+  `fn_leave_shared_booking` / `fn_admin_remove_shared_participant` now
+  branch on the 24h boundary. `fn_organizer_leave_shared_booking` (the
+  ex-organizer stays aboard as a payer) and `fn_cancel_shared_booking`
+  (whole-sail cancel = full refund to all) are unaffected — neither is
+  a "withdrawing participant". `EditBookingModal.jsx` warns before a
+  <24h leave/remove that it will be a proportional charge, not a
+  refund. `tests/sharedSailCoinEngine.test.js` gains Scenario D
+  covering both sides of the boundary.
+- **Audit against the locked spec — no change needed** for capacity
+  (9, `trg_fn_enforce_booking_capacity` + RPC guards), the immediate
+  flat solo-equivalent charge (§E, `fn_charge_new_participant_full`),
+  the guest-weighted formula and sail-time settlement sweep (§F/§G,
+  `fn_recompute_shared_booking_participants` + `fn_settle_due_shared_
+  bookings`), and organizer handoff (§2, `0060`/`0062`). Organizer
+  leaving before anyone joins stays a soft `status='Cancelled'` +
+  full refund (keeps the cancellation email / sail-closing-log / guard
+  paths that all key off `'Cancelled'`); the 0045/0046 post-start
+  windows stay authoritative for whether a change is allowed at all.
 - **Shared/Cyprus sail coins now settle once, at sail time, instead of
   re-splitting everyone's cost on every join/leave/guest-count change.**
   Confirmed against two fully-worked scenarios with exact expected
