@@ -1123,12 +1123,11 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
             {bookingType === 'Private' ? (
               // Private sailings don't record an exact guest count — the
               // organizer pays the full coin cost regardless of headcount,
-              // so there's nothing for a selector to feed into. Guests are
-              // still welcome; this is a capacity notice, not a field.
-              <div className="rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950 px-3 py-2 text-sm text-emerald-800 dark:text-emerald-300">
-                אורחים מוזמנים בשמחה! כל עוד סך האנשים על הסירה (שותף + אורחים)
-                אינו עולה על 8 — עד למגבלת הקיבולת המקסימלית של הסירה, 9 אנשים בסך הכל.
-              </div>
+              // so there's nothing for a selector to feed into. The green
+              // guest-capacity notice that used to sit here is exclusive
+              // to Shared/Cyprus sails and was irrelevant to Private, so
+              // Private now renders nothing in this slot.
+              null
             ) : isSharedType && !isOrganizer ? (
               // Shared/Cyprus: this top selector is the ORGANIZER's own
               // guest count (handleSave submits it as the organizer's
@@ -1253,7 +1252,7 @@ export default function EditBookingModal({ isOpen, onClose, booking, currentUser
                 disabled={submitting}
                 className="flex-1 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-semibold py-2.5 transition-colors"
               >
-                ביטול
+                צא ללא שמירה
               </button>
             </div>
 

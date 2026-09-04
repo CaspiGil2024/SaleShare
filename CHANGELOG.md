@@ -116,6 +116,20 @@ developers.
   `.env.test.example`; never point at the production project.
 
 ### Fixed
+- **Booking-modal button-label and notice cleanup.**
+  - `EditBookingModal.jsx`'s neutral dismiss button on the editable
+    form now reads **"צא ללא שמירה"** instead of "ביטול", so it can't be
+    misread as the red **"ביטול ההפלגה"** (cancel-sail) action directly
+    below it. The read-only "פרטי הפלגה" view's dismiss button is
+    unchanged — it already said **"סגור"** (it's a plain close, no form
+    to abandon).
+  - The green guest-capacity notice ("אורחים מוזמנים בשמחה…") is now
+    hidden for **Private** (`שייט פרטי`) sails in both
+    `NewBookingModal.jsx` and `EditBookingModal.jsx` — that notice is
+    about the Shared/Cyprus per-boat headcount cap and was irrelevant on
+    a Private sail (which records no guest count at all). The Private
+    branch of that slot now renders nothing; Shared/Cyprus keep their
+    guest selector and notice.
 - **Hardened notification-email addressing against a misconfigured
   EmailJS template.** Audit result: `emailNotifications.js` has no
   hardcoded recipient and never did — every send already passed the real

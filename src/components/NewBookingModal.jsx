@@ -596,12 +596,11 @@ export default function NewBookingModal({ isOpen, onClose, initialStart, initial
           {bookingType === 'Private' ? (
             // Private sailings don't record an exact guest count — the
             // organizer pays the full coin cost regardless of headcount,
-            // so there's nothing for a selector to feed into. Guests are
-            // still welcome; this is a capacity notice, not a field.
-            <div className="rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950 px-3 py-2 text-sm text-emerald-800 dark:text-emerald-300">
-              אורחים מוזמנים בשמחה! כל עוד סך האנשים על הסירה (שותף + אורחים)
-              אינו עולה על 8 — עד למגבלת הקיבולת המקסימלית של הסירה, 9 אנשים בסך הכל.
-            </div>
+            // so there's nothing for a selector to feed into. The green
+            // guest-capacity notice that used to sit here is exclusive to
+            // Shared/Cyprus sails and was irrelevant to Private, so
+            // Private now renders nothing in this slot.
+            null
           ) : (
             // At creation there's only ever the organizer, so guests
             // here don't change the estimate below (their share is
